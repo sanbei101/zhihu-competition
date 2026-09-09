@@ -1,0 +1,184 @@
+import {
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  GitBranch,
+  MessageCircle,
+  Quote,
+  ThumbsUp,
+} from "lucide-react";
+import Link from "next/link";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { getWorldScenario, requireZhihuAccessSecret } from "@/lib/worlds";
+
+export const dynamic = "force-dynamic";
+
+interface WorldPageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ q?: string }>;
+}
+
+const numberFormatter = new Intl.NumberFormat("zh-CN", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+function editDate(editTime: number) {
+  if (!editTime) return null;
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(editTime * 1000));
+}
+
+export default async function WorldPage({ params, searchParams }: WorldPageProps) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const scenario = await getWorldScenario(requireZhihuAccessSecret(), id, query.q);
+  const updatedAt = editDate(scenario.editTime);
+
+  return (
+    <main className="bg-muted/30 text-foreground min-h-screen">
+      <header className="bg-background border-b">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
+          <Link href="/" className="flex items-center gap-3" aria-label="返回岔路首页">
+            <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
+              <GitBranch className="size-5" />
+            </span>
+            <span className="font-semibold tracking-tight">岔路</span>
+          </Link>
+          <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
+            <ArrowLeft data-icon="inline-start" />
+            返回副本库
+          </Button>
+        </div>
+      </header>
+
+      <section className="bg-background border-b">
+        <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-20">
+          <div className="border-primary max-w-4xl border-l-4 pl-6 sm:pl-8">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-sm">
+              <Badge variant="outline">知乎母本</Badge>
+              <span className="font-mono text-xs">{scenario.id}</span>
+            </div>
+            <h1 className="mt-6 text-4xl leading-tight font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+              {scenario.title}
+            </h1>
+            {scenario.author ? (
+              <div className="text-muted-foreground mt-7 flex items-center gap-3 text-sm">
+                <Avatar>
+                  {scenario.authorAvatar ? (
+                    <AvatarImage src={scenario.authorAvatar} alt="" />
+                  ) : null}
+                  <AvatarFallback>{scenario.author.slice(0, 1)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-foreground font-medium">{scenario.author}</p>
+                  {updatedAt ? <p className="text-xs">编辑于 {updatedAt}</p> : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-16">
+          <div>
+            <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-primary text-sm font-medium">SOURCE / ZHIHU</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight">问题原文</h2>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-4 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <ThumbsUp className="size-4" />
+                  {numberFormatter.format(scenario.votes)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <MessageCircle className="size-4" />
+                  {numberFormatter.format(scenario.comments)}
+                </span>
+              </div>
+            </div>
+
+            <Card className="border-border/70 shadow-none">
+              <CardHeader className="p-6 sm:p-8">
+                <Quote className="text-primary size-6" />
+                <CardTitle className="pt-2 text-xl leading-8">{scenario.title}</CardTitle>
+              </CardHeader>
+              {scenario.content ? (
+                <CardContent className="px-6 sm:px-8">
+                  <Separator className="mb-6" />
+                  <p className="text-muted-foreground text-base leading-8 whitespace-pre-wrap">
+                    {scenario.content}
+                  </p>
+                </CardContent>
+              ) : null}
+              {scenario.url ? (
+                <CardFooter className="bg-muted/30 border-t px-6 py-4 sm:px-8">
+                  <Button
+                    variant="outline"
+                    render={<a href={scenario.url} target="_blank" rel="noreferrer" />}
+                  >
+                    打开知乎原页
+                    <ExternalLink data-icon="inline-end" />
+                  </Button>
+                </CardFooter>
+              ) : null}
+            </Card>
+          </div>
+
+          <aside>
+            <Card className="border-border/70 shadow-none">
+              <CardHeader className="p-6">
+                <Badge variant="secondary" className="w-fit">
+                  WORLDLINE / ENTRY
+                </Badge>
+                <CardTitle className="pt-2 text-xl leading-8">从这道题开始推演</CardTitle>
+                <CardDescription className="leading-6">
+                  当前页面已载入知乎母本。决策分支需要接入推演服务后生成，不使用预置选项。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="px-6">
+                <ol className="text-muted-foreground space-y-4 text-sm">
+                  <li className="flex gap-3">
+                    <span className="text-primary font-mono">01</span>
+                    <span>确认这条问题作为世界线起点</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-primary font-mono">02</span>
+                    <span>由推演服务生成符合母本的决策者与势力</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-primary font-mono">03</span>
+                    <span>提交选择，获得连锁反应与分支结果</span>
+                  </li>
+                </ol>
+              </CardContent>
+              <CardFooter className="bg-muted/30 border-t px-6 py-4">
+                <Button variant="outline" className="w-full" disabled>
+                  推演入口待接入
+                  <ArrowRight data-icon="inline-end" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </aside>
+        </div>
+      </section>
+    </main>
+  );
+}
