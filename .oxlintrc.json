@@ -9,7 +9,9 @@
     "correctness": "error",
     "perf": "warn"
   },
-  "rules": {},
+  "rules": {
+    "typescript/no-deprecated": "error"
+  },
   "env": {
     "builtin": true
   },

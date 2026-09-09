@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 
 import { judgeTurnAction } from "@/app/world/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -287,7 +287,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     router.push(`/world/${encodeURIComponent(worldId)}/finale`);
   }
 
-  async function submitDecision(event: FormEvent<HTMLFormElement>) {
+  async function submitDecision(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = decision.trim();
     if (!content || isResolving || isJudging || isTurnComplete || ended) return;

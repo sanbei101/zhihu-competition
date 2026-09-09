@@ -12,11 +12,13 @@
     "deploy": "vinext-cloudflare deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "^3.0.39",
+    "@ai-sdk/react": "^4.0.96",
     "@base-ui/react": "^1.8.0",
-    "@mastra/core": "^1.64.0",
     "@shadcn/react": "^0.3.1",
     "@tailwindcss/vite": "^4.3.3",
     "@vinext/cloudflare": "^1.0.0-beta.7",
+    "ai": "^7.0.93",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "lucide-react": "^1.42.0",

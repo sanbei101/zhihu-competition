@@ -94,8 +94,12 @@ export async function getWorldScenario(
     (query): query is string => !!query?.trim(),
   );
 
-  for (const query of new Set(queries)) {
-    const { Items } = await client.search({ Query: query, Count: 20 });
+  const uniqueQueries = [...new Set(queries)];
+  const results = await Promise.all(
+    uniqueQueries.map((query) => client.search({ Query: query, Count: 20 })),
+  );
+
+  for (const { Items } of results) {
     const item = Items.find((searchItem) => searchItem.ContentID === id);
     if (item) {
       const scenario = mapScenario(item);

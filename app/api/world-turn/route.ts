@@ -1,5 +1,4 @@
-import { Agent } from "@mastra/core/agent";
-
+import { generateStructured } from "@/lib/deepseek";
 import { agentReactionSchema, type WorldTurnEvent, worldTurnRequestSchema } from "@/lib/world-turn";
 
 const encoder = new TextEncoder();
@@ -37,10 +36,7 @@ export async function POST(request: Request) {
         send({ type: "agent-start", agentId: character.id });
 
         try {
-          const agent = new Agent({
-            id: `world-character-${character.id}`,
-            name: character.name,
-            model: "deepseek/deepseek-v4-flash",
+          const object = await generateStructured({
             instructions: `你只能扮演下面这名角色，基于角色自己的认知和利益回应玩家，不能替其他人物发言，也不能宣告最终世界结果。
 
 姓名：${character.name}
@@ -53,9 +49,7 @@ export async function POST(request: Request) {
 惯用手段：${character.pressureMethod}
 
 秘密动机用于决定行动，但绝不能直接泄露。回应必须包含一句符合身份的现场发言和一个立刻执行的具体行动。使用简体中文。`,
-          });
-          const response = await agent.generate(
-            `当前时间：${cast.setting.time}
+            prompt: `当前时间：${cast.setting.time}
 当前地点：${cast.setting.location}
 核心危机：${cast.setting.crisis}
 
@@ -68,24 +62,13 @@ ${cast.agentCharacters
   .join("\n")}
 
 立即作出你的独立回应。`,
-            {
-              structuredOutput: {
-                schema: agentReactionSchema,
-                jsonPromptInjection: true,
-              },
-              providerOptions: {
-                deepseek: { thinking: { type: "disabled" } },
-              },
-              modelSettings: {
-                temperature: 0.8,
-                maxOutputTokens: 1000,
-              },
-              abortSignal: request.signal,
-            },
-          );
+            schema: agentReactionSchema,
+            temperature: 0.8,
+            maxOutputTokens: 1000,
+            abortSignal: request.signal,
+          });
 
-          if (response.error) throw response.error;
-          const reaction = agentReactionSchema.parse(response.object);
+          const reaction = agentReactionSchema.parse(object);
           send({ type: "agent-reaction", agentId: character.id, reaction });
         } catch (error) {
           console.error(`[岔路] ${character.name} Agent 回应失败`, error);
