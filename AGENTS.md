@@ -12,12 +12,13 @@
 
 ## 1. 项目概述与架构
 
-本项目基于 **vinext** 构建,在 **Vite 8** 之上运行 Next.js App Router 规范,通过 **Rolldown/Oxc** 编译,产出 Node `standalone` 服务并直接运行(`vinext start`)
-- **框架**: `vinext`(基于 `Vite` 的 Next.js 16 App Router 兼容实现)
+本项目基于 **Next.js 16** 构建,使用 App Router 规范,开启 React Compiler,产出 Node `standalone` 服务
+
+- **框架**: `next` 16(官方 Turbopack 构建)
 - **运行时**: Node
 - **UI 与 React**: React 19 + React Server Components (RSC)
-- **自动记忆化**: 通过 `oxc-transform-react` 使用 React Compiler
-- **样式方案**: Tailwind CSS v4,通过 `@tailwindcss/vite` 使用 `tailwindcss`, 配置文件在 `app/globals.css`
+- **自动记忆化**: Next 内置 React Compiler(`next.config.ts` 中 `reactCompiler: true`)
+- **样式方案**: Tailwind CSS v4,通过 `@tailwindcss/postcss` 使用 `tailwindcss`, 配置文件在 `app/globals.css`
 - **包管理器**: `pnpm`
 
 ---
@@ -31,14 +32,13 @@
 
 ### 样式与 CSS
 
-- Tailwind CSS v4 通过官方 Vite 插件(`@tailwindcss/vite`)使用。
-- **不要**创建 `postcss.config.js` 或安装 `@tailwindcss/postcss`。
+- Tailwind CSS v4 通过官方 PostCSS 插件(`@tailwindcss/postcss`)使用,配置文件为 `postcss.config.mjs`。
+- 第三方纯 CSS 包(`tw-animate-css` 等)在其自身 `exports` 未暴露 CSS 时,用 `node_modules` 相对路径导入。
 - 全局样式和自定义主题变量应放在 `app/globals.css` 中,使用 `@theme` 和 `@import "tailwindcss";` 指令。
 
 ### 工具链约束
 
-- **仅限 Vite 插件**:本项目运行在 Vite 上,而非 Webpack 或 Turbopack。请勿建议安装 Webpack 加载器或 Next.js 专用 SWC 插件。
-- **请勿手动注册 `@vitejs/plugin-rsc`**:`vinext` 内部已处理 RSC 插件的注册。
+- **仅限官方 Next 工具链**:本项目运行在 Next.js 上,而非 Vite/Webpack。请勿建议安装 Vite 插件或 Webpack 加载器。
 
 ---
 

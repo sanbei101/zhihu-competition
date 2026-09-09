@@ -56,7 +56,12 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
               <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
               <span className="font-semibold tracking-tight">知乎脑洞</span>
             </Link>
-            <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
+            <Button
+              nativeButton={false}
+              variant="ghost"
+              size="sm"
+              render={<Link href="/#archives" />}
+            >
               <ArrowLeft data-icon="inline-start" />
               返回副本库
             </Button>
@@ -71,7 +76,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
               <p className="text-muted-foreground mt-1 font-mono text-xs">ID: {id}</p>
             </CardHeader>
             <CardFooter className="bg-muted/30 flex gap-2 border-t px-6 py-4 sm:px-8">
-              <Button render={<Link href="/#archives" />}>
+              <Button nativeButton={false} render={<Link href="/#archives" />}>
                 <ArrowLeft data-icon="inline-start" />
                 回副本库换一条
               </Button>
@@ -106,7 +111,12 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
             <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
             <span className="font-semibold tracking-tight">知乎脑洞</span>
           </Link>
-          <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
+          <Button
+            nativeButton={false}
+            variant="ghost"
+            size="sm"
+            render={<Link href="/#archives" />}
+          >
             <ArrowLeft data-icon="inline-start" />
             返回副本库
           </Button>
@@ -178,6 +188,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
                 <CardFooter className="bg-muted/30 border-t px-6 py-4 sm:px-8">
                   <Button
                     variant="outline"
+                    nativeButton={false}
                     render={<a href={scenario.url} target="_blank" rel="noreferrer" />}
                   >
                     打开知乎原页

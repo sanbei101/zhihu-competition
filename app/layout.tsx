@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 
 import { Toaster } from "@/components/ui/toast";
 
@@ -9,6 +10,12 @@ export const metadata: Metadata = {
   icons: { icon: "/zhihu.svg" },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
-  return <Toaster>{children}</Toaster>;
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className="antialiased">
+        <Toaster>{children}</Toaster>
+      </body>
+    </html>
+  );
 }

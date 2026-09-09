@@ -3,5 +3,5 @@ node_modules
 .next
 next-env.d.ts
 /dist/
-.vinext/
+/.next/standalone
 tsconfig.tsbuildinfo

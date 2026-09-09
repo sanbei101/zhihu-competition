@@ -285,7 +285,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
           </p>
         </CardHeader>
         <CardContent>
-          <Button render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}>
+          <Button
+            nativeButton={false}
+            render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}
+          >
             返回世界线
             <ArrowLeft data-icon="inline-end" />
           </Button>
@@ -1118,7 +1121,10 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
           </p>
         </CardHeader>
         <CardContent>
-          <Button render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}>
+          <Button
+            nativeButton={false}
+            render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}
+          >
             返回世界线
             <ArrowLeft data-icon="inline-end" />
           </Button>

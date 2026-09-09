@@ -261,7 +261,7 @@ export default async function Home() {
               <p className="text-muted-foreground mt-2 text-sm leading-7">{loadError}</p>
             </CardHeader>
             <CardFooter className="bg-muted/30 border-t px-6 py-4 sm:px-8">
-              <Button render={<Link href="/" />}>
+              <Button nativeButton={false} render={<Link href="/" />}>
                 重试
                 <ArrowRight data-icon="inline-end" />
               </Button>

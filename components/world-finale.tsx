@@ -142,7 +142,10 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
           </p>
         </CardHeader>
         <CardContent>
-          <Button render={<Link href={`/world/${encodeURIComponent(worldId)}/council`} />}>
+          <Button
+            nativeButton={false}
+            render={<Link href={`/world/${encodeURIComponent(worldId)}/council`} />}
+          >
             返回议事厅
             <ArrowLeft data-icon="inline-end" />
           </Button>
@@ -334,13 +337,14 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               <Button
                 size="sm"
                 variant="outline"
+                nativeButton={false}
                 render={<a href={session.scenarioUrl} target="_blank" rel="noreferrer" />}
               >
                 去知乎原帖讨论
                 <ExternalLink data-icon="inline-end" />
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" render={<Link href="/" />}>
+            <Button size="sm" variant="ghost" nativeButton={false} render={<Link href="/" />}>
               再开一条世界线
             </Button>
           </CardContent>
