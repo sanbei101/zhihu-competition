@@ -116,6 +116,7 @@ function ScenarioCard({ scenario, index }: { scenario: WorldScenario; index: num
           <Button
             variant="ghost"
             size="sm"
+            nativeButton={false}
             className="text-muted-foreground group-hover:text-primary hover:bg-primary/10 h-7 px-2 text-xs font-medium transition-colors"
             render={<Link href={scenarioHref(scenario)} />}
           >
@@ -205,6 +206,7 @@ function FeaturedScenario({ scenario }: { scenario: WorldScenario }) {
 
           <Button
             size="sm"
+            nativeButton={false}
             className="group-hover:shadow-primary/20 gap-2 shadow-sm transition-all duration-200 group-hover:shadow-md"
             render={<Link href={scenarioHref(scenario)} />}
           >
@@ -278,7 +280,7 @@ export default async function Home() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button size="default" className="gap-2" render={<Link href="#archives" />}>
+                <Button size="default" nativeButton={false} className="gap-2" render={<Link href="#archives" />}>
                   挑选副本探索
                   <ArrowRight className="size-4" />
                 </Button>
@@ -364,6 +366,7 @@ export default async function Home() {
             <Button
               variant="link"
               size="sm"
+              nativeButton={false}
               className="text-muted-foreground hover:text-primary h-auto p-0 text-xs"
               render={<a href={featured.url} target="_blank" rel="noreferrer" />}
             >
