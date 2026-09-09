@@ -9,7 +9,6 @@ import {
   Flag,
   GitBranch,
   LoaderCircle,
-  Megaphone,
   ScrollText,
   UserRound,
 } from "lucide-react";
@@ -18,7 +17,6 @@ import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 import { generateOptionsAction, judgeTurnAction } from "@/app/world/actions";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +50,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { WorldIntro } from "@/components/world-intro";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   MAX_ROUNDS,
@@ -183,6 +182,8 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
 
   const [submittedDecision, setSubmittedDecision] = useState("");
+  // 开场片头只在新开对局播一次：中途刷新、下一回合不再重播。
+  const [showIntro, setShowIntro] = useState(initial.turns.length === 0);
   const [options, setOptions] = useState<RoundOptions | null>(null);
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const [optionsError, setOptionsError] = useState("");
@@ -500,6 +501,13 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   return (
     <div className="space-y-4">
+      {showIntro ? (
+        <WorldIntro
+          crisis={cast.setting.crisis}
+          opening={cast.setting.opening}
+          onDone={() => setShowIntro(false)}
+        />
+      ) : null}
       <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回角色选择">
@@ -646,14 +654,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
         </Card>
 
         <Card className="order-1 min-w-0 shadow-none lg:order-2">
-          <CardHeader className="border-b">
-            <Alert variant="destructive" className="bg-destructive/5 border-destructive/20 p-3">
-              <Megaphone />
-              <AlertTitle>突发事件</AlertTitle>
-              <AlertDescription className="leading-6">{cast.setting.crisis}</AlertDescription>
-            </Alert>
-          </CardHeader>
-
           <CardContent className="p-0">
             <MessageScrollerProvider>
               <MessageScroller className="h-128">
