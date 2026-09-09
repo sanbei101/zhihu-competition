@@ -1,16 +1,20 @@
 import { worldCastSchema, type WorldCast } from "@/lib/world-cast";
 
-const CAST_CACHE_PREFIX = "world-cast-cache:";
-
-function canUseStorage(): boolean {
-  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+function storage(): Storage | null {
+  // ponytail: 单次特性检测即可，三处 canUseStorage 重复分支合并于此
+  try {
+    return typeof window !== "undefined" ? window.localStorage : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 读取本地缓存的阵容（刷新页面不丢）。 */
 export function loadCachedCast(scenarioId: string): { cast: WorldCast; savedAt: number } | null {
-  if (!canUseStorage()) return null;
+  const store = storage();
+  if (!store) return null;
   try {
-    const raw = window.localStorage.getItem(`${CAST_CACHE_PREFIX}${scenarioId}`);
+    const raw = store.getItem(`world-cast-cache:${scenarioId}`);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) return null;
@@ -25,12 +29,10 @@ export function loadCachedCast(scenarioId: string): { cast: WorldCast; savedAt: 
 
 /** 生成成功后写入本地缓存。 */
 export function saveCachedCast(scenarioId: string, cast: WorldCast): void {
-  if (!canUseStorage()) return;
+  const store = storage();
+  if (!store) return;
   try {
-    window.localStorage.setItem(
-      `${CAST_CACHE_PREFIX}${scenarioId}`,
-      JSON.stringify({ savedAt: Date.now(), cast }),
-    );
+    store.setItem(`world-cast-cache:${scenarioId}`, JSON.stringify({ savedAt: Date.now(), cast }));
   } catch {
     // 配额不足等情况静默忽略
   }
@@ -38,9 +40,8 @@ export function saveCachedCast(scenarioId: string, cast: WorldCast): void {
 
 /** 清除本地缓存的阵容。 */
 export function clearCachedCast(scenarioId: string): void {
-  if (!canUseStorage()) return;
   try {
-    window.localStorage.removeItem(`${CAST_CACHE_PREFIX}${scenarioId}`);
+    storage()?.removeItem(`world-cast-cache:${scenarioId}`);
   } catch {
     // 静默忽略
   }

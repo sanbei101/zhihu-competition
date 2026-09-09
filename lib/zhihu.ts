@@ -1,9 +1,5 @@
 // ==================== 数据模型 ====================
 
-export interface ZhihuCommentInfo {
-  Content: string;
-}
-
 export interface ZhihuSearchItem {
   Title: string;
   ContentType: string;
@@ -14,19 +10,12 @@ export interface ZhihuSearchItem {
   VoteUpCount: number;
   AuthorName: string;
   AuthorAvatar: string;
-  AuthorBadge: string;
-  AuthorBadgeText: string;
   EditTime: number;
-  CommentInfoList?: ZhihuCommentInfo[];
-  AuthorityLevel: string;
-  RankingScore: number;
 }
 
 export interface ZhihuSearchData {
   HasMore: boolean;
-  SearchHashId: string;
   Items: ZhihuSearchItem[];
-  EmptyReason?: string;
 }
 
 export interface ZhihuResponse<T> {
@@ -40,7 +29,6 @@ export type ZhihuSearchResponse = ZhihuResponse<ZhihuSearchData>;
 export interface ZhihuSearchParams {
   Query: string;
   Count?: number;
-  SortBy?: string;
 }
 
 // ==================== 错误处理 ====================
@@ -71,10 +59,6 @@ export class ZhihuClient {
 
     if (params.Count !== undefined) {
       url.searchParams.set("Count", String(params.Count));
-    }
-
-    if (params.SortBy !== undefined) {
-      url.searchParams.set("SortBy", params.SortBy);
     }
 
     const res = await fetch(url.toString(), {

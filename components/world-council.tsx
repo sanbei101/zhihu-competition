@@ -60,17 +60,12 @@ import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  type WorldCast,
-  worldCouncilSessionSchema,
-  worldCouncilStorageKey,
-} from "@/lib/world-cast";
+import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   MAX_ROUNDS,
   MIN_ROUND_TO_CLOSE,
   actForRound,
   buildVoluntaryEnding,
-  createInitialGameSession,
   endingLabels,
   metricKeys,
   metricLabels,
@@ -113,10 +108,6 @@ const stanceLabels: Record<AgentReaction["stance"], string> = {
   negotiate: "交涉",
   exploit: "借势",
 };
-
-function formatRound(round: number) {
-  return `回合 ${String(round).padStart(2, "0")} / ${String(MAX_ROUNDS).padStart(2, "0")}`;
-}
 
 function PlayerDecisionMessage({
   playerName,
@@ -463,13 +454,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       async function pump(): Promise<void> {
         const { done, value } = await reader.read();
         if (done) return;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          applyLine(line);
-        }
+        for (const line of lines) applyLine(line);
         await pump();
       }
 
@@ -505,7 +493,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
           </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge>{formatRound(round)}</Badge>
+              <Badge>{`回合 ${String(round).padStart(2, "0")} / ${String(MAX_ROUNDS).padStart(2, "0")}`}</Badge>
               <Badge variant="outline">
                 <CircleDot data-icon="inline-start" />
                 {actForRound(round)}
@@ -977,24 +965,7 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
     try {
       const raw: unknown = JSON.parse(storedSession);
       const parsed = worldGameSessionSchema.safeParse(raw);
-      if (parsed.success && parsed.data.scenarioId === worldId) {
-        setSession(parsed.data);
-        return;
-      }
-      // 兼容旧存档：仅含 scenarioId / scenarioTitle / playerId / cast
-      const legacy = worldCouncilSessionSchema.safeParse(raw);
-      if (legacy.success && legacy.data.scenarioId === worldId) {
-        setSession(
-          createInitialGameSession({
-            scenarioId: legacy.data.scenarioId,
-            scenarioTitle: legacy.data.scenarioTitle,
-            playerId: legacy.data.playerId,
-            cast: legacy.data.cast,
-          }),
-        );
-        return;
-      }
-      setSession(null);
+      setSession(parsed.success && parsed.data.scenarioId === worldId ? parsed.data : null);
     } catch (error) {
       console.error("[岔路] 对局会话恢复失败", error);
       sessionStorage.removeItem(key);

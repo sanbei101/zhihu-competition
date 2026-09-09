@@ -43,8 +43,6 @@ export const metricDeltasSchema = z.object({
 });
 export type MetricDeltas = z.infer<typeof metricDeltasSchema>;
 
-export const zeroDeltas: MetricDeltas = { stability: 0, morale: 0, support: 0, resources: 0 };
-
 // ==================== 回合记录 ====================
 
 export const turnReactionRecordSchema = z.object({
