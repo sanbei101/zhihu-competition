@@ -44,7 +44,6 @@ export class ZhihuApiError extends Error {
 }
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
-// ponytail: 有界 Map,超 100 条淘汰最早项,避免 Workers 常驻内存无界增长
 const CACHE_MAX_ENTRIES = 100;
 const searchCache = new Map<string, { expiresAt: number; data: ZhihuSearchData }>();
 const pendingSearches = new Map<string, Promise<ZhihuSearchData>>();
