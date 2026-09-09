@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type SyntheticEvent } from "react";
 
 import { judgeTurnAction } from "@/app/world/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -118,6 +118,95 @@ function formatRound(round: number) {
   return `回合 ${String(round).padStart(2, "0")} / ${String(MAX_ROUNDS).padStart(2, "0")}`;
 }
 
+function PlayerDecisionMessage({
+  playerName,
+  decision,
+  modeLabel,
+  roundLabel,
+}: {
+  playerName: string;
+  decision: string;
+  modeLabel: string;
+  roundLabel?: string;
+}) {
+  return (
+    <Message align="end">
+      <MessageAvatar className="bg-primary text-primary-foreground size-8">
+        {playerName.slice(0, 1)}
+      </MessageAvatar>
+      <MessageContent>
+        <MessageHeader>
+          {playerName} · 你的决策{roundLabel ? ` · ${roundLabel}` : null}
+        </MessageHeader>
+        <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
+          {decision}
+        </div>
+        <MessageFooter>{modeLabel}</MessageFooter>
+      </MessageContent>
+    </Message>
+  );
+}
+
+function ReactionMessage({
+  characterName,
+  reaction,
+}: {
+  characterName: string;
+  reaction: AgentReaction;
+}) {
+  return (
+    <Message>
+      <MessageAvatar className="size-8">{characterName.slice(0, 1)}</MessageAvatar>
+      <MessageContent>
+        <MessageHeader className="gap-2">
+          <span>{characterName}</span>
+          <Badge variant="outline">{stanceLabels[reaction.stance]}</Badge>
+        </MessageHeader>
+        <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
+          {reaction.speech}
+        </div>
+        <MessageFooter className="max-w-2xl items-start leading-5">
+          行动：{reaction.action} · 影响：{reaction.impact}
+        </MessageFooter>
+      </MessageContent>
+    </Message>
+  );
+}
+
+function DirectorNarrationMessage({
+  title,
+  narration,
+  deltas,
+}: {
+  title: string;
+  narration: string;
+  deltas: MetricDeltas | null;
+}) {
+  return (
+    <Message>
+      <MessageAvatar className="bg-primary text-primary-foreground size-8">
+        <GitBranch className="size-4" />
+      </MessageAvatar>
+      <MessageContent>
+        <MessageHeader>{title}</MessageHeader>
+        <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">{narration}</div>
+        {deltas ? (
+          <MessageFooter className="max-w-2xl items-start leading-5">
+            {metricKeys
+              .map((key) => {
+                const delta = deltas[key];
+                if (delta === 0) return null;
+                return `${metricLabels[key]}${delta > 0 ? `+${delta}` : delta}`;
+              })
+              .filter(Boolean)
+              .join(" · ") || "四维指标持平"}
+          </MessageFooter>
+        ) : null}
+      </MessageContent>
+    </Message>
+  );
+}
+
 function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const router = useRouter();
   const cast: WorldCast = initial.cast;
@@ -141,9 +230,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   );
   const [turnError, setTurnError] = useState("");
   const [judgeError, setJudgeError] = useState("");
-  const [lastNarration, setLastNarration] = useState(
-    initial.turns.length ? initial.turns[initial.turns.length - 1].narration : "",
-  );
   const [lastDeltas, setLastDeltas] = useState<MetricDeltas | null>(
     initial.turns.length ? initial.turns[initial.turns.length - 1].deltas : null,
   );
@@ -174,6 +260,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   }
 
   const ended = ending !== null;
+  const currentTurnSettled = turns.some((turn) => turn.round === round);
   const storageKey = worldCouncilStorageKey(worldId);
   // 守卫之后收窄为非空别名，供闭包与 JSX 使用（tsgolint 不跟踪闭包内的收窄）
   const activePlayer = player;
@@ -241,7 +328,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     const judged = result.data;
     setMetrics(judged.metrics);
     setLastDeltas(judged.deltas);
-    setLastNarration(judged.narration);
     setTurns((current) => [
       ...current,
       {
@@ -557,79 +643,61 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                       </MessageScrollerItem>
                     ))}
 
-                    {submittedDecision ? (
-                      <MessageScrollerItem scrollAnchor>
-                        <Message align="end">
-                          <MessageAvatar className="bg-primary text-primary-foreground size-8">
-                            {activePlayer.name.slice(0, 1)}
-                          </MessageAvatar>
-                          <MessageContent>
-                            <MessageHeader>{activePlayer.name} · 你的决策</MessageHeader>
-                            <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
-                              {submittedDecision}
-                            </div>
-                            <MessageFooter>{decisionModes[submittedMode].label}</MessageFooter>
-                          </MessageContent>
-                        </Message>
-                      </MessageScrollerItem>
-                    ) : null}
-
-                    {reactions.map(({ agentId, reaction }) => {
-                      const character = cast.agentCharacters.find(
-                        (candidate) => candidate.id === agentId,
-                      );
-                      if (!character) return null;
-
-                      return (
-                        <MessageScrollerItem key={`reaction-${agentId}`} scrollAnchor>
-                          <Message>
-                            <MessageAvatar className="size-8">
-                              {character.name.slice(0, 1)}
-                            </MessageAvatar>
-                            <MessageContent>
-                              <MessageHeader className="gap-2">
-                                <span>{character.name}</span>
-                                <Badge variant="outline">{stanceLabels[reaction.stance]}</Badge>
-                              </MessageHeader>
-                              <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
-                                {reaction.speech}
-                              </div>
-                              <MessageFooter className="max-w-2xl items-start leading-5">
-                                行动：{reaction.action} · 影响：{reaction.impact}
-                              </MessageFooter>
-                            </MessageContent>
-                          </Message>
+                    {turns.map((turn) => (
+                      <Fragment key={`turn-${turn.round}`}>
+                        <MessageScrollerItem>
+                          <PlayerDecisionMessage
+                            playerName={activePlayer.name}
+                            decision={turn.decision}
+                            modeLabel={decisionModes[turn.decisionMode].label}
+                            roundLabel={`第 ${turn.round} 回合`}
+                          />
                         </MessageScrollerItem>
-                      );
-                    })}
+                        {turn.reactions.map(({ agentId, reaction }) => {
+                          const character = cast.agentCharacters.find(
+                            (candidate) => candidate.id === agentId,
+                          );
+                          if (!character) return null;
+                          return (
+                            <MessageScrollerItem key={`turn-${turn.round}-reaction-${agentId}`}>
+                              <ReactionMessage characterName={character.name} reaction={reaction} />
+                            </MessageScrollerItem>
+                          );
+                        })}
+                        <MessageScrollerItem>
+                          <DirectorNarrationMessage
+                            title={`世界线导演 · 第 ${turn.round} 回合裁决`}
+                            narration={turn.narration}
+                            deltas={turn.deltas}
+                          />
+                        </MessageScrollerItem>
+                      </Fragment>
+                    ))}
 
-                    {isTurnComplete && lastNarration ? (
+                    {!currentTurnSettled && submittedDecision ? (
                       <MessageScrollerItem scrollAnchor>
-                        <Message>
-                          <MessageAvatar className="bg-primary text-primary-foreground size-8">
-                            <GitBranch className="size-4" />
-                          </MessageAvatar>
-                          <MessageContent>
-                            <MessageHeader>世界线导演 · 冲突裁决</MessageHeader>
-                            <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
-                              {lastNarration}
-                            </div>
-                            {lastDeltas ? (
-                              <MessageFooter className="max-w-2xl items-start leading-5">
-                                {metricKeys
-                                  .map((key) => {
-                                    const delta = lastDeltas[key];
-                                    if (delta === 0) return null;
-                                    return `${metricLabels[key]}${delta > 0 ? `+${delta}` : delta}`;
-                                  })
-                                  .filter(Boolean)
-                                  .join(" · ") || "四维指标持平"}
-                              </MessageFooter>
-                            ) : null}
-                          </MessageContent>
-                        </Message>
+                        <PlayerDecisionMessage
+                          playerName={activePlayer.name}
+                          decision={submittedDecision}
+                          modeLabel={decisionModes[submittedMode].label}
+                        />
                       </MessageScrollerItem>
                     ) : null}
+
+                    {!currentTurnSettled
+                      ? reactions.map(({ agentId, reaction }) => {
+                          const character = cast.agentCharacters.find(
+                            (candidate) => candidate.id === agentId,
+                          );
+                          if (!character) return null;
+
+                          return (
+                            <MessageScrollerItem key={`reaction-${agentId}`} scrollAnchor>
+                              <ReactionMessage characterName={character.name} reaction={reaction} />
+                            </MessageScrollerItem>
+                          );
+                        })
+                      : null}
 
                     {ended && ending ? (
                       <MessageScrollerItem scrollAnchor>
@@ -839,12 +907,12 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                   <li className="flex gap-3">
                     <span
                       className={
-                        submittedDecision
+                        submittedDecision || currentTurnSettled
                           ? "grid size-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700"
                           : "bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs"
                       }
                     >
-                      {submittedDecision ? <Check className="size-3.5" /> : 2}
+                      {submittedDecision || currentTurnSettled ? <Check className="size-3.5" /> : 2}
                     </span>
                     <div>
                       <p className="font-medium">玩家决策</p>
@@ -852,7 +920,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                     </div>
                   </li>
                   {[
-                    { label: "Agent 行动", done: reactions.length > 0 },
+                    { label: "Agent 行动", done: reactions.length > 0 || currentTurnSettled },
                     { label: "冲突裁决", done: isTurnComplete },
                     { label: "世界更新", done: isTurnComplete },
                   ].map((step, index) => (
