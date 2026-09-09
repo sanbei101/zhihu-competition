@@ -259,10 +259,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     worldId,
   ]);
 
-  // 回合开始时生成处境与四个选项；已结算/已提交/已生成时不再请求。
-  // 注意：守卫条件里不能放 isGeneratingOptions —— dev 下 StrictMode 会把 effect 跑两遍，
-  // 第一遍 setIsGeneratingOptions(true) 后 cleanup 取消请求，第二遍会被守卫拦住，
-  // 而被取消的请求又永远不会把 flag 置回 false，骨架屏就一直转下去了。
+  // 回合开始时生成处境与四个选项;已结算/已提交/已生成时不再请求。
+  // 注意:守卫条件里不能放 isGeneratingOptions -- dev 下 StrictMode 会把 effect 跑两遍,
+  // 第一遍 setIsGeneratingOptions(true) 后 cleanup 取消请求,第二遍会被守卫拦住,
+  // 而被取消的请求又永远不会把 flag 置回 false,骨架屏就一直转下去了。
   useEffect(() => {
     if (ended || currentTurnSettled || submittedDecision || options) return;
     let cancelled = false;
@@ -279,7 +279,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       setIsGeneratingOptions(false);
       if (!result.ok) {
         setOptionsError(
-          `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失进度）`,
+          `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失进度)`,
         );
         return;
       }

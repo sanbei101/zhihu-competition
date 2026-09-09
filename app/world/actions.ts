@@ -96,14 +96,14 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
 
   try {
     const object = await generateStructured({
-      instructions: `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择，供玩家点选。
-四个选项必须立场/代价明显不同，覆盖稳、险、赌三种风险；只写本回合能做的具体行动，不提前揭示结局。使用简体中文。`,
+      instructions: `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
+四个选项必须立场/代价明显不同,覆盖稳、险、赌三种风险;只写本回合能做的具体行动,不提前揭示结局。使用简体中文。`,
       prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
-时间：${cast.setting.time}；地点：${cast.setting.location}；危机：${cast.setting.crisis}
-玩家：${player.name}（${player.identity}），可调动：${player.decisionPower}
-当前四维：政权稳定 ${metrics.stability}，军心士气 ${metrics.morale}，民众支持 ${metrics.support}，战略资源 ${metrics.resources}
+时间:${cast.setting.time};地点:${cast.setting.location};危机:${cast.setting.crisis}
+玩家:${player.name}(${player.identity}),可调动:${player.decisionPower}
+当前四维:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}
 
-此前已结算回合：
+此前已结算回合:
 ${summarizeTurnsForPrompt(history)}
 
 请给出本回合处境与四个选项。`,
