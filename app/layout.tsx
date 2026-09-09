@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { Toaster } from "@/components/ui/toast";
+
 import "./globals.css";
 export const metadata: Metadata = {
   title: "岔路 | 世界线档案库",
@@ -7,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  return <>{children}</>;
+  return <Toaster>{children}</Toaster>;
 }

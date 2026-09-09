@@ -10,14 +10,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { ErrorToast } from "@/components/error-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getWorldScenarios, requireZhihuAccessSecret, type WorldScenario } from "@/lib/worlds";
+import { ZhihuApiError } from "@/lib/zhihu";
 
-export const dynamic = "force-dynamic";
+// 首页每 5 分钟最多打一次知乎搜索
+export const revalidate = 300;
 
 const numberFormatter = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
@@ -219,7 +222,55 @@ function FeaturedScenario({ scenario }: { scenario: WorldScenario }) {
 }
 
 export default async function Home() {
-  const scenarios = await getWorldScenarios(requireZhihuAccessSecret());
+  let scenarios: WorldScenario[] | null = null;
+  let loadError = "";
+  try {
+    scenarios = await getWorldScenarios(requireZhihuAccessSecret());
+  } catch (error) {
+    console.error("[岔路] 首页副本加载失败", error);
+    loadError =
+      error instanceof ZhihuApiError
+        ? `知乎搜索暂时不可用（${error.message}），稍后重试即可。`
+        : "副本加载失败，请稍后重试。";
+  }
+
+  if (!scenarios) {
+    return (
+      <main className="bg-muted/20 text-foreground min-h-screen">
+        <ErrorToast title="副本加载失败" description={loadError} />
+        <header className="border-border/60 bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-5 sm:px-8">
+            <Link
+              href="/"
+              className="flex items-center gap-3 transition-opacity hover:opacity-90"
+              aria-label="岔路首页"
+            >
+              <span className="bg-primary text-primary-foreground shadow-primary/20 grid size-9 place-items-center rounded-lg shadow-sm">
+                <GitBranch className="size-5" />
+              </span>
+              <span className="text-base font-semibold tracking-tight">岔路</span>
+            </Link>
+          </div>
+        </header>
+
+        <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+          <Card className="mx-auto max-w-lg shadow-none">
+            <CardHeader className="p-6 sm:p-8">
+              <CardTitle className="text-xl">副本库暂时打不开了</CardTitle>
+              <p className="text-muted-foreground mt-2 text-sm leading-7">{loadError}</p>
+            </CardHeader>
+            <CardFooter className="bg-muted/30 border-t px-6 py-4 sm:px-8">
+              <Button render={<Link href="/" />}>
+                重试
+                <ArrowRight data-icon="inline-end" />
+              </Button>
+            </CardFooter>
+          </Card>
+        </section>
+      </main>
+    );
+  }
+
   const [featured, ...rest] = scenarios;
 
   return (
