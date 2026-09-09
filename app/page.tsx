@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { ErrorToast } from "@/components/error-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -237,7 +236,6 @@ export default async function Home() {
   if (!scenarios) {
     return (
       <main className="bg-muted/20 text-foreground min-h-screen">
-        <ErrorToast title="副本加载失败" description={loadError} />
         <header className="border-border/60 bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-5 sm:px-8">
             <Link

@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "@/components/ui/toast";
 import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import { createInitialGameSession } from "@/lib/world-ending";
@@ -70,10 +71,17 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       setCast(result.data);
       setSelectedCharacterId(null);
       saveCachedCast(scenario.id, result.data);
-      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s,已存入本地缓存`);
+      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s，已存入本地缓存`);
+      toast.add({
+        title: "角色阵容已生成",
+        description: "挑选你的角色进入第一幕",
+        type: "success",
+      });
     } catch (cause) {
       console.error("[岔路] 角色阵容请求失败", cause);
-      setError(cause instanceof Error ? cause.message : "角色生成失败");
+      const message = cause instanceof Error ? cause.message : "角色生成失败";
+      setError(message);
+      toast.add({ title: "角色生成失败", description: message, type: "error" });
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +93,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     setSelectedCharacterId(null);
     setCacheNote("");
     setElapsed("");
+    toast.add({ title: "已清除本地缓存", type: "info" });
   }
 
   const selectedCharacter = cast?.playerCharacters.find(

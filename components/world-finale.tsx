@@ -11,7 +11,7 @@ import {
   ScrollText,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { generateFinaleAction } from "@/app/world/actions";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 import { worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   endingLabels,
@@ -49,6 +50,8 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState<"article" | "share" | null>(null);
+  // 自动结算只触发一次：dev 下 StrictMode 会把 effect 跑两遍，不拦会调两次终章生成。
+  const autoFinaleRef = useRef<string | null>(null);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(worldCouncilStorageKey(worldId));
@@ -78,7 +81,10 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
       }
 
       if (parsed.data.status === "ended" && parsed.data.ending) {
-        void requestFinale(parsed.data);
+        if (autoFinaleRef.current !== worldId) {
+          autoFinaleRef.current = worldId;
+          void requestFinale(parsed.data);
+        }
       }
     } catch (err) {
       console.error("[岔路] 终章存档恢复失败", err);
@@ -103,10 +109,13 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     });
     setIsLoading(false);
     if (!result.ok) {
-      setError(`${result.error}${result.detail ? `:${result.detail}` : ""}`);
+      const message = `${result.error}${result.detail ? `：${result.detail}` : ""}`;
+      setError(message);
+      toast.add({ title: "终章生成失败", description: result.error, type: "error" });
       return;
     }
     setFinale(result.data);
+    toast.add({ title: "终章已生成", type: "success" });
     try {
       sessionStorage.setItem(finaleCacheKey(worldId), JSON.stringify(result.data));
     } catch (err) {
@@ -280,8 +289,16 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               size="sm"
               onClick={() =>
                 void copyText(
-                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n--岔路世界线推演`,
-                ).then((ok) => ok && setCopied("article"))
+                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n——岔路世界线推演`,
+                ).then((ok) => {
+                  if (ok) setCopied("article");
+                  else
+                    toast.add({
+                      title: "复制失败",
+                      description: "浏览器未授权剪贴板",
+                      type: "error",
+                    });
+                })
               }
             >
               {copied === "article" ? (
@@ -294,7 +311,17 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => void copyText(finale.shareText).then((ok) => ok && setCopied("share"))}
+              onClick={() =>
+                void copyText(finale.shareText).then((ok) => {
+                  if (ok) setCopied("share");
+                  else
+                    toast.add({
+                      title: "复制失败",
+                      description: "浏览器未授权剪贴板",
+                      type: "error",
+                    });
+                })
+              }
             >
               {copied === "share" ? (
                 <Check data-icon="inline-start" />

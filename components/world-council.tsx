@@ -50,6 +50,7 @@ import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/toast";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   MAX_ROUNDS,
@@ -278,9 +279,9 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       if (cancelled) return;
       setIsGeneratingOptions(false);
       if (!result.ok) {
-        setOptionsError(
-          `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失进度)`,
-        );
+        const message = `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失进度）`;
+        setOptionsError(message);
+        toast.add({ title: "选项生成失败", description: result.error, type: "error" });
         return;
       }
       setOptions(result.data);
@@ -323,9 +324,9 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
     setIsJudging(false);
     if (!result.ok) {
-      setJudgeError(
-        `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失本回合回应)`,
-      );
+      const message = `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失本回合回应）`;
+      setJudgeError(message);
+      toast.add({ title: "冲突裁决失败", description: result.error, type: "error" });
       return;
     }
 
@@ -347,6 +348,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       setEnding(judged.ending);
     }
     setIsTurnComplete(true);
+    toast.add({ title: `第 ${round} 回合已裁决`, type: "success" });
   }
 
   function retryJudge() {
@@ -371,6 +373,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     if (ended || round < MIN_ROUND_TO_CLOSE) return;
     setEnding(buildVoluntaryEnding(round));
     setJudgeError("");
+    toast.add({ title: "世界线已收束", description: "可查看终章结算", type: "success" });
   }
 
   function goFinale() {
@@ -476,7 +479,9 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       if (buffer.trim()) applyLine(buffer);
     } catch (error) {
       console.error("[岔路] 回合响应流失败", error);
-      setTurnError(error instanceof Error ? error.message : "回合推演失败");
+      const message = error instanceof Error ? error.message : "回合推演失败";
+      setTurnError(message);
+      toast.add({ title: "回合推演失败", description: message, type: "error" });
       // 失败时收回提交态,选项卡片恢复可点,保证可以直接重试
       setSubmittedDecision("");
       setIsResolving(false);
