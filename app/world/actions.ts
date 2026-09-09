@@ -20,7 +20,7 @@ import {
   type JudgeResult,
   type WorldFinale,
 } from "@/lib/world-ending";
-import { decisionModeSchema } from "@/lib/world-turn";
+import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
 
 // ==================== 返回包络 ====================
 
@@ -73,6 +73,55 @@ export async function generateCastAction(
   }
 }
 
+// ==================== 回合选项 ====================
+
+const generateOptionsInputSchema = z.object({
+  cast: worldCastSchema,
+  playerId: z.string().min(1),
+  metrics: metricsSchema,
+  round: z.number().int().min(1).max(MAX_ROUNDS),
+  history: z.array(turnRecordSchema).max(MAX_ROUNDS).optional().default([]),
+});
+
+export async function generateOptionsAction(input: unknown): Promise<ActionResult<RoundOptions>> {
+  const parsed = generateOptionsInputSchema.safeParse(input);
+  if (!parsed.success) return fail("选项输入不完整");
+
+  const keyCheck = requireDeepSeekKey();
+  if (typeof keyCheck !== "string") return keyCheck;
+
+  const { cast, playerId, metrics, round, history } = parsed.data;
+  const player = cast.playerCharacters.find((character) => character.id === playerId);
+  if (!player) return fail("玩家角色不存在");
+
+  try {
+    const object = await generateStructured({
+      instructions: `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择，供玩家点选。
+四个选项必须立场/代价明显不同，覆盖稳、险、赌三种风险；只写本回合能做的具体行动，不提前揭示结局。使用简体中文。`,
+      prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
+时间：${cast.setting.time}；地点：${cast.setting.location}；危机：${cast.setting.crisis}
+玩家：${player.name}（${player.identity}），可调动：${player.decisionPower}
+当前四维：政权稳定 ${metrics.stability}，军心士气 ${metrics.morale}，民众支持 ${metrics.support}，战略资源 ${metrics.resources}
+
+此前已结算回合：
+${summarizeTurnsForPrompt(history)}
+
+请给出本回合处境与四个选项。`,
+      schema: roundOptionsSchema,
+      temperature: 0.8,
+      maxOutputTokens: 1500,
+    });
+
+    return { ok: true, data: roundOptionsSchema.parse(object) };
+  } catch (error) {
+    console.error("[岔路] 回合选项生成失败", error);
+    return fail(
+      "选项生成失败",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    );
+  }
+}
+
 // ==================== 回合裁决 ====================
 
 const judgeTurnInputSchema = z.object({
@@ -80,7 +129,6 @@ const judgeTurnInputSchema = z.object({
   playerId: z.string().min(1),
   metrics: metricsSchema,
   round: z.number().int().min(1).max(MAX_ROUNDS),
-  decisionMode: decisionModeSchema,
   decision: z.string().trim().min(1).max(600),
   reactions: z.array(turnReactionRecordSchema).max(8),
   history: z.array(turnRecordSchema).max(MAX_ROUNDS).optional().default([]),
@@ -110,8 +158,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;
 
-  const { cast, playerId, metrics, round, decisionMode, decision, reactions, history } =
-    parsed.data;
+  const { cast, playerId, metrics, round, decision, reactions, history } = parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
   if (!player) return fail("玩家角色不存在");
 
@@ -127,7 +174,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
 此前已结算回合:
 ${summarizeTurnsForPrompt(history)}
 
-本回合玩家(${player.name},${player.identity})以'${decisionMode}'决策:${decision}
+本回合玩家(${player.name},${player.identity})作出抉择:${decision}
 
 本回合各方行动:
 ${summarizeReactionsForPrompt(reactions)}

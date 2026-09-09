@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { worldCastSchema } from "@/lib/world-cast";
-import { agentReactionSchema, decisionModeSchema } from "@/lib/world-turn";
+import { agentReactionSchema } from "@/lib/world-turn";
 
 // ==================== 局制常量 ====================
 
@@ -53,7 +53,6 @@ export type TurnReactionRecord = z.infer<typeof turnReactionRecordSchema>;
 
 export const turnRecordSchema = z.object({
   round: z.number().int().min(1).max(MAX_ROUNDS),
-  decisionMode: decisionModeSchema,
   decision: z.string(),
   reactions: z.array(turnReactionRecordSchema),
   narration: z.string(),
@@ -274,7 +273,7 @@ export function summarizeTurnsForPrompt(turns: TurnRecord[], maxChars = 1800): s
       const stances = turn.reactions
         .map((entry) => `${entry.agentId}:${entry.reaction.stance}`)
         .join(",");
-      return `第${turn.round}回合:玩家[${turn.decisionMode}]${turn.decision.slice(0, 80)};各方(${stances || "无回应"});旁白:${turn.narration.slice(0, 120)}`;
+      return `第${turn.round}回合:玩家${turn.decision.slice(0, 80)};各方(${stances || "无回应"});旁白:${turn.narration.slice(0, 120)}`;
     })
     .join("\n");
   return text.length > maxChars ? `…${text.slice(-maxChars)}` : text;

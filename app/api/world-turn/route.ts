@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "服务端缺少 DEEPSEEK_API_KEY" }, { status: 500 });
   }
 
-  const { cast, playerId, decisionMode, decision } = parsedInput.data;
+  const { cast, playerId, decision } = parsedInput.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
   if (!player) {
     return Response.json({ error: "玩家角色不存在" }, { status: 400 });
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 当前地点:${cast.setting.location}
 核心危机:${cast.setting.crisis}
 
-玩家是${player.name}(${player.identity}),刚刚以"${decisionMode}"方式作出决策:${decision}
+玩家是${player.name}(${player.identity}),刚刚作出抉择:${decision}
 
 其他在场角色:
 ${cast.agentCharacters

@@ -2,12 +2,9 @@ import { z } from "zod";
 
 import { worldCastSchema } from "@/lib/world-cast";
 
-export const decisionModeSchema = z.enum(["public", "secret", "mobilize"]);
-
 export const worldTurnRequestSchema = z.object({
   cast: worldCastSchema,
   playerId: z.string(),
-  decisionMode: decisionModeSchema,
   decision: z.string().trim().min(1).max(600),
 });
 

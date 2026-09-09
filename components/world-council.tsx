@@ -9,30 +9,20 @@ import {
   Flag,
   GitBranch,
   LoaderCircle,
-  LockKeyhole,
   Megaphone,
   ScrollText,
-  SendHorizontal,
-  Shield,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
-import { judgeTurnAction } from "@/app/world/actions";
+import { generateOptionsAction, judgeTurnAction } from "@/app/world/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupText,
-  InputGroupTextarea,
-} from "@/components/ui/input-group";
 import {
   Item,
   ItemActions,
@@ -76,6 +66,7 @@ import {
   type WorldGameSession,
   type WorldMetrics,
 } from "@/lib/world-ending";
+import { decisionTextOf, type DecisionOption, type RoundOptions } from "@/lib/world-options";
 import { type AgentReaction, type WorldTurnEvent, worldTurnEventSchema } from "@/lib/world-turn";
 
 interface WorldCouncilProps {
@@ -84,22 +75,6 @@ interface WorldCouncilProps {
   onBack: () => void;
 }
 
-const decisionModes = {
-  public: {
-    label: "公开表态",
-    placeholder: "向所有在场角色宣布你的决定……",
-  },
-  secret: {
-    label: "秘密联络",
-    placeholder: "写下联络对象与只有对方能看见的内容……",
-  },
-  mobilize: {
-    label: "调动资源",
-    placeholder: "说明要调动的权力、人员或物资……",
-  },
-} as const;
-
-type DecisionMode = keyof typeof decisionModes;
 type AgentStatus = "thinking" | "done" | "error";
 
 const stanceLabels: Record<AgentReaction["stance"], string> = {
@@ -112,12 +87,10 @@ const stanceLabels: Record<AgentReaction["stance"], string> = {
 function PlayerDecisionMessage({
   playerName,
   decision,
-  modeLabel,
   roundLabel,
 }: {
   playerName: string;
   decision: string;
-  modeLabel: string;
   roundLabel?: string;
 }) {
   return (
@@ -127,12 +100,11 @@ function PlayerDecisionMessage({
       </MessageAvatar>
       <MessageContent>
         <MessageHeader>
-          {playerName} · 你的决策{roundLabel ? ` · ${roundLabel}` : null}
+          {playerName} · 你的抉择{roundLabel ? ` · ${roundLabel}` : null}
         </MessageHeader>
         <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
           {decision}
         </div>
-        <MessageFooter>{modeLabel}</MessageFooter>
       </MessageContent>
     </Message>
   );
@@ -208,10 +180,11 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const [turns, setTurns] = useState<WorldGameSession["turns"]>(initial.turns);
   const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
 
-  const [decisionMode, setDecisionMode] = useState<DecisionMode>("public");
-  const [decision, setDecision] = useState("");
   const [submittedDecision, setSubmittedDecision] = useState("");
-  const [submittedMode, setSubmittedMode] = useState<DecisionMode>("public");
+  const [options, setOptions] = useState<RoundOptions | null>(null);
+  const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
+  const [optionsError, setOptionsError] = useState("");
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [reactions, setReactions] = useState<TurnReactionRecord[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isResolving, setIsResolving] = useState(false);
@@ -227,7 +200,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   const pendingJudgeRef = useRef<{
     decision: string;
-    mode: DecisionMode;
     collected: TurnReactionRecord[];
   } | null>(null);
 
@@ -287,12 +259,55 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     worldId,
   ]);
 
-  async function runJudge(
-    judgeDecision: string,
-    mode: DecisionMode,
-    collected: TurnReactionRecord[],
-  ) {
-    pendingJudgeRef.current = { decision: judgeDecision, mode, collected };
+  // 回合开始时生成处境与四个选项；已结算/已提交/已生成时不再请求。
+  // 注意：守卫条件里不能放 isGeneratingOptions —— dev 下 StrictMode 会把 effect 跑两遍，
+  // 第一遍 setIsGeneratingOptions(true) 后 cleanup 取消请求，第二遍会被守卫拦住，
+  // 而被取消的请求又永远不会把 flag 置回 false，骨架屏就一直转下去了。
+  useEffect(() => {
+    if (ended || currentTurnSettled || submittedDecision || options) return;
+    let cancelled = false;
+    setIsGeneratingOptions(true);
+    setOptionsError("");
+    void generateOptionsAction({
+      cast,
+      playerId: activePlayer.id,
+      metrics,
+      round,
+      history: turns,
+    }).then((result) => {
+      if (cancelled) return;
+      setIsGeneratingOptions(false);
+      if (!result.ok) {
+        setOptionsError(
+          `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失进度）`,
+        );
+        return;
+      }
+      setOptions(result.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activePlayer.id,
+    cast,
+    currentTurnSettled,
+    ended,
+    metrics,
+    options,
+    optionsAttempt,
+    round,
+    submittedDecision,
+    turns,
+  ]);
+
+  function retryOptions() {
+    setOptionsError("");
+    setOptionsAttempt((attempt) => attempt + 1);
+  }
+
+  async function runJudge(judgeDecision: string, collected: TurnReactionRecord[]) {
+    pendingJudgeRef.current = { decision: judgeDecision, collected };
     setIsJudging(true);
     setJudgeError("");
 
@@ -301,7 +316,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       playerId: activePlayer.id,
       metrics,
       round,
-      decisionMode: mode,
       decision: judgeDecision,
       reactions: collected,
       history: turns,
@@ -323,7 +337,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       ...current,
       {
         round,
-        decisionMode: mode,
         decision: judgeDecision,
         reactions: collected,
         narration: judged.narration,
@@ -338,15 +351,15 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   function retryJudge() {
     const pending = pendingJudgeRef.current;
-    if (pending) void runJudge(pending.decision, pending.mode, pending.collected);
+    if (pending) void runJudge(pending.decision, pending.collected);
   }
 
   function startNextRound() {
     if (ended || round >= MAX_ROUNDS) return;
     setRound(round + 1);
     setSubmittedDecision("");
-    setSubmittedMode(decisionMode);
-    setDecision("");
+    setOptions(null);
+    setOptionsError("");
     setReactions([]);
     setAgentStatuses({});
     setIsTurnComplete(false);
@@ -364,14 +377,11 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     router.push(`/world/${encodeURIComponent(worldId)}/finale`);
   }
 
-  async function submitDecision(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = decision.trim();
+  async function chooseOption(option: DecisionOption) {
+    const content = decisionTextOf(option);
     if (!content || isResolving || isJudging || isTurnComplete || ended) return;
 
     setSubmittedDecision(content);
-    setSubmittedMode(decisionMode);
-    setDecision("");
     setReactions([]);
     setAgentStatuses({});
     setIsResolving(true);
@@ -428,7 +438,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
         body: JSON.stringify({
           cast,
           playerId: activePlayer.id,
-          decisionMode,
           decision: content,
         }),
       });
@@ -468,19 +477,18 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     } catch (error) {
       console.error("[岔路] 回合响应流失败", error);
       setTurnError(error instanceof Error ? error.message : "回合推演失败");
-      // 失败时把已提交的内容恢复到输入框,并收回提交态,保证可以修改后重试
+      // 失败时收回提交态,选项卡片恢复可点,保证可以直接重试
       setSubmittedDecision("");
-      setDecision(content);
       setIsResolving(false);
       return;
     }
 
     setIsResolving(false);
     // 流式回应收齐后自动进入冲突裁决
-    await runJudge(content, decisionMode, collected);
+    await runJudge(content, collected);
   }
 
-  const inputDisabled = isResolving || isJudging || isTurnComplete || ended;
+  const choiceDisabled = isResolving || isJudging || isTurnComplete || ended;
   const canCloseVoluntarily =
     !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE && round < MAX_ROUNDS;
 
@@ -637,7 +645,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                           <PlayerDecisionMessage
                             playerName={activePlayer.name}
                             decision={turn.decision}
-                            modeLabel={decisionModes[turn.decisionMode].label}
                             roundLabel={`第 ${turn.round} 回合`}
                           />
                         </MessageScrollerItem>
@@ -667,7 +674,6 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                         <PlayerDecisionMessage
                           playerName={activePlayer.name}
                           decision={submittedDecision}
-                          modeLabel={decisionModes[submittedMode].label}
                         />
                       </MessageScrollerItem>
                     ) : null}
@@ -717,55 +723,59 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
               </MessageScroller>
             </MessageScrollerProvider>
 
-            <form onSubmit={submitDecision} className="border-t p-4 sm:p-5">
-              <Tabs
-                value={decisionMode}
-                onValueChange={(value) => {
-                  if (value === "public" || value === "secret" || value === "mobilize") {
-                    setDecisionMode(value);
-                  }
-                }}
-              >
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="public">
-                    <Megaphone data-icon="inline-start" />
-                    公开表态
-                  </TabsTrigger>
-                  <TabsTrigger value="secret">
-                    <LockKeyhole data-icon="inline-start" />
-                    秘密联络
-                  </TabsTrigger>
-                  <TabsTrigger value="mobilize">
-                    <Shield data-icon="inline-start" />
-                    调动资源
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <InputGroup className="mt-3">
-                <InputGroupTextarea
-                  value={decision}
-                  onChange={(event) => setDecision(event.target.value)}
-                  placeholder={decisionModes[decisionMode].placeholder}
-                  rows={3}
-                  maxLength={600}
-                  disabled={inputDisabled}
-                />
-                <InputGroupAddon align="block-end" className="border-t">
-                  <InputGroupText className="text-xs tabular-nums">
-                    {decision.length} / 600
-                  </InputGroupText>
-                  <InputGroupButton
-                    type="submit"
-                    variant="default"
-                    size="sm"
-                    className="ml-auto"
-                    disabled={!decision.trim() || inputDisabled}
-                  >
-                    提交决策
-                    <SendHorizontal />
-                  </InputGroupButton>
-                </InputGroupAddon>
-              </InputGroup>
+            <div className="border-t p-4 sm:p-5">
+              {!ended && !currentTurnSettled && !submittedDecision ? (
+                <div aria-live="polite">
+                  {isGeneratingOptions ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[0, 1, 2, 3].map((index) => (
+                        <Skeleton key={index} className="h-24" />
+                      ))}
+                    </div>
+                  ) : null}
+                  {optionsError ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-destructive text-xs" role="alert">
+                        {optionsError}
+                      </p>
+                      <Button type="button" variant="outline" size="sm" onClick={retryOptions}>
+                        重试生成选项
+                      </Button>
+                    </div>
+                  ) : null}
+                  {options && !isGeneratingOptions ? (
+                    <div className="space-y-3">
+                      <p className="text-sm leading-7">{options.situation}</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {options.options.map((option, index) => (
+                          <Button
+                            key={option.id}
+                            type="button"
+                            variant="outline"
+                            disabled={choiceDisabled}
+                            onClick={() => void chooseOption(option)}
+                            className="h-auto flex-col items-start gap-1 p-4 text-left"
+                          >
+                            <span className="flex w-full items-center gap-2">
+                              <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded font-mono text-[11px]">
+                                {["A", "B", "C", "D"][index] ?? index + 1}
+                              </span>
+                              <span className="font-medium">{option.title}</span>
+                              <Badge variant="secondary" className="ml-auto shrink-0">
+                                {option.risk}
+                              </Badge>
+                            </span>
+                            <span className="text-muted-foreground text-xs leading-5 font-normal whitespace-normal">
+                              {option.desc}
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-muted-foreground text-xs">点选其一即提交,不可更改</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {isResolving ? (
                 <div
                   className="text-muted-foreground mt-3 flex items-center gap-2 text-xs"
@@ -824,10 +834,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
               ) : null}
               {turnError ? (
                 <p className="text-destructive mt-3 text-xs" role="alert">
-                  {turnError}(已将决策恢复到输入框,修改后可重新提交)
+                  {turnError}(可直接重选其一重试)
                 </p>
               ) : null}
-            </form>
+            </div>
           </CardContent>
         </Card>
 
@@ -904,7 +914,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                     </span>
                     <div>
                       <p className="font-medium">玩家决策</p>
-                      <p className="text-muted-foreground mt-1 text-xs">选择公开、秘密或资源行动</p>
+                      <p className="text-muted-foreground mt-1 text-xs">从四个选项中做出抉择</p>
                     </div>
                   </li>
                   {[
