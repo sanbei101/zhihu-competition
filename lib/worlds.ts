@@ -59,7 +59,9 @@ export async function getWorldScenarios(accessSecret: string): Promise<WorldScen
   });
   const { Items } = data;
 
-  const scenarios = Items.map(mapScenario)
+  // 先用原始 Title 粗筛(标题短、含 <em> 也不影响关键字匹配),命中后再洗 ContentText(全文 HTML,最贵)
+  const scenarios = Items.filter((item) => scenarioTitlePattern.test(item.Title))
+    .map(mapScenario)
     .filter((scenario): scenario is WorldScenario => scenario !== null)
     .filter((scenario) => scenarioTitlePattern.test(scenario.title));
 

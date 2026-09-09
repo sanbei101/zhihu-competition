@@ -85,7 +85,12 @@ function ScenarioCard({ scenario, index }: { scenario: WorldScenario; index: num
               <div className="flex items-center gap-2 overflow-hidden">
                 <Avatar className="border-border/50 size-5 border">
                   {scenario.authorAvatar ? (
-                    <AvatarImage src={scenario.authorAvatar} alt="" />
+                    <AvatarImage
+                      src={scenario.authorAvatar}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : null}
                   <AvatarFallback className="text-[10px]">
                     {scenario.author.slice(0, 1)}
@@ -229,8 +234,8 @@ export default async function Home() {
     console.error("首页副本加载失败", error);
     loadError =
       error instanceof ZhihuApiError
-        ? `知乎搜索暂时不可用（${error.message}），稍后重试即可。`
-        : "副本加载失败，请稍后重试。";
+        ? `知乎搜索暂时不可用(${error.message}),稍后重试即可。`
+        : "副本加载失败,请稍后重试。";
   }
 
   if (!scenarios) {

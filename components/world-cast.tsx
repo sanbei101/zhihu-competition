@@ -71,7 +71,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       setCast(result.data);
       setSelectedCharacterId(null);
       saveCachedCast(scenario.id, result.data);
-      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s，已存入本地缓存`);
+      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s,已存入本地缓存`);
       toast.add({
         title: "角色阵容已生成",
         description: "挑选你的角色进入第一幕",

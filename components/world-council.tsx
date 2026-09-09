@@ -90,9 +90,21 @@ function useTypewriter(text: string, durationMs = 6000): { typed: string; isTypi
 
   useEffect(() => {
     setCount(0);
+    if (!text.length) return;
     const frame = Math.max(1, Math.ceil(text.length / (durationMs / 50)));
     const id = setInterval(() => {
-      setCount((current) => (current >= text.length ? current : current + frame));
+      setCount((current) => {
+        if (current >= text.length) {
+          clearInterval(id);
+          return current;
+        }
+        const next = current + frame;
+        if (next >= text.length) {
+          clearInterval(id);
+          return text.length;
+        }
+        return next;
+      });
     }, 50);
     return () => clearInterval(id);
   }, [durationMs, text]);
@@ -239,7 +251,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
 
   const [submittedDecision, setSubmittedDecision] = useState("");
-  // 开场片头只在新开对局播一次：中途刷新、下一回合不再重播。
+  // 开场片头只在新开对局播一次:中途刷新、下一回合不再重播。
   const [showIntro, setShowIntro] = useState(initial.turns.length === 0);
   const [options, setOptions] = useState<RoundOptions | null>(null);
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
@@ -338,7 +350,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       if (cancelled) return;
       setIsGeneratingOptions(false);
       if (!result.ok) {
-        const message = `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失进度）`;
+        const message = `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失进度)`;
         setOptionsError(message);
         toast.add({ title: "选项生成失败", description: result.error, type: "error" });
         return;
@@ -383,7 +395,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
     setIsJudging(false);
     if (!result.ok) {
-      const message = `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失本回合回应）`;
+      const message = `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失本回合回应)`;
       setJudgeError(message);
       toast.add({ title: "冲突裁决失败", description: result.error, type: "error" });
       return;
@@ -522,17 +534,15 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       const decoder = new TextDecoder();
       let buffer = "";
 
-      async function pump(): Promise<void> {
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop -- 流式读取必须串行等待每个 chunk
         const { done, value } = await reader.read();
-        if (done) return;
+        if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
         for (const line of lines) applyLine(line);
-        await pump();
       }
-
-      await pump();
 
       buffer += decoder.decode();
       if (buffer.trim()) applyLine(buffer);
@@ -700,7 +710,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                         <p className="text-xs leading-5">{character.pressureMethod}</p>
                       </div>
                       <blockquote className="text-muted-foreground border-l pl-2 text-xs leading-5">
-                        “{character.openingLine}”
+                        "{character.openingLine}"
                       </blockquote>
                     </div>
                   </HoverCardContent>

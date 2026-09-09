@@ -43,7 +43,7 @@ export function WorldIntro({
   opening: string;
   onDone: () => void;
 }) {
-  // 先挂到 body 再渲染：祖先链上任何 transform/filter 都会劫持 fixed 定位，
+  // 先挂到 body 再渲染:祖先链上任何 transform/filter 都会劫持 fixed 定位,
   // portal 能保证黑幕相对视口铺满。
   const [mounted, setMounted] = useState(false);
   useEffect(() => {

@@ -44,7 +44,10 @@ export class ZhihuApiError extends Error {
 }
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
+// ponytail: 有界 Map,超 100 条淘汰最早项,避免 Workers 常驻内存无界增长
+const CACHE_MAX_ENTRIES = 100;
 const searchCache = new Map<string, { expiresAt: number; data: ZhihuSearchData }>();
+const pendingSearches = new Map<string, Promise<ZhihuSearchData>>();
 
 export class ZhihuClient {
   private readonly baseUrl = "https://developer.zhihu.com/api/v1/content/zhihu_search";
@@ -60,7 +63,17 @@ export class ZhihuClient {
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
+    const pending = pendingSearches.get(cacheKey);
+    if (pending) return pending;
 
+    const task = this.fetchSearch(params, cacheKey).finally(() => {
+      pendingSearches.delete(cacheKey);
+    });
+    pendingSearches.set(cacheKey, task);
+    return task;
+  }
+
+  private async fetchSearch(params: ZhihuSearchParams, cacheKey: string): Promise<ZhihuSearchData> {
     const url = new URL(this.baseUrl);
     url.searchParams.set("Query", params.Query);
 
@@ -87,6 +100,10 @@ export class ZhihuClient {
       throw new ZhihuApiError(body.Code, body.Message);
     }
 
+    if (searchCache.size >= CACHE_MAX_ENTRIES) {
+      const oldestKey = searchCache.keys().next().value;
+      if (oldestKey !== undefined) searchCache.delete(oldestKey);
+    }
     searchCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: body.Data });
 
     return body.Data;

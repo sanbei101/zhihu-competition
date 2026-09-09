@@ -50,7 +50,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState<"article" | "share" | null>(null);
-  // 自动结算只触发一次：dev 下 StrictMode 会把 effect 跑两遍，不拦会调两次终章生成。
+  // 自动结算只触发一次:dev 下 StrictMode 会把 effect 跑两遍,不拦会调两次终章生成。
   const autoFinaleRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     });
     setIsLoading(false);
     if (!result.ok) {
-      const message = `${result.error}${result.detail ? `：${result.detail}` : ""}`;
+      const message = `${result.error}${result.detail ? `:${result.detail}` : ""}`;
       setError(message);
       toast.add({ title: "终章生成失败", description: result.error, type: "error" });
       return;
@@ -289,7 +289,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               size="sm"
               onClick={() =>
                 void copyText(
-                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n——知乎脑洞世界线推演`,
+                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n--知乎脑洞世界线推演`,
                 ).then((ok) => {
                   if (ok) setCopied("article");
                   else
