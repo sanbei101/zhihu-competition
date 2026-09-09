@@ -133,83 +133,84 @@ function ScenarioCard({ scenario, index }: { scenario: WorldScenario; index: num
  */
 function FeaturedScenario({ scenario }: { scenario: WorldScenario }) {
   return (
-    <Card className="group border-border/70 from-card to-card/60 shadow-primary/5 hover:border-primary/40 relative overflow-hidden bg-gradient-to-b shadow-lg transition-all duration-300">
-      {/* 顶部微高光 */}
-      <div className="via-primary/40 pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent to-transparent" />
+    <Card className="group border-border/80 from-card via-card/90 to-muted/20 hover:border-primary/50 hover:shadow-primary/5 relative overflow-hidden rounded-2xl border bg-gradient-to-b p-6 shadow-sm transition-all duration-300 hover:shadow-xl sm:p-8">
+      {/* 顶部环境微光丝带 */}
+      <div className="via-primary pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent to-transparent opacity-75" />
 
-      <div className="grid md:grid-cols-[11rem_minmax(0,1fr)]">
-        {/* 左侧侧标区块 */}
-        <div className="bg-primary/10 text-foreground relative flex min-h-36 flex-col justify-between overflow-hidden p-6 md:min-h-full">
-          <div className="bg-primary/20 pointer-events-none absolute -top-8 -left-8 size-28 rounded-full blur-xl" />
-          <div className="relative flex items-center gap-2">
+      {/* 右上角背景隐约的网格徽标装饰（增强科技探索感） */}
+      <div className="text-primary/5 group-hover:text-primary/10 pointer-events-none absolute -top-6 -right-6 transition-transform duration-700 group-hover:scale-110">
+        <GitBranch className="size-48 stroke-1" />
+      </div>
+
+      <div className="relative space-y-6">
+        {/* 卡片顶部 HUD 状态栏 */}
+        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex items-center gap-2.5">
             <span className="relative flex size-2">
               <span className="bg-primary absolute inline-flex size-full animate-ping rounded-full opacity-75" />
               <span className="bg-primary relative inline-flex size-2 rounded-full" />
             </span>
-            <span className="text-primary font-mono text-xs font-semibold tracking-wider">
-              LIVE // 01
-            </span>
+            <Badge className="bg-primary text-primary-foreground font-mono text-xs tracking-wider uppercase">
+              FEATURED // 01 观测核心
+            </Badge>
+            <Badge
+              variant="outline"
+              className="border-border/60 text-muted-foreground font-mono text-[11px]"
+            >
+              ID: {scenario.id.slice(0, 10)}
+            </Badge>
           </div>
-          <GitBranch className="text-primary/80 relative size-10 stroke-[1.25] transition-transform duration-500 group-hover:scale-110 group-hover:rotate-12" />
+
+          <span className="text-muted-foreground font-mono text-xs tracking-wider">
+            DIVERGENCE // ACTIVE
+          </span>
         </div>
 
-        {/* 右侧核心内容 */}
-        <div className="p-6 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-primary text-primary-foreground gap-1 shadow-none">
-                <Sparkles className="size-3" />
-                本期主焦点
-              </Badge>
-              <Badge variant="outline" className="border-border/60 font-mono text-xs">
-                PARALLEL_CORE
-              </Badge>
-            </div>
-            <span className="text-muted-foreground/80 font-mono text-xs">ID: {scenario.id}</span>
-          </div>
-
-          <h3 className="text-card-foreground mt-5 max-w-3xl text-2xl leading-snug font-semibold tracking-tight sm:text-3xl">
+        {/* 核心问题标题：排版强化 */}
+        <div className="space-y-3">
+          <CardTitle className="text-foreground group-hover:text-primary text-xl leading-relaxed font-bold tracking-tight transition-colors sm:text-2xl lg:text-3xl">
             {scenario.title}
-          </h3>
+          </CardTitle>
 
-          {scenario.author ? (
-            <div className="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
+          {scenario.author && (
+            <div className="flex items-center gap-2.5 pt-1">
               <Avatar className="border-border size-6 border">
                 {scenario.authorAvatar ? <AvatarImage src={scenario.authorAvatar} alt="" /> : null}
-                <AvatarFallback>{scenario.author.slice(0, 1)}</AvatarFallback>
+                <AvatarFallback className="text-xs">{scenario.author.slice(0, 1)}</AvatarFallback>
               </Avatar>
-              <span className="text-foreground font-medium">{scenario.author}</span>
-              <span className="text-muted-foreground/60 text-xs">发起设想</span>
+              <span className="text-foreground text-xs font-medium">{scenario.author}</span>
+              <span className="text-muted-foreground text-xs">· 知乎母本发起人</span>
             </div>
-          ) : null}
+          )}
+        </div>
 
-          <Separator className="bg-border/60 my-6" />
-
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-muted-foreground flex items-center gap-6 text-sm">
-              <span className="flex items-center gap-2">
-                <ThumbsUp className="text-primary size-4" />
-                <strong className="text-foreground">
-                  {numberFormatter.format(scenario.votes)}
-                </strong>{" "}
-                赞同
-              </span>
-              <span className="flex items-center gap-2">
-                <MessageCircle className="text-primary size-4" />
-                <strong className="text-foreground">
-                  {numberFormatter.format(scenario.comments)}
-                </strong>{" "}
-                深度讨论
-              </span>
+        {/* 底部交互与数据槽 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="border-border/60 bg-background/80 text-muted-foreground flex items-center gap-1.5 rounded-full border px-3 py-1">
+              <ThumbsUp className="text-primary size-3.5" />
+              <span>赞同</span>
+              <strong className="text-foreground font-mono">
+                {numberFormatter.format(scenario.votes)}
+              </strong>
             </div>
-            <Button
-              className="group/btn shadow-primary/20 gap-2 shadow-sm"
-              render={<Link href={scenarioHref(scenario)} />}
-            >
-              载入母本推演
-              <ArrowRight className="size-4 transition-transform duration-200 group-hover/btn:translate-x-1" />
-            </Button>
+            <div className="border-border/60 bg-background/80 text-muted-foreground flex items-center gap-1.5 rounded-full border px-3 py-1">
+              <MessageCircle className="text-primary size-3.5" />
+              <span>讨论</span>
+              <strong className="text-foreground font-mono">
+                {numberFormatter.format(scenario.comments)}
+              </strong>
+            </div>
           </div>
+
+          <Button
+            size="sm"
+            className="group-hover:shadow-primary/20 gap-2 shadow-sm transition-all duration-200 group-hover:shadow-md"
+            render={<Link href={scenarioHref(scenario)} />}
+          >
+            载入世界线推演
+            <ArrowRight className="size-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+          </Button>
         </div>
       </div>
     </Card>
@@ -252,46 +253,64 @@ export default async function Home() {
       </header>
 
       {/* Hero 区域 */}
-      <section className="border-border/60 bg-background relative overflow-hidden border-b py-16 sm:py-24">
-        {/* 背景微光扩散 */}
-        <div className="bg-primary/5 pointer-events-none absolute -top-24 left-1/2 size-96 -translate-x-1/2 rounded-full blur-3xl" />
+      <section className="border-border/60 from-background via-muted/10 to-background relative overflow-hidden border-b bg-gradient-to-b py-16 sm:py-20">
+        {/* 背景质感微网格（纯 Tailwind 类实现） */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]" />
 
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-end lg:gap-20">
-          <div className="border-primary max-w-3xl border-l-2 pl-6 sm:pl-8">
-            <Badge
-              variant="secondary"
-              className="border-primary/20 bg-primary/10 text-primary font-mono text-xs"
-            >
-              WHAT IF // WORLDLINE LAB
-            </Badge>
-            <h1 className="mt-6 text-4xl leading-tight font-bold tracking-tight sm:text-6xl">
-              一个问题，
-              <br className="hidden sm:block" />
-              一条尚未发生的世界线。
-            </h1>
-            <p className="text-muted-foreground mt-6 max-w-2xl text-base leading-relaxed sm:text-lg">
-              从知乎的历史假设与科幻脑洞出发，挑选一张母本档案，进入它可能发生的另一种推演结局。
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Button size="lg" className="gap-2 shadow-sm" render={<Link href="#archives" />}>
-                探索副本流
-                <ArrowRight className="size-4" />
-              </Button>
-            </div>
-          </div>
+        <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
+            {/* 左侧主要文案 */}
+            <div className="max-w-2xl space-y-5">
+              <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
+                <GitBranch className="size-3.5" />
+                <span>WHAT IF // WORLDLINE ARCHIVE LAB</span>
+              </div>
 
-          <div className="border-border/60 grid grid-cols-2 gap-5 border-t pt-6 lg:block lg:border-t-0 lg:border-l lg:pl-8">
-            <div>
-              <p className="text-muted-foreground text-xs tracking-wider uppercase">已载入母本</p>
-              <p className="text-foreground mt-2 font-mono text-4xl font-bold tabular-nums">
-                {scenarios.length}
+              <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-5xl sm:leading-[1.15]">
+                一个问题，
+                <span className="text-muted-foreground"> 衍生出</span>
+                <br />
+                一条尚未发生的世界线。
+              </h1>
+
+              <p className="text-muted-foreground text-base sm:text-lg">
+                从知乎的历史假设与脑洞命题出发，提取母本切片，探索平行历史的另一种解答。
               </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button size="default" className="gap-2" render={<Link href="#archives" />}>
+                  挑选副本探索
+                  <ArrowRight className="size-4" />
+                </Button>
+                <div className="text-muted-foreground flex items-center gap-2 text-xs sm:ml-2">
+                  <span className="size-1.5 rounded-full bg-emerald-500" />
+                  <span>实时数据流同步中</span>
+                </div>
+              </div>
             </div>
-            <div className="lg:mt-8">
-              <p className="text-muted-foreground text-xs tracking-wider uppercase">数据源状态</p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="bg-primary size-1.5 rounded-full" />
-                <p className="text-foreground font-mono text-xs">知乎实时搜索</p>
+
+            {/* 右侧紧凑数据仪表舱（替代原来两行孤零零的字） */}
+            <div className="flex flex-row gap-4 lg:flex-col">
+              <div className="border-border/60 bg-card/60 flex-1 rounded-xl border p-4 shadow-sm backdrop-blur-sm sm:p-5 lg:w-56">
+                <span className="text-muted-foreground font-mono text-[11px] tracking-wider uppercase">
+                  母本载入量
+                </span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-foreground font-mono text-3xl font-bold tracking-tight sm:text-4xl">
+                    {scenarios.length}
+                  </span>
+                  <span className="text-muted-foreground text-xs">PARALLELS</span>
+                </div>
+              </div>
+
+              <div className="border-border/60 bg-card/60 flex-1 rounded-xl border p-4 shadow-sm backdrop-blur-sm sm:p-5 lg:w-56">
+                <span className="text-muted-foreground font-mono text-[11px] tracking-wider uppercase">
+                  数据信源
+                </span>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="bg-primary size-2 rounded-full" />
+                  <span className="text-foreground text-sm font-medium">知乎实时搜索 API</span>
+                </div>
               </div>
             </div>
           </div>
