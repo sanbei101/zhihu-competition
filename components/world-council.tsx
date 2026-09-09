@@ -6,18 +6,21 @@ import {
   Check,
   CircleDot,
   Clock3,
+  Flag,
   GitBranch,
   LoaderCircle,
   LockKeyhole,
   Megaphone,
+  ScrollText,
   SendHorizontal,
   Shield,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { judgeTurnAction } from "@/app/world/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -59,25 +62,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   type WorldCast,
-  type WorldCouncilSession,
   worldCouncilSessionSchema,
   worldCouncilStorageKey,
 } from "@/lib/world-cast";
+import {
+  MAX_ROUNDS,
+  MIN_ROUND_TO_CLOSE,
+  actForRound,
+  buildVoluntaryEnding,
+  createInitialGameSession,
+  endingLabels,
+  metricKeys,
+  metricLabels,
+  worldGameSessionSchema,
+  type MetricDeltas,
+  type TurnReactionRecord,
+  type WorldEnding,
+  type WorldGameSession,
+  type WorldMetrics,
+} from "@/lib/world-ending";
 import { type AgentReaction, type WorldTurnEvent, worldTurnEventSchema } from "@/lib/world-turn";
 
 interface WorldCouncilProps {
-  cast: WorldCast;
-  player: WorldCast["playerCharacters"][number];
-  scenarioTitle: string;
+  initial: WorldGameSession;
+  worldId: string;
   onBack: () => void;
 }
-
-const worldMetrics = [
-  { label: "政权稳定", value: 62, delta: "-3" },
-  { label: "军心士气", value: 74, delta: "+6" },
-  { label: "民众支持", value: 48, delta: "-8" },
-  { label: "战略资源", value: 57, delta: "+2" },
-];
 
 const decisionModes = {
   public: {
@@ -104,20 +114,159 @@ const stanceLabels: Record<AgentReaction["stance"], string> = {
   exploit: "借势",
 };
 
-function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps) {
+function formatRound(round: number) {
+  return `回合 ${String(round).padStart(2, "0")} / ${String(MAX_ROUNDS).padStart(2, "0")}`;
+}
+
+function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
+  const router = useRouter();
+  const cast: WorldCast = initial.cast;
+  const player = cast.playerCharacters.find((character) => character.id === initial.playerId);
+
+  const [round, setRound] = useState(initial.round);
+  const [metrics, setMetrics] = useState<WorldMetrics>(initial.metrics);
+  const [turns, setTurns] = useState<WorldGameSession["turns"]>(initial.turns);
+  const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
+
   const [decisionMode, setDecisionMode] = useState<DecisionMode>("public");
   const [decision, setDecision] = useState("");
   const [submittedDecision, setSubmittedDecision] = useState("");
   const [submittedMode, setSubmittedMode] = useState<DecisionMode>("public");
-  const [reactions, setReactions] = useState<Array<{ agentId: string; reaction: AgentReaction }>>(
-    [],
-  );
+  const [reactions, setReactions] = useState<TurnReactionRecord[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isResolving, setIsResolving] = useState(false);
-  const [isTurnComplete, setIsTurnComplete] = useState(false);
+  const [isJudging, setIsJudging] = useState(false);
+  const [isTurnComplete, setIsTurnComplete] = useState(
+    initial.status === "ended" && initial.turns.length > 0,
+  );
   const [turnError, setTurnError] = useState("");
+  const [judgeError, setJudgeError] = useState("");
+  const [lastNarration, setLastNarration] = useState(
+    initial.turns.length ? initial.turns[initial.turns.length - 1].narration : "",
+  );
+  const [lastDeltas, setLastDeltas] = useState<MetricDeltas | null>(
+    initial.turns.length ? initial.turns[initial.turns.length - 1].deltas : null,
+  );
+
+  const pendingJudgeRef = useRef<{
+    decision: string;
+    mode: DecisionMode;
+    collected: TurnReactionRecord[];
+  } | null>(null);
+
+  if (!player) {
+    return (
+      <Card className="mx-auto max-w-lg shadow-none">
+        <CardHeader>
+          <CardTitle>玩家角色丢失</CardTitle>
+          <p className="text-muted-foreground text-sm leading-6">
+            存档中的角色与当前阵容不一致，请返回世界线页面重新建档。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}>
+            返回世界线
+            <ArrowLeft data-icon="inline-end" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const ended = ending !== null;
+  const storageKey = worldCouncilStorageKey(worldId);
+  // 守卫之后收窄为非空别名，供闭包与 JSX 使用（tsgolint 不跟踪闭包内的收窄）
+  const activePlayer = player;
+
+  useEffect(() => {
+    const session: WorldGameSession = {
+      scenarioId: worldId,
+      scenarioTitle: initial.scenarioTitle,
+      scenarioUrl: initial.scenarioUrl,
+      playerId: initial.playerId,
+      cast,
+      metrics,
+      round,
+      turns,
+      status: ending ? "ended" : "ongoing",
+      ending,
+    };
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(session));
+    } catch (error) {
+      console.error("[岔路] 对局存档写入失败", error);
+    }
+  }, [
+    cast,
+    ending,
+    initial.playerId,
+    initial.scenarioTitle,
+    initial.scenarioUrl,
+    metrics,
+    round,
+    storageKey,
+    turns,
+    worldId,
+  ]);
+
+  async function runJudge(
+    judgeDecision: string,
+    mode: DecisionMode,
+    collected: TurnReactionRecord[],
+  ) {
+    pendingJudgeRef.current = { decision: judgeDecision, mode, collected };
+    setIsJudging(true);
+    setJudgeError("");
+
+    const result = await judgeTurnAction({
+      cast,
+      playerId: activePlayer.id,
+      metrics,
+      round,
+      decisionMode: mode,
+      decision: judgeDecision,
+      reactions: collected,
+      history: turns,
+    });
+
+    setIsJudging(false);
+    if (!result.ok) {
+      setJudgeError(
+        `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失本回合回应）`,
+      );
+      return;
+    }
+
+    pendingJudgeRef.current = null;
+    const judged = result.data;
+    setMetrics(judged.metrics);
+    setLastDeltas(judged.deltas);
+    setLastNarration(judged.narration);
+    setTurns((current) => [
+      ...current,
+      {
+        round,
+        decisionMode: mode,
+        decision: judgeDecision,
+        reactions: collected,
+        narration: judged.narration,
+        deltas: judged.deltas,
+      },
+    ]);
+    if (judged.isEnded && judged.ending) {
+      setEnding(judged.ending);
+    }
+    setIsTurnComplete(true);
+  }
+
+  function retryJudge() {
+    const pending = pendingJudgeRef.current;
+    if (pending) void runJudge(pending.decision, pending.mode, pending.collected);
+  }
 
   function startNextRound() {
+    if (ended || round >= MAX_ROUNDS) return;
+    setRound(round + 1);
     setSubmittedDecision("");
     setSubmittedMode(decisionMode);
     setDecision("");
@@ -125,12 +274,23 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
     setAgentStatuses({});
     setIsTurnComplete(false);
     setTurnError("");
+    setJudgeError("");
   }
 
-  async function submitDecision(event: SubmitEvent<HTMLFormElement>) {
+  function closeVoluntarily() {
+    if (ended || round < MIN_ROUND_TO_CLOSE) return;
+    setEnding(buildVoluntaryEnding(round));
+    setJudgeError("");
+  }
+
+  function goFinale() {
+    router.push(`/world/${encodeURIComponent(worldId)}/finale`);
+  }
+
+  async function submitDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = decision.trim();
-    if (!content || isResolving || isTurnComplete) return;
+    if (!content || isResolving || isJudging || isTurnComplete || ended) return;
 
     setSubmittedDecision(content);
     setSubmittedMode(decisionMode);
@@ -140,6 +300,9 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
     setIsResolving(true);
     setIsTurnComplete(false);
     setTurnError("");
+    setJudgeError("");
+
+    const collected: TurnReactionRecord[] = [];
 
     function applyEvent(turnEvent: WorldTurnEvent) {
       if (turnEvent.type === "agent-start") {
@@ -148,10 +311,9 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
           [turnEvent.agentId]: "thinking",
         }));
       } else if (turnEvent.type === "agent-reaction") {
-        setReactions((current) => [
-          ...current,
-          { agentId: turnEvent.agentId, reaction: turnEvent.reaction },
-        ]);
+        const record = { agentId: turnEvent.agentId, reaction: turnEvent.reaction };
+        collected.push(record);
+        setReactions((current) => [...current, record]);
         setAgentStatuses((statuses) => ({
           ...statuses,
           [turnEvent.agentId]: "done",
@@ -161,8 +323,6 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
           ...statuses,
           [turnEvent.agentId]: "error",
         }));
-      } else if (turnEvent.type === "complete") {
-        setIsTurnComplete(true);
       }
     }
 
@@ -190,7 +350,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cast,
-          playerId: player.id,
+          playerId: activePlayer.id,
           decisionMode,
           decision: content,
         }),
@@ -237,10 +397,18 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
       // 失败时把已提交的内容恢复到输入框，并收回提交态，保证可以修改后重试
       setSubmittedDecision("");
       setDecision(content);
-    } finally {
       setIsResolving(false);
+      return;
     }
+
+    setIsResolving(false);
+    // 流式回应收齐后自动进入冲突裁决
+    await runJudge(content, decisionMode, collected);
   }
+
+  const inputDisabled = isResolving || isJudging || isTurnComplete || ended;
+  const canCloseVoluntarily =
+    !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE && round < MAX_ROUNDS;
 
   return (
     <div className="space-y-4">
@@ -251,14 +419,19 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
           </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge>回合 01</Badge>
+              <Badge>{formatRound(round)}</Badge>
               <Badge variant="outline">
                 <CircleDot data-icon="inline-start" />
-                第一幕
+                {actForRound(round)}
               </Badge>
+              {ended && ending ? (
+                <Badge variant="secondary">{endingLabels[ending.type]}</Badge>
+              ) : null}
             </div>
             <h2 className="mt-2 text-xl font-semibold">危机议事</h2>
-            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">{scenarioTitle}</p>
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
+              {initial.scenarioTitle}
+            </p>
           </div>
         </div>
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -279,12 +452,12 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
             <Item variant="muted">
               <ItemMedia>
                 <Avatar>
-                  <AvatarFallback>{player.name.slice(0, 1)}</AvatarFallback>
+                  <AvatarFallback>{activePlayer.name.slice(0, 1)}</AvatarFallback>
                 </Avatar>
               </ItemMedia>
               <ItemContent className="min-w-0">
-                <ItemTitle>{player.name}</ItemTitle>
-                <p className="text-muted-foreground truncate text-xs">{player.identity}</p>
+                <ItemTitle>{activePlayer.name}</ItemTitle>
+                <p className="text-muted-foreground truncate text-xs">{activePlayer.identity}</p>
               </ItemContent>
               <ItemActions>
                 <Badge variant="outline" className="px-1.5">
@@ -388,10 +561,10 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                       <MessageScrollerItem scrollAnchor>
                         <Message align="end">
                           <MessageAvatar className="bg-primary text-primary-foreground size-8">
-                            {player.name.slice(0, 1)}
+                            {activePlayer.name.slice(0, 1)}
                           </MessageAvatar>
                           <MessageContent>
-                            <MessageHeader>{player.name} · 你的决策</MessageHeader>
+                            <MessageHeader>{activePlayer.name} · 你的决策</MessageHeader>
                             <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
                               {submittedDecision}
                             </div>
@@ -430,17 +603,54 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                       );
                     })}
 
-                    {isTurnComplete ? (
+                    {isTurnComplete && lastNarration ? (
+                      <MessageScrollerItem scrollAnchor>
+                        <Message>
+                          <MessageAvatar className="bg-primary text-primary-foreground size-8">
+                            <GitBranch className="size-4" />
+                          </MessageAvatar>
+                          <MessageContent>
+                            <MessageHeader>世界线导演 · 冲突裁决</MessageHeader>
+                            <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
+                              {lastNarration}
+                            </div>
+                            {lastDeltas ? (
+                              <MessageFooter className="max-w-2xl items-start leading-5">
+                                {metricKeys
+                                  .map((key) => {
+                                    const delta = lastDeltas[key];
+                                    if (delta === 0) return null;
+                                    return `${metricLabels[key]}${delta > 0 ? `+${delta}` : delta}`;
+                                  })
+                                  .filter(Boolean)
+                                  .join(" · ") || "四维指标持平"}
+                              </MessageFooter>
+                            ) : null}
+                          </MessageContent>
+                        </Message>
+                      </MessageScrollerItem>
+                    ) : null}
+
+                    {ended && ending ? (
                       <MessageScrollerItem scrollAnchor>
                         <Message>
                           <MessageAvatar className="size-8 bg-emerald-100 text-emerald-700">
-                            <Check className="size-4" />
+                            <Flag className="size-4" />
                           </MessageAvatar>
                           <MessageContent>
-                            <MessageHeader>本回合回应完成</MessageHeader>
+                            <MessageHeader>世界线终局 · {endingLabels[ending.type]}</MessageHeader>
                             <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
-                              各方行动已经收齐，可以进入冲突裁决。
+                              <p className="font-medium">{ending.title}</p>
+                              <p className="text-muted-foreground mt-1 text-sm leading-6">
+                                {ending.reason}
+                              </p>
                             </div>
+                            <MessageFooter>
+                              <Button type="button" size="sm" onClick={goFinale}>
+                                <ScrollText data-icon="inline-start" />
+                                查看终章结算
+                              </Button>
+                            </MessageFooter>
                           </MessageContent>
                         </Message>
                       </MessageScrollerItem>
@@ -482,7 +692,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                   placeholder={decisionModes[decisionMode].placeholder}
                   rows={3}
                   maxLength={600}
-                  disabled={isResolving || isTurnComplete}
+                  disabled={inputDisabled}
                 />
                 <InputGroupAddon align="block-end" className="border-t">
                   <InputGroupText className="text-xs tabular-nums">
@@ -493,7 +703,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                     variant="default"
                     size="sm"
                     className="ml-auto"
-                    disabled={!decision.trim() || isResolving || isTurnComplete}
+                    disabled={!decision.trim() || inputDisabled}
                   >
                     提交决策
                     <SendHorizontal />
@@ -509,14 +719,50 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                   已收到 {reactions.length} / {cast.agentCharacters.length} 条回应
                 </div>
               ) : null}
-              {isTurnComplete ? (
+              {isJudging ? (
+                <div
+                  className="text-muted-foreground mt-3 flex items-center gap-2 text-xs"
+                  aria-live="polite"
+                >
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                  各方表态收齐，正在裁决世界走向……
+                </div>
+              ) : null}
+              {judgeError ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+                  <p className="text-destructive text-xs" role="alert">
+                    {judgeError}
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={retryJudge}>
+                    重试裁决
+                  </Button>
+                </div>
+              ) : null}
+              {isTurnComplete && !ended && !isJudging && !judgeError ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
                   <div className="flex items-center gap-2 text-xs text-emerald-700">
                     <Check className="size-3.5" />
-                    本回合各方表态完成
+                    本回合已裁决
+                    {round >= MAX_ROUNDS ? "" : `（已演 ${turns.length} / ${MAX_ROUNDS} 回合）`}
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={startNextRound}>
-                    开始下一回合
+                  {round < MAX_ROUNDS ? (
+                    <Button type="button" variant="outline" size="sm" onClick={startNextRound}>
+                      开始下一回合
+                    </Button>
+                  ) : null}
+                  {canCloseVoluntarily ? (
+                    <Button type="button" variant="ghost" size="sm" onClick={closeVoluntarily}>
+                      <Flag data-icon="inline-start" />
+                      收束世界线
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              {ended ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+                  <Button type="button" size="sm" onClick={goFinale}>
+                    <ScrollText data-icon="inline-start" />
+                    查看终章结算
                   </Button>
                 </div>
               ) : null}
@@ -545,33 +791,37 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
             </CardHeader>
             <CardContent>
               <TabsContent value="world" className="space-y-6">
-                {worldMetrics.map((metric) => (
-                  <Progress key={metric.label} value={metric.value}>
-                    <ProgressLabel>{metric.label}</ProgressLabel>
-                    <ProgressValue>
-                      {() => (
-                        <>
-                          {metric.value}
-                          <span
-                            className={
-                              metric.delta.startsWith("+")
-                                ? "ml-1 text-emerald-600"
-                                : "text-destructive ml-1"
-                            }
-                          >
-                            {metric.delta}
-                          </span>
-                        </>
-                      )}
-                    </ProgressValue>
-                  </Progress>
-                ))}
+                {metricKeys.map((key) => {
+                  const delta = lastDeltas?.[key] ?? 0;
+                  const showDelta = turns.length > 0 && delta !== 0;
+                  return (
+                    <Progress key={key} value={metrics[key]}>
+                      <ProgressLabel>{metricLabels[key]}</ProgressLabel>
+                      <ProgressValue>
+                        {() => (
+                          <>
+                            {metrics[key]}
+                            {showDelta ? (
+                              <span
+                                className={
+                                  delta > 0 ? "ml-1 text-emerald-600" : "text-destructive ml-1"
+                                }
+                              >
+                                {delta > 0 ? `+${delta}` : delta}
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </ProgressValue>
+                    </Progress>
+                  );
+                })}
                 <Separator />
                 <div>
                   <p className="text-muted-foreground text-xs">当前身份</p>
-                  <p className="mt-1 font-medium">{player.identity}</p>
+                  <p className="mt-1 font-medium">{activePlayer.identity}</p>
                   <p className="text-muted-foreground mt-2 text-xs leading-5">
-                    {player.decisionPower}
+                    {activePlayer.decisionPower}
                   </p>
                 </div>
               </TabsContent>
@@ -587,22 +837,52 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                     </div>
                   </li>
                   <li className="flex gap-3">
-                    <span className="bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs">
-                      2
+                    <span
+                      className={
+                        submittedDecision
+                          ? "grid size-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700"
+                          : "bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs"
+                      }
+                    >
+                      {submittedDecision ? <Check className="size-3.5" /> : 2}
                     </span>
                     <div>
                       <p className="font-medium">玩家决策</p>
                       <p className="text-muted-foreground mt-1 text-xs">选择公开、秘密或资源行动</p>
                     </div>
                   </li>
-                  {["Agent 行动", "冲突裁决", "世界更新"].map((step, index) => (
-                    <li key={step} className="text-muted-foreground flex gap-3">
-                      <span className="bg-muted grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs">
-                        {index + 3}
+                  {[
+                    { label: "Agent 行动", done: reactions.length > 0 },
+                    { label: "冲突裁决", done: isTurnComplete },
+                    { label: "世界更新", done: isTurnComplete },
+                  ].map((step, index) => (
+                    <li
+                      key={step.label}
+                      className={step.done ? "flex gap-3" : "text-muted-foreground flex gap-3"}
+                    >
+                      <span
+                        className={
+                          step.done
+                            ? "grid size-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-700"
+                            : "bg-muted grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs"
+                        }
+                      >
+                        {step.done ? <Check className="size-3.5" /> : index + 3}
                       </span>
-                      <p className="pt-0.5">{step}</p>
+                      <p className="pt-0.5">{step.label}</p>
                     </li>
                   ))}
+                  <li className="text-muted-foreground flex gap-3">
+                    <span className="bg-muted grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs">
+                      终
+                    </span>
+                    <div className="pt-0.5">
+                      <p>终章结算（{MAX_ROUNDS} 回合或提前终局）</p>
+                      <p className="mt-1 text-xs">
+                        已演 {turns.length} / {MAX_ROUNDS} 回合
+                      </p>
+                    </div>
+                  </li>
                 </ol>
               </TabsContent>
             </CardContent>
@@ -615,10 +895,11 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
 
 export function WorldCouncilSession({ worldId }: { worldId: string }) {
   const router = useRouter();
-  const [session, setSession] = useState<WorldCouncilSession | null>();
+  const [session, setSession] = useState<WorldGameSession | null>();
+  const key = worldCouncilStorageKey(worldId);
 
   useEffect(() => {
-    const storedSession = sessionStorage.getItem(worldCouncilStorageKey(worldId));
+    const storedSession = sessionStorage.getItem(key);
 
     if (!storedSession) {
       setSession(null);
@@ -626,14 +907,32 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
     }
 
     try {
-      const parsedSession = worldCouncilSessionSchema.parse(JSON.parse(storedSession));
-      setSession(parsedSession.scenarioId === worldId ? parsedSession : null);
+      const raw: unknown = JSON.parse(storedSession);
+      const parsed = worldGameSessionSchema.safeParse(raw);
+      if (parsed.success && parsed.data.scenarioId === worldId) {
+        setSession(parsed.data);
+        return;
+      }
+      // 兼容旧存档：仅含 scenarioId / scenarioTitle / playerId / cast
+      const legacy = worldCouncilSessionSchema.safeParse(raw);
+      if (legacy.success && legacy.data.scenarioId === worldId) {
+        setSession(
+          createInitialGameSession({
+            scenarioId: legacy.data.scenarioId,
+            scenarioTitle: legacy.data.scenarioTitle,
+            playerId: legacy.data.playerId,
+            cast: legacy.data.cast,
+          }),
+        );
+        return;
+      }
+      setSession(null);
     } catch (error) {
       console.error("[岔路] 对局会话恢复失败", error);
-      sessionStorage.removeItem(worldCouncilStorageKey(worldId));
+      sessionStorage.removeItem(key);
       setSession(null);
     }
-  }, [worldId]);
+  }, [key, worldId]);
 
   if (session === undefined) {
     return (
@@ -668,12 +967,5 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
     );
   }
 
-  return (
-    <WorldCouncil
-      cast={session.cast}
-      player={player}
-      scenarioTitle={session.scenarioTitle}
-      onBack={() => router.back()}
-    />
-  );
+  return <WorldCouncil initial={session} worldId={worldId} onBack={() => router.back()} />;
 }

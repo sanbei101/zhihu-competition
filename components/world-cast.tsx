@@ -2,8 +2,9 @@
 
 import { Bot, LoaderCircle, Play, RefreshCw, Sparkles, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { generateCastAction } from "@/app/world/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,13 +16,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { type WorldCast, worldCastSchema, worldCouncilStorageKey } from "@/lib/world-cast";
+import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
+import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
+import { createInitialGameSession } from "@/lib/world-ending";
 
 interface WorldCastProps {
   scenario: {
     id: string;
     title: string;
     content: string;
+    url?: string;
   };
 }
 
@@ -31,41 +35,56 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [cacheNote, setCacheNote] = useState("");
+  const [elapsed, setElapsed] = useState("");
+
+  // 刷新页面后从本地缓存恢复阵容，不用重新等模型生成
+  useEffect(() => {
+    const cached = loadCachedCast(scenario.id);
+    if (cached) {
+      setCast(cached.cast);
+      setCacheNote(
+        `已从本地缓存恢复（${new Date(cached.savedAt).toLocaleString("zh-CN", { hour12: false })}）`,
+      );
+    }
+  }, [scenario.id]);
 
   async function generateCast() {
     setError("");
     setIsLoading(true);
+    setCacheNote("");
+    setElapsed("");
+    const startedAt = Date.now();
 
     try {
-      const response = await fetch("/api/world-cast", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scenarioId: scenario.id,
-          title: scenario.title,
-          content: scenario.content,
-        }),
+      const result = await generateCastAction({
+        scenarioId: scenario.id,
+        title: scenario.title,
+        content: scenario.content,
       });
-      const body: unknown = await response.json();
 
-      if (!response.ok) {
-        const message =
-          typeof body === "object" && body !== null && "error" in body
-            ? String(body.error)
-            : "角色生成失败";
-        const detail =
-          typeof body === "object" && body !== null && "detail" in body ? String(body.detail) : "";
-        throw new Error(detail ? `${message}\n${detail}` : message);
+      if (!result.ok) {
+        throw new Error(result.detail ? `${result.error}\n${result.detail}` : result.error);
       }
 
-      setCast(worldCastSchema.parse(body));
+      setCast(result.data);
       setSelectedCharacterId(null);
+      saveCachedCast(scenario.id, result.data);
+      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s，已存入本地缓存`);
     } catch (cause) {
       console.error("[岔路] 角色阵容请求失败", cause);
       setError(cause instanceof Error ? cause.message : "角色生成失败");
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function clearCache() {
+    clearCachedCast(scenario.id);
+    setCast(null);
+    setSelectedCharacterId(null);
+    setCacheNote("");
+    setElapsed("");
   }
 
   const selectedCharacter = cast?.playerCharacters.find(
@@ -77,12 +96,15 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
 
     sessionStorage.setItem(
       worldCouncilStorageKey(scenario.id),
-      JSON.stringify({
-        scenarioId: scenario.id,
-        scenarioTitle: scenario.title,
-        playerId: selectedCharacter.id,
-        cast,
-      }),
+      JSON.stringify(
+        createInitialGameSession({
+          scenarioId: scenario.id,
+          scenarioTitle: scenario.title,
+          scenarioUrl: scenario.url ?? "",
+          playerId: selectedCharacter.id,
+          cast,
+        }),
+      ),
     );
     router.push(`/world/${encodeURIComponent(scenario.id)}/council`);
   }
@@ -122,8 +144,13 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
             >
               {error}
             </p>
+            {cacheNote || elapsed ? (
+              <p className="text-muted-foreground mt-3 text-xs leading-5" aria-live="polite">
+                {[cacheNote, elapsed].filter(Boolean).join(" · ")}
+              </p>
+            ) : null}
           </CardContent>
-          <CardFooter className="bg-muted/30 border-t px-6 py-4">
+          <CardFooter className="bg-muted/30 flex-col items-stretch gap-2 border-t px-6 py-4">
             <Button className="w-full" onClick={generateCast} disabled={isLoading}>
               {isLoading ? (
                 <LoaderCircle className="animate-spin" data-icon="inline-start" />
@@ -134,6 +161,11 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               )}
               {isLoading ? "正在召集角色" : cast ? "重新生成阵容" : "生成角色阵容"}
             </Button>
+            {cast && !isLoading ? (
+              <Button variant="ghost" size="sm" className="w-full" onClick={clearCache}>
+                清除本地缓存
+              </Button>
+            ) : null}
           </CardFooter>
         </Card>
       </aside>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Separator } from "@/components/ui/separator";
 import { WorldCastPanel } from "@/components/world-cast";
 import { getWorldScenario, requireZhihuAccessSecret } from "@/lib/worlds";
+import { ZhihuApiError } from "@/lib/zhihu";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,70 @@ function editDate(editTime: number) {
 
 export default async function WorldPage({ params, searchParams }: WorldPageProps) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const scenario = await getWorldScenario(requireZhihuAccessSecret(), id, query.q);
+
+  let scenario: Awaited<ReturnType<typeof getWorldScenario>> | null = null;
+  let loadError = "";
+  try {
+    scenario = await getWorldScenario(requireZhihuAccessSecret(), id, query.q);
+  } catch (error) {
+    console.error("[岔路] 世界线母本加载失败", error);
+    loadError =
+      error instanceof ZhihuApiError
+        ? `该知乎母本暂时无法载入（${error.message}），可能是内容已删除或搜索暂时搜不到它。`
+        : "世界线母本加载失败，请稍后重试。";
+  }
+
+  if (!scenario) {
+    return (
+      <main className="bg-muted/30 text-foreground min-h-screen">
+        <header className="bg-background border-b">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
+            <Link href="/" className="flex items-center gap-3" aria-label="返回岔路首页">
+              <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
+                <GitBranch className="size-5" />
+              </span>
+              <span className="font-semibold tracking-tight">岔路</span>
+            </Link>
+            <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
+              <ArrowLeft data-icon="inline-start" />
+              返回副本库
+            </Button>
+          </div>
+        </header>
+
+        <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
+          <Card className="mx-auto max-w-lg shadow-none">
+            <CardHeader className="p-6 sm:p-8">
+              <CardTitle className="text-xl">这条世界线暂时打不开了</CardTitle>
+              <p className="text-muted-foreground mt-2 text-sm leading-7">{loadError}</p>
+              <p className="text-muted-foreground mt-1 font-mono text-xs">ID: {id}</p>
+            </CardHeader>
+            <CardFooter className="bg-muted/30 flex gap-2 border-t px-6 py-4 sm:px-8">
+              <Button render={<Link href="/#archives" />}>
+                <ArrowLeft data-icon="inline-start" />
+                回副本库换一条
+              </Button>
+              <Button
+                variant="outline"
+                render={
+                  <Link
+                    href={
+                      query.q
+                        ? `/world/${encodeURIComponent(id)}?q=${encodeURIComponent(query.q)}`
+                        : `/world/${encodeURIComponent(id)}`
+                    }
+                  />
+                }
+              >
+                重试
+              </Button>
+            </CardFooter>
+          </Card>
+        </section>
+      </main>
+    );
+  }
+
   const updatedAt = editDate(scenario.editTime);
 
   return (

@@ -89,21 +89,18 @@ export async function getWorldScenario(
   title?: string,
 ): Promise<WorldScenario> {
   const client = new ZhihuClient(accessSecret);
-  const query = title?.trim() || id;
-  const { Items } = await client.search({ Query: query, Count: 20 });
-  const item = Items.find((searchItem) => searchItem.ContentID === id);
+  // 同一条母本换多种 query 形态各查一次：标题、原始 ID、去负号 ID（知乎部分内容 ID 为负数，搜索分词可能吞掉负号）
+  const queries = [title?.trim(), id, id.startsWith("-") ? id.slice(1) : null].filter(
+    (query): query is string => !!query?.trim(),
+  );
 
-  if (item) {
-    const scenario = mapScenario(item);
-    if (scenario) return scenario;
-  }
-
-  if (query !== id) {
-    const byId = await client.search({ Query: id, Count: 20 });
-    const itemById = byId.Items.find((searchItem) => searchItem.ContentID === id);
-    const scenario = itemById ? mapScenario(itemById) : null;
-
-    if (scenario) return scenario;
+  for (const query of new Set(queries)) {
+    const { Items } = await client.search({ Query: query, Count: 20 });
+    const item = Items.find((searchItem) => searchItem.ContentID === id);
+    if (item) {
+      const scenario = mapScenario(item);
+      if (scenario) return scenario;
+    }
   }
 
   throw new ZhihuApiError(404, `知乎内容不存在: ${id}`);
