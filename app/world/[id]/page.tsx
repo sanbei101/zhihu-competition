@@ -1,26 +1,12 @@
-import {
-  ArrowLeft,
-  ArrowRight,
-  ExternalLink,
-  GitBranch,
-  MessageCircle,
-  Quote,
-  ThumbsUp,
-} from "lucide-react";
+import { ArrowLeft, ExternalLink, GitBranch, MessageCircle, Quote, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { WorldCastPanel } from "@/components/world-cast";
 import { getWorldScenario, requireZhihuAccessSecret } from "@/lib/worlds";
 
 export const dynamic = "force-dynamic";
@@ -142,41 +128,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
             </Card>
           </div>
 
-          <aside>
-            <Card className="border-border/70 shadow-none">
-              <CardHeader className="p-6">
-                <Badge variant="secondary" className="w-fit">
-                  WORLDLINE / ENTRY
-                </Badge>
-                <CardTitle className="pt-2 text-xl leading-8">从这道题开始推演</CardTitle>
-                <CardDescription className="leading-6">
-                  当前页面已载入知乎母本。决策分支需要接入推演服务后生成，不使用预置选项。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-6">
-                <ol className="text-muted-foreground space-y-4 text-sm">
-                  <li className="flex gap-3">
-                    <span className="text-primary font-mono">01</span>
-                    <span>确认这条问题作为世界线起点</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-primary font-mono">02</span>
-                    <span>由推演服务生成符合母本的决策者与势力</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="text-primary font-mono">03</span>
-                    <span>提交选择，获得连锁反应与分支结果</span>
-                  </li>
-                </ol>
-              </CardContent>
-              <CardFooter className="bg-muted/30 border-t px-6 py-4">
-                <Button variant="outline" className="w-full" disabled>
-                  推演入口待接入
-                  <ArrowRight data-icon="inline-end" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </aside>
+          <WorldCastPanel scenario={scenario} />
         </div>
       </section>
     </main>
