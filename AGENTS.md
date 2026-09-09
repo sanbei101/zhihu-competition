@@ -12,10 +12,9 @@
 
 ## 1. 项目概述与架构
 
-本项目基于 **vinext** 构建,在 **Vite 8** 之上运行 Next.js App Router 规范,通过 **Rolldown/Oxc** 编译,产出 Node `standalone` 服务并直接运行(`vinext start`),不依赖任何 Cloudflare/边缘运行时。
-
+本项目基于 **vinext** 构建,在 **Vite 8** 之上运行 Next.js App Router 规范,通过 **Rolldown/Oxc** 编译,产出 Node `standalone` 服务并直接运行(`vinext start`)
 - **框架**: `vinext`(基于 `Vite` 的 Next.js 16 App Router 兼容实现)
-- **运行时**: Node.js(标准 Node HTTP 服务)
+- **运行时**: Node
 - **UI 与 React**: React 19 + React Server Components (RSC)
 - **自动记忆化**: 通过 `oxc-transform-react` 使用 React Compiler
 - **样式方案**: Tailwind CSS v4,通过 `@tailwindcss/vite` 使用 `tailwindcss`, 配置文件在 `app/globals.css`
