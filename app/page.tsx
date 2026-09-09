@@ -262,11 +262,6 @@ export default async function Home() {
           <div className="grid gap-10 lg:grid-cols-[1fr_auto] lg:items-center">
             {/* 左侧主要文案 */}
             <div className="max-w-2xl space-y-5">
-              <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
-                <GitBranch className="size-3.5" />
-                <span>WHAT IF // WORLDLINE ARCHIVE LAB</span>
-              </div>
-
               <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-5xl sm:leading-[1.15]">
                 一个问题，
                 <span className="text-muted-foreground"> 衍生出</span>
@@ -279,7 +274,12 @@ export default async function Home() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Button size="default" nativeButton={false} className="gap-2" render={<Link href="#archives" />}>
+                <Button
+                  size="default"
+                  nativeButton={false}
+                  className="gap-2"
+                  render={<Link href="#archives" />}
+                >
                   挑选副本探索
                   <ArrowRight className="size-4" />
                 </Button>
@@ -290,7 +290,7 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* 右侧紧凑数据仪表舱（替代原来两行孤零零的字） */}
+            {/* 右侧紧凑数据仪表舱 */}
             <div className="flex flex-row gap-4 lg:flex-col">
               <div className="border-border/60 bg-card/60 flex-1 rounded-xl border p-4 shadow-sm backdrop-blur-sm sm:p-5 lg:w-56">
                 <span className="text-muted-foreground font-mono text-[11px] tracking-wider uppercase">
