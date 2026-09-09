@@ -57,9 +57,12 @@
 
 ## 4. UI 组件标准 - shadcn/ui
 
-所有 UI 组件必须使用 `shadcn/ui` 作为基础组件库进行构建。
+尽可能直接使用 `shadcn` 中已有的组件, 少自己实现,可以使用 `shadcn mcp` 获取想要用的组件, 
+
+所有 UI 组件必须使用 `shadcn/ui` 作为基础组件库进行构建
 
 ```
 pnpm dlx shadcn@latest add <组件名称>
 ```
+
 尽可能少写 `className`,不要写稀奇古怪的class,比如渐变阴影等复杂逻辑, **禁止**写原生css
