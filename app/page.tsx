@@ -5,7 +5,6 @@ import {
   GitBranch,
   GitCommit,
   MessageCircle,
-  Sparkles,
   ThumbsUp,
   TrendingUp,
 } from "lucide-react";
