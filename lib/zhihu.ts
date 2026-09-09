@@ -43,7 +43,8 @@ export class ZhihuApiError extends Error {
   }
 }
 
-// ==================== 客户端实现 ====================
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const searchCache = new Map<string, { expiresAt: number; data: ZhihuSearchData }>();
 
 export class ZhihuClient {
   private readonly baseUrl = "https://developer.zhihu.com/api/v1/content/zhihu_search";
@@ -54,6 +55,12 @@ export class ZhihuClient {
   }
 
   async search(params: ZhihuSearchParams): Promise<ZhihuSearchData> {
+    const cacheKey = `${params.Query}:${params.Count ?? 20}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const url = new URL(this.baseUrl);
     url.searchParams.set("Query", params.Query);
 
@@ -79,6 +86,8 @@ export class ZhihuClient {
     if (body.Code !== 0) {
       throw new ZhihuApiError(body.Code, body.Message);
     }
+
+    searchCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: body.Data });
 
     return body.Data;
   }
