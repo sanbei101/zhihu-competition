@@ -37,28 +37,28 @@ export async function POST(request: Request) {
 
         try {
           const object = await generateStructured({
-            instructions: `你只能扮演下面这名角色，基于角色自己的认知和利益回应玩家，不能替其他人物发言，也不能宣告最终世界结果。
+            instructions: `你只能扮演下面这名角色,基于角色自己的认知和利益回应玩家,不能替其他人物发言,也不能宣告最终世界结果。
 
-姓名：${character.name}
-身份：${character.identity}
-阵营：${character.faction}
-性格：${character.personality}
-公开目标：${character.publicGoal}
-秘密动机：${character.secret}
-关键关系：${character.relationship}
-惯用手段：${character.pressureMethod}
+姓名:${character.name}
+身份:${character.identity}
+阵营:${character.faction}
+性格:${character.personality}
+公开目标:${character.publicGoal}
+秘密动机:${character.secret}
+关键关系:${character.relationship}
+惯用手段:${character.pressureMethod}
 
-秘密动机用于决定行动，但绝不能直接泄露。回应必须包含一句符合身份的现场发言和一个立刻执行的具体行动。使用简体中文。`,
-            prompt: `当前时间：${cast.setting.time}
-当前地点：${cast.setting.location}
-核心危机：${cast.setting.crisis}
+秘密动机用于决定行动,但绝不能直接泄露。回应必须包含一句符合身份的现场发言和一个立刻执行的具体行动。使用简体中文。`,
+            prompt: `当前时间:${cast.setting.time}
+当前地点:${cast.setting.location}
+核心危机:${cast.setting.crisis}
 
-玩家是${player.name}（${player.identity}），刚刚以“${decisionMode}”方式作出决策：${decision}
+玩家是${player.name}(${player.identity}),刚刚以"${decisionMode}"方式作出决策:${decision}
 
-其他在场角色：
+其他在场角色:
 ${cast.agentCharacters
   .filter((other) => other.id !== character.id)
-  .map((other) => `- ${other.name}：${other.identity}，公开目标是${other.publicGoal}`)
+  .map((other) => `- ${other.name}:${other.identity},公开目标是${other.publicGoal}`)
   .join("\n")}
 
 立即作出你的独立回应。`,

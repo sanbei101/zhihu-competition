@@ -103,7 +103,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     });
     setIsLoading(false);
     if (!result.ok) {
-      setError(`${result.error}${result.detail ? `：${result.detail}` : ""}`);
+      setError(`${result.error}${result.detail ? `:${result.detail}` : ""}`);
       return;
     }
     setFinale(result.data);
@@ -129,7 +129,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         <CardHeader>
           <CardTitle>世界线尚未终局</CardTitle>
           <p className="text-muted-foreground text-sm leading-6">
-            请先回到议事厅完成推演（跑满 5 回合、触发提前结局，或第 3 回合后主动收束）。
+            请先回到议事厅完成推演(跑满 5 回合、触发提前结局,或第 3 回合后主动收束)。
           </p>
         </CardHeader>
         <CardContent>
@@ -163,7 +163,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
           </p>
           <p className="text-muted-foreground text-xs">
             {session.scenarioTitle}
-            {player ? ` · 你扮演 ${player.name}（${player.identity}）` : ""} · 共演{" "}
+            {player ? ` · 你扮演 ${player.name}(${player.identity})` : ""} · 共演{" "}
             {session.turns.length} 回合
           </p>
         </CardHeader>
@@ -188,7 +188,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             </div>
             <div>
               <p className="text-muted-foreground text-xs">终章评级</p>
-              <p className="mt-1 font-mono text-xl font-semibold">{finale ? finale.rating : "—"}</p>
+              <p className="mt-1 font-mono text-xl font-semibold">{finale ? finale.rating : "-"}</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">结局类型</p>
@@ -231,7 +231,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             知乎体深度长文
           </CardTitle>
           <p className="text-muted-foreground text-xs leading-5">
-            由史官根据你的真实推演记录整理，可一键复制去知乎社区发帖分享。
+            由史官根据你的真实推演记录整理,可一键复制去知乎社区发帖分享。
           </p>
         </CardHeader>
         <CardContent>
@@ -280,7 +280,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               size="sm"
               onClick={() =>
                 void copyText(
-                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n——岔路世界线推演`,
+                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n--岔路世界线推演`,
                 ).then((ok) => ok && setCopied("article"))
               }
             >

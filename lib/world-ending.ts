@@ -152,7 +152,7 @@ export function createInitialGameSession(input: {
   };
 }
 
-// ==================== 纯函数：幕次 / 数值 / 判定 ====================
+// ==================== 纯函数:幕次 / 数值 / 判定 ====================
 
 export function actForRound(round: number): string {
   if (round <= 2) return "第一幕·立势";
@@ -198,8 +198,8 @@ function collapseEnding(metrics: WorldMetrics): WorldEnding {
   const { key, value } = minMetric(metrics);
   return {
     type: "collapse",
-    title: `${metricLabels[key]}归零，世界线崩断`,
-    reason: `第${metricKeys.length}维指标中的「${metricLabels[key]}」已跌至 ${value}，局势无法维持，进入崩盘结局。`,
+    title: `${metricLabels[key]}归零,世界线崩断`,
+    reason: `第${metricKeys.length}维指标中的'${metricLabels[key]}'已跌至 ${value},局势无法维持,进入崩盘结局。`,
   };
 }
 
@@ -210,33 +210,33 @@ export function finalEndingForMetrics(metrics: WorldMetrics): WorldEnding {
   if (avg >= 75 && min.value >= 40) {
     return {
       type: "glorious",
-      title: "大势底定，辉煌收束",
-      reason: `五回合推演结束，世界均值 ${avg}，各条战线均稳固，堪称最优世界线。`,
+      title: "大势底定,辉煌收束",
+      reason: `五回合推演结束,世界均值 ${avg},各条战线均稳固,堪称最优世界线。`,
     };
   }
   if (avg >= 55) {
     return {
       type: "balanced",
-      title: "均势收束，各方止血",
-      reason: `五回合推演结束，世界均值 ${avg}，没有赢家，但也没有输家。`,
+      title: "均势收束,各方止血",
+      reason: `五回合推演结束,世界均值 ${avg},没有赢家,但也没有输家。`,
     };
   }
   if (avg >= 35) {
     return {
       type: "pyrrhic",
-      title: "惨胜收场，代价沉重",
-      reason: `五回合推演结束，世界均值 ${avg}，「${metricLabels[min.key]}」仅剩 ${min.value}，胜利名存实亡。`,
+      title: "惨胜收场,代价沉重",
+      reason: `五回合推演结束,世界均值 ${avg},'${metricLabels[min.key]}'仅剩 ${min.value},胜利名存实亡。`,
     };
   }
   return collapseEnding(metrics);
 }
 
 /**
- * 核心结束判定（服务端与客户端共用同一份）：
+ * 核心结束判定(服务端与客户端共用同一份):
  * 1. 任一指标 ≤0 → 崩盘提前结束
  * 2. 任一指标 ≥95 且均值 ≥70 → 辉煌提前结束
  * 3. 跑满 MAX_ROUNDS → 强制结算
- * 否则返回 null（继续）。
+ * 否则返回 null(继续)。
  */
 export function checkEnding(metrics: WorldMetrics, round: number): WorldEnding | null {
   const min = minMetric(metrics);
@@ -247,8 +247,8 @@ export function checkEnding(metrics: WorldMetrics, round: number): WorldEnding |
   if (hasPeak && avg >= 70) {
     return {
       type: "glorious",
-      title: "天命所归，提前定鼎",
-      reason: `世界均值 ${Math.round(avg)} 且有维度突破 95，大势已成，无需再演。`,
+      title: "天命所归,提前定鼎",
+      reason: `世界均值 ${Math.round(avg)} 且有维度突破 95,大势已成,无需再演。`,
     };
   }
 
@@ -256,36 +256,36 @@ export function checkEnding(metrics: WorldMetrics, round: number): WorldEnding |
   return null;
 }
 
-/** 第 MIN_ROUND_TO_CLOSE 回合起允许的玩家主动收束（本地构造，无需 LLM）。 */
+/** 第 MIN_ROUND_TO_CLOSE 回合起允许的玩家主动收束(本地构造,无需 LLM)。 */
 export function buildVoluntaryEnding(round: number): WorldEnding {
   return {
     type: "open",
-    title: `演至第 ${round} 回合，主动收束`,
-    reason: `玩家在第 ${round} 回合选择收束世界线，故事在此分叉处定格，留给知乎评论区继续推演。`,
+    title: `演至第 ${round} 回合,主动收束`,
+    reason: `玩家在第 ${round} 回合选择收束世界线,故事在此分叉处定格,留给知乎评论区继续推演。`,
   };
 }
 
 // ==================== 给 LLM 的压缩上下文 ====================
 
 export function summarizeTurnsForPrompt(turns: TurnRecord[], maxChars = 1800): string {
-  if (!turns.length) return "（此前尚无已结算回合，这是第一回合）";
+  if (!turns.length) return "(此前尚无已结算回合,这是第一回合)";
   const text = turns
     .map((turn) => {
       const stances = turn.reactions
         .map((entry) => `${entry.agentId}:${entry.reaction.stance}`)
-        .join("，");
-      return `第${turn.round}回合：玩家[${turn.decisionMode}]${turn.decision.slice(0, 80)}；各方（${stances || "无回应"}）；旁白：${turn.narration.slice(0, 120)}`;
+        .join(",");
+      return `第${turn.round}回合:玩家[${turn.decisionMode}]${turn.decision.slice(0, 80)};各方(${stances || "无回应"});旁白:${turn.narration.slice(0, 120)}`;
     })
     .join("\n");
   return text.length > maxChars ? `…${text.slice(-maxChars)}` : text;
 }
 
 export function summarizeReactionsForPrompt(reactions: TurnReactionRecord[]): string {
-  if (!reactions.length) return "（本回合没有任何 Agent 成功回应）";
+  if (!reactions.length) return "(本回合没有任何 Agent 成功回应)";
   return reactions
     .map(
       (entry) =>
-        `- ${entry.agentId}（${entry.reaction.stance}）：${entry.reaction.speech.slice(0, 80)}｜行动：${entry.reaction.action.slice(0, 80)}`,
+        `- ${entry.agentId}(${entry.reaction.stance}):${entry.reaction.speech.slice(0, 80)}|行动:${entry.reaction.action.slice(0, 80)}`,
     )
     .join("\n");
 }

@@ -89,7 +89,7 @@ export async function getWorldScenario(
   title?: string,
 ): Promise<WorldScenario> {
   const client = new ZhihuClient(accessSecret);
-  // 同一条母本换多种 query 形态各查一次：标题、原始 ID、去负号 ID（知乎部分内容 ID 为负数，搜索分词可能吞掉负号）
+  // 同一条母本换多种 query 形态各查一次:标题、原始 ID、去负号 ID(知乎部分内容 ID 为负数,搜索分词可能吞掉负号)
   const queries = [title?.trim(), id, id.startsWith("-") ? id.slice(1) : null].filter(
     (query): query is string => !!query?.trim(),
   );

@@ -157,7 +157,7 @@ function ReactionMessage({
           {reaction.speech}
         </div>
         <MessageFooter className="max-w-2xl items-start leading-5">
-          行动：{reaction.action} · 影响：{reaction.impact}
+          行动:{reaction.action} · 影响:{reaction.impact}
         </MessageFooter>
       </MessageContent>
     </Message>
@@ -237,7 +237,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
         <CardHeader>
           <CardTitle>玩家角色丢失</CardTitle>
           <p className="text-muted-foreground text-sm leading-6">
-            存档中的角色与当前阵容不一致，请返回世界线页面重新建档。
+            存档中的角色与当前阵容不一致,请返回世界线页面重新建档。
           </p>
         </CardHeader>
         <CardContent>
@@ -253,7 +253,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const ended = ending !== null;
   const currentTurnSettled = turns.some((turn) => turn.round === round);
   const storageKey = worldCouncilStorageKey(worldId);
-  // 守卫之后收窄为非空别名，供闭包与 JSX 使用（tsgolint 不跟踪闭包内的收窄）
+  // 守卫之后收窄为非空别名,供闭包与 JSX 使用(tsgolint 不跟踪闭包内的收窄)
   const activePlayer = player;
 
   useEffect(() => {
@@ -310,7 +310,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     setIsJudging(false);
     if (!result.ok) {
       setJudgeError(
-        `${result.error}${result.detail ? `：${result.detail}` : ""}（可重试，不会丢失本回合回应）`,
+        `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失本回合回应)`,
       );
       return;
     }
@@ -434,7 +434,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       });
 
       if (!response.ok) {
-        let message = `回合推演失败（${response.status}）`;
+        let message = `回合推演失败(${response.status})`;
         try {
           const body: unknown = await response.json();
           if (typeof body === "object" && body !== null && "error" in body) {
@@ -468,7 +468,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     } catch (error) {
       console.error("[岔路] 回合响应流失败", error);
       setTurnError(error instanceof Error ? error.message : "回合推演失败");
-      // 失败时把已提交的内容恢复到输入框，并收回提交态，保证可以修改后重试
+      // 失败时把已提交的内容恢复到输入框,并收回提交态,保证可以修改后重试
       setSubmittedDecision("");
       setDecision(content);
       setIsResolving(false);
@@ -781,7 +781,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                   aria-live="polite"
                 >
                   <LoaderCircle className="size-3.5 animate-spin" />
-                  各方表态收齐，正在裁决世界走向……
+                  各方表态收齐,正在裁决世界走向……
                 </div>
               ) : null}
               {judgeError ? (
@@ -799,7 +799,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                   <div className="flex items-center gap-2 text-xs text-emerald-700">
                     <Check className="size-3.5" />
                     本回合已裁决
-                    {round >= MAX_ROUNDS ? "" : `（已演 ${turns.length} / ${MAX_ROUNDS} 回合）`}
+                    {round >= MAX_ROUNDS ? "" : `(已演 ${turns.length} / ${MAX_ROUNDS} 回合)`}
                   </div>
                   {round < MAX_ROUNDS ? (
                     <Button type="button" variant="outline" size="sm" onClick={startNextRound}>
@@ -824,7 +824,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
               ) : null}
               {turnError ? (
                 <p className="text-destructive mt-3 text-xs" role="alert">
-                  {turnError}（已将决策恢复到输入框，修改后可重新提交）
+                  {turnError}(已将决策恢复到输入框,修改后可重新提交)
                 </p>
               ) : null}
             </form>
@@ -933,7 +933,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                       终
                     </span>
                     <div className="pt-0.5">
-                      <p>终章结算（{MAX_ROUNDS} 回合或提前终局）</p>
+                      <p>终章结算({MAX_ROUNDS} 回合或提前终局)</p>
                       <p className="mt-1 text-xs">
                         已演 {turns.length} / {MAX_ROUNDS} 回合
                       </p>

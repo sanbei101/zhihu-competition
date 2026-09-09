@@ -72,7 +72,7 @@ function ScenarioCard({ scenario, index }: { scenario: WorldScenario; index: num
             )}
           </div>
 
-          {/* 标题：不固定高度，让字数自然撑开卡片，形成视觉上的波浪落差 */}
+          {/* 标题:不固定高度,让字数自然撑开卡片,形成视觉上的波浪落差 */}
           <CardTitle className="text-foreground group-hover:text-primary text-base leading-relaxed font-semibold tracking-tight transition-colors duration-200 sm:text-lg">
             {scenario.title}
           </CardTitle>
@@ -137,7 +137,7 @@ function FeaturedScenario({ scenario }: { scenario: WorldScenario }) {
       {/* 顶部环境微光丝带 */}
       <div className="via-primary pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent to-transparent opacity-75" />
 
-      {/* 右上角背景隐约的网格徽标装饰（增强科技探索感） */}
+      {/* 右上角背景隐约的网格徽标装饰(增强科技探索感) */}
       <div className="text-primary/5 group-hover:text-primary/10 pointer-events-none absolute -top-6 -right-6 transition-transform duration-700 group-hover:scale-110">
         <GitBranch className="size-48 stroke-1" />
       </div>
@@ -166,7 +166,7 @@ function FeaturedScenario({ scenario }: { scenario: WorldScenario }) {
           </span>
         </div>
 
-        {/* 核心问题标题：排版强化 */}
+        {/* 核心问题标题:排版强化 */}
         <div className="space-y-3">
           <CardTitle className="text-foreground group-hover:text-primary text-xl leading-relaxed font-bold tracking-tight transition-colors sm:text-2xl lg:text-3xl">
             {scenario.title}
@@ -255,7 +255,7 @@ export default async function Home() {
 
       {/* Hero 区域 */}
       <section className="border-border/60 from-background via-muted/10 to-background relative overflow-hidden border-b bg-gradient-to-b py-16 sm:py-20">
-        {/* 背景质感微网格（纯 Tailwind 类实现） */}
+        {/* 背景质感微网格(纯 Tailwind 类实现) */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,hsl(var(--primary)/0.12),transparent)]" />
 
         <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
@@ -263,14 +263,14 @@ export default async function Home() {
             {/* 左侧主要文案 */}
             <div className="max-w-2xl space-y-5">
               <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-5xl sm:leading-[1.15]">
-                一个问题，
+                一个问题,
                 <span className="text-muted-foreground"> 衍生出</span>
                 <br />
                 一条尚未发生的世界线。
               </h1>
 
               <p className="text-muted-foreground text-base sm:text-lg">
-                从知乎的历史假设与脑洞命题出发，提取母本切片，探索平行历史的另一种解答。
+                从知乎的历史假设与脑洞命题出发,提取母本切片,探索平行历史的另一种解答。
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -328,7 +328,7 @@ export default async function Home() {
             </div>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">选择世界线切片</h2>
             <p className="text-muted-foreground mt-2 text-sm">
-              错落排列的假设题目，卡片随思考深度自然延展。
+              错落排列的假设题目,卡片随思考深度自然延展。
             </p>
           </div>
           <Badge

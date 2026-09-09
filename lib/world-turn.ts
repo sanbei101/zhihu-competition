@@ -12,7 +12,7 @@ export const worldTurnRequestSchema = z.object({
 });
 
 export const agentReactionSchema = z.object({
-  speech: z.string().describe("角色当场说出的话，不超过一百二十字"),
+  speech: z.string().describe("角色当场说出的话,不超过一百二十字"),
   action: z.string().describe("角色立刻采取的具体行动"),
   target: z.string().describe("行动针对的人物、阵营或资源"),
   stance: z.enum(["support", "oppose", "negotiate", "exploit"]),

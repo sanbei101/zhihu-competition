@@ -43,8 +43,8 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
     console.error("[岔路] 世界线母本加载失败", error);
     loadError =
       error instanceof ZhihuApiError
-        ? `该知乎母本暂时无法载入（${error.message}），可能是内容已删除或搜索暂时搜不到它。`
-        : "世界线母本加载失败，请稍后重试。";
+        ? `该知乎母本暂时无法载入(${error.message}),可能是内容已删除或搜索暂时搜不到它。`
+        : "世界线母本加载失败,请稍后重试。";
   }
 
   if (!scenario) {

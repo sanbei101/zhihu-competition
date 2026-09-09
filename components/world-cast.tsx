@@ -38,13 +38,13 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   const [cacheNote, setCacheNote] = useState("");
   const [elapsed, setElapsed] = useState("");
 
-  // 刷新页面后从本地缓存恢复阵容，不用重新等模型生成
+  // 刷新页面后从本地缓存恢复阵容,不用重新等模型生成
   useEffect(() => {
     const cached = loadCachedCast(scenario.id);
     if (cached) {
       setCast(cached.cast);
       setCacheNote(
-        `已从本地缓存恢复（${new Date(cached.savedAt).toLocaleString("zh-CN", { hour12: false })}）`,
+        `已从本地缓存恢复(${new Date(cached.savedAt).toLocaleString("zh-CN", { hour12: false })})`,
       );
     }
   }, [scenario.id]);
@@ -70,7 +70,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       setCast(result.data);
       setSelectedCharacterId(null);
       saveCachedCast(scenario.id, result.data);
-      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s，已存入本地缓存`);
+      setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s,已存入本地缓存`);
     } catch (cause) {
       console.error("[岔路] 角色阵容请求失败", cause);
       setError(cause instanceof Error ? cause.message : "角色生成失败");
@@ -286,7 +286,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                       <p className="mt-1">{character.pressureMethod}</p>
                     </div>
                     <blockquote className="text-muted-foreground border-l pl-3">
-                      “{character.openingLine}”
+                      "{character.openingLine}"
                     </blockquote>
                   </CardContent>
                 </Card>

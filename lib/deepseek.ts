@@ -10,7 +10,7 @@ interface StructuredCallOptions<T> {
   abortSignal?: AbortSignal;
 }
 
-/** 结构化对象生成（generateText + Output.object），返回按 schema 解析后的对象。 */
+/** 结构化对象生成(generateText + Output.object),返回按 schema 解析后的对象。 */
 export async function generateStructured<T>(options: StructuredCallOptions<T>): Promise<T> {
   const { output } = await generateText({
     model: createDeepSeek({ apiKey: process.env.DEEPSEEK_API_KEY })("deepseek-v4-flash"),

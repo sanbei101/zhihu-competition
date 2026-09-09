@@ -1,7 +1,7 @@
 import { worldCastSchema, type WorldCast } from "@/lib/world-cast";
 
 function storage(): Storage | null {
-  // ponytail: 单次特性检测即可，三处 canUseStorage 重复分支合并于此
+  // ponytail: 单次特性检测即可,三处 canUseStorage 重复分支合并于此
   try {
     return typeof window !== "undefined" ? window.localStorage : null;
   } catch {
@@ -9,7 +9,7 @@ function storage(): Storage | null {
   }
 }
 
-/** 读取本地缓存的阵容（刷新页面不丢）。 */
+/** 读取本地缓存的阵容(刷新页面不丢)。 */
 export function loadCachedCast(scenarioId: string): { cast: WorldCast; savedAt: number } | null {
   const store = storage();
   if (!store) return null;
