@@ -85,6 +85,37 @@ const stanceLabels: Record<AgentReaction["stance"], string> = {
   exploit: "借势",
 };
 
+function useTypewriter(text: string, durationMs = 6000): { typed: string; isTyping: boolean } {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    setCount(0);
+    const frame = Math.max(1, Math.ceil(text.length / (durationMs / 50)));
+    const id = setInterval(() => {
+      setCount((current) => (current >= text.length ? current : current + frame));
+    }, 50);
+    return () => clearInterval(id);
+  }, [durationMs, text]);
+
+  return { typed: text.slice(0, count), isTyping: count < text.length };
+}
+
+function SpeakingAvatar({
+  isTyping,
+  characterName,
+  className,
+}: {
+  isTyping: boolean;
+  characterName: string;
+  className?: string;
+}) {
+  return (
+    <MessageAvatar className={`${className ?? "size-8"} ${isTyping ? "animate-pulse" : ""}`}>
+      {characterName.slice(0, 1)}
+    </MessageAvatar>
+  );
+}
+
 function PlayerDecisionMessage({
   playerName,
   decision,
@@ -118,20 +149,46 @@ function ReactionMessage({
   characterName: string;
   reaction: AgentReaction;
 }) {
+  const { typed, isTyping } = useTypewriter(reaction.speech);
   return (
     <Message>
-      <MessageAvatar className="size-8">{characterName.slice(0, 1)}</MessageAvatar>
+      <SpeakingAvatar isTyping={isTyping} characterName={characterName} />
       <MessageContent>
         <MessageHeader className="gap-2">
           <span>{characterName}</span>
           <Badge variant="outline">{stanceLabels[reaction.stance]}</Badge>
         </MessageHeader>
         <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
-          {reaction.speech}
+          {typed}
         </div>
         <MessageFooter className="max-w-2xl items-start leading-5">
           行动:{reaction.action} · 影响:{reaction.impact}
         </MessageFooter>
+      </MessageContent>
+    </Message>
+  );
+}
+
+function OpeningLineMessage({
+  character,
+  footer,
+}: {
+  character: WorldCast["agentCharacters"][number];
+  footer: string;
+}) {
+  const { typed, isTyping } = useTypewriter(character.openingLine);
+  return (
+    <Message>
+      <SpeakingAvatar isTyping={isTyping} characterName={character.name} />
+      <MessageContent>
+        <MessageHeader className="gap-2">
+          <span>{character.name}</span>
+          <span className="font-normal">{character.identity}</span>
+        </MessageHeader>
+        <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
+          {typed}
+        </div>
+        <MessageFooter>{footer}</MessageFooter>
       </MessageContent>
     </Message>
   );
@@ -676,21 +733,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
                     {cast.agentCharacters.map((character, index) => (
                       <MessageScrollerItem key={character.id}>
-                        <Message>
-                          <MessageAvatar className="size-8">
-                            {character.name.slice(0, 1)}
-                          </MessageAvatar>
-                          <MessageContent>
-                            <MessageHeader className="gap-2">
-                              <span>{character.name}</span>
-                              <span className="font-normal">{character.identity}</span>
-                            </MessageHeader>
-                            <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
-                              {character.openingLine}
-                            </div>
-                            <MessageFooter>{index < 2 ? "公开表态" : "旁听发言"}</MessageFooter>
-                          </MessageContent>
-                        </Message>
+                        <OpeningLineMessage
+                          character={character}
+                          footer={index < 2 ? "公开表态" : "旁听发言"}
+                        />
                       </MessageScrollerItem>
                     ))}
 

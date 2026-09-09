@@ -243,9 +243,7 @@ export default async function Home() {
               className="flex items-center gap-3 transition-opacity hover:opacity-90"
               aria-label="知乎脑洞首页"
             >
-              <span className="bg-primary text-primary-foreground shadow-primary/20 grid size-9 place-items-center rounded-lg shadow-sm">
-                <GitBranch className="size-5" />
-              </span>
+              <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
               <span className="text-base font-semibold tracking-tight">知乎脑洞</span>
             </Link>
           </div>
@@ -281,9 +279,7 @@ export default async function Home() {
             className="flex items-center gap-3 transition-opacity hover:opacity-90"
             aria-label="知乎脑洞首页"
           >
-            <span className="bg-primary text-primary-foreground shadow-primary/20 grid size-9 place-items-center rounded-lg shadow-sm">
-              <GitBranch className="size-5" />
-            </span>
+            <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
             <span className="text-base font-semibold tracking-tight">知乎脑洞</span>
             <Separator orientation="vertical" className="bg-border/60 hidden h-4 sm:block" />
             <span className="text-muted-foreground hidden text-xs tracking-wider uppercase sm:block">

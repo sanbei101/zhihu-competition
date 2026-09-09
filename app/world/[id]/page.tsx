@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, GitBranch, MessageCircle, Quote, ThumbsUp } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageCircle, Quote, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,9 +53,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
         <header className="bg-background border-b">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
             <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
-              <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
-                <GitBranch className="size-5" />
-              </span>
+              <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
               <span className="font-semibold tracking-tight">知乎脑洞</span>
             </Link>
             <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
@@ -105,9 +103,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
       <header className="bg-background border-b">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
           <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
-            <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
-              <GitBranch className="size-5" />
-            </span>
+            <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
             <span className="font-semibold tracking-tight">知乎脑洞</span>
           </Link>
           <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
