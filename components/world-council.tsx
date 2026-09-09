@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -117,10 +117,20 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
   const [isTurnComplete, setIsTurnComplete] = useState(false);
   const [turnError, setTurnError] = useState("");
 
-  async function submitDecision(event: FormEvent<HTMLFormElement>) {
+  function startNextRound() {
+    setSubmittedDecision("");
+    setSubmittedMode(decisionMode);
+    setDecision("");
+    setReactions([]);
+    setAgentStatuses({});
+    setIsTurnComplete(false);
+    setTurnError("");
+  }
+
+  async function submitDecision(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = decision.trim();
-    if (!content || isResolving || submittedDecision) return;
+    if (!content || isResolving || isTurnComplete) return;
 
     setSubmittedDecision(content);
     setSubmittedMode(decisionMode);
@@ -151,9 +161,27 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
           ...statuses,
           [turnEvent.agentId]: "error",
         }));
-      } else {
+      } else if (turnEvent.type === "complete") {
         setIsTurnComplete(true);
       }
+    }
+
+    function applyLine(line: string) {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let parsedJson: unknown;
+      try {
+        parsedJson = JSON.parse(trimmed);
+      } catch (error) {
+        console.error("[岔路] 回合事件不是合法 JSON", error, trimmed.slice(0, 200));
+        return;
+      }
+      const parsedEvent = worldTurnEventSchema.safeParse(parsedJson);
+      if (!parsedEvent.success) {
+        console.error("[岔路] 回合事件结构不匹配", parsedEvent.error, trimmed.slice(0, 200));
+        return;
+      }
+      applyEvent(parsedEvent.data);
     }
 
     try {
@@ -169,33 +197,46 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
       });
 
       if (!response.ok) {
-        const body: unknown = await response.json();
-        const message =
-          typeof body === "object" && body !== null && "error" in body
-            ? String(body.error)
-            : "回合推演失败";
+        let message = `回合推演失败（${response.status}）`;
+        try {
+          const body: unknown = await response.json();
+          if (typeof body === "object" && body !== null && "error" in body) {
+            message = String(body.error);
+          }
+        } catch {
+          // 服务端返回的不是 JSON,保留默认提示
+        }
         throw new Error(message);
       }
       if (!response.body) throw new Error("浏览器未收到回合响应流");
 
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
-      for await (const value of response.body) {
+      async function pump(): Promise<void> {
+        const { done, value } = await reader.read();
+        if (done) return;
+
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-
         for (const line of lines) {
-          if (line) applyEvent(worldTurnEventSchema.parse(JSON.parse(line)));
+          applyLine(line);
         }
+        await pump();
       }
 
+      await pump();
+
       buffer += decoder.decode();
-      if (buffer.trim()) applyEvent(worldTurnEventSchema.parse(JSON.parse(buffer)));
+      if (buffer.trim()) applyLine(buffer);
     } catch (error) {
       console.error("[岔路] 回合响应流失败", error);
       setTurnError(error instanceof Error ? error.message : "回合推演失败");
+      // 失败时把已提交的内容恢复到输入框，并收回提交态，保证可以修改后重试
+      setSubmittedDecision("");
+      setDecision(content);
     } finally {
       setIsResolving(false);
     }
@@ -441,7 +482,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                   placeholder={decisionModes[decisionMode].placeholder}
                   rows={3}
                   maxLength={600}
-                  disabled={isResolving || Boolean(submittedDecision)}
+                  disabled={isResolving || isTurnComplete}
                 />
                 <InputGroupAddon align="block-end" className="border-t">
                   <InputGroupText className="text-xs tabular-nums">
@@ -452,7 +493,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                     variant="default"
                     size="sm"
                     className="ml-auto"
-                    disabled={!decision.trim() || isResolving || Boolean(submittedDecision)}
+                    disabled={!decision.trim() || isResolving || isTurnComplete}
                   >
                     提交决策
                     <SendHorizontal />
@@ -469,17 +510,19 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                 </div>
               ) : null}
               {isTurnComplete ? (
-                <div
-                  className="mt-3 flex items-center gap-2 text-xs text-emerald-700"
-                  aria-live="polite"
-                >
-                  <Check className="size-3.5" />
-                  本回合各方表态完成
+                <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+                  <div className="flex items-center gap-2 text-xs text-emerald-700">
+                    <Check className="size-3.5" />
+                    本回合各方表态完成
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={startNextRound}>
+                    开始下一回合
+                  </Button>
                 </div>
               ) : null}
               {turnError ? (
                 <p className="text-destructive mt-3 text-xs" role="alert">
-                  {turnError}
+                  {turnError}（已将决策恢复到输入框，修改后可重新提交）
                 </p>
               ) : null}
             </form>
