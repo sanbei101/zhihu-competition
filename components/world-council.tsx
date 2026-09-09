@@ -63,6 +63,7 @@ import {
   worldCouncilSessionSchema,
   worldCouncilStorageKey,
 } from "@/lib/world-cast";
+import { type AgentReaction, type WorldTurnEvent, worldTurnEventSchema } from "@/lib/world-turn";
 
 interface WorldCouncilProps {
   cast: WorldCast;
@@ -94,19 +95,110 @@ const decisionModes = {
 } as const;
 
 type DecisionMode = keyof typeof decisionModes;
+type AgentStatus = "thinking" | "done" | "error";
+
+const stanceLabels: Record<AgentReaction["stance"], string> = {
+  support: "支持",
+  oppose: "反对",
+  negotiate: "交涉",
+  exploit: "借势",
+};
 
 function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps) {
   const [decisionMode, setDecisionMode] = useState<DecisionMode>("public");
   const [decision, setDecision] = useState("");
   const [submittedDecision, setSubmittedDecision] = useState("");
+  const [submittedMode, setSubmittedMode] = useState<DecisionMode>("public");
+  const [reactions, setReactions] = useState<Array<{ agentId: string; reaction: AgentReaction }>>(
+    [],
+  );
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [isResolving, setIsResolving] = useState(false);
+  const [isTurnComplete, setIsTurnComplete] = useState(false);
+  const [turnError, setTurnError] = useState("");
 
-  function submitDecision(event: FormEvent<HTMLFormElement>) {
+  async function submitDecision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = decision.trim();
-    if (!content) return;
+    if (!content || isResolving || submittedDecision) return;
 
     setSubmittedDecision(content);
+    setSubmittedMode(decisionMode);
     setDecision("");
+    setReactions([]);
+    setAgentStatuses({});
+    setIsResolving(true);
+    setIsTurnComplete(false);
+    setTurnError("");
+
+    function applyEvent(turnEvent: WorldTurnEvent) {
+      if (turnEvent.type === "agent-start") {
+        setAgentStatuses((statuses) => ({
+          ...statuses,
+          [turnEvent.agentId]: "thinking",
+        }));
+      } else if (turnEvent.type === "agent-reaction") {
+        setReactions((current) => [
+          ...current,
+          { agentId: turnEvent.agentId, reaction: turnEvent.reaction },
+        ]);
+        setAgentStatuses((statuses) => ({
+          ...statuses,
+          [turnEvent.agentId]: "done",
+        }));
+      } else if (turnEvent.type === "agent-error") {
+        setAgentStatuses((statuses) => ({
+          ...statuses,
+          [turnEvent.agentId]: "error",
+        }));
+      } else {
+        setIsTurnComplete(true);
+      }
+    }
+
+    try {
+      const response = await fetch("/api/world-turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cast,
+          playerId: player.id,
+          decisionMode,
+          decision: content,
+        }),
+      });
+
+      if (!response.ok) {
+        const body: unknown = await response.json();
+        const message =
+          typeof body === "object" && body !== null && "error" in body
+            ? String(body.error)
+            : "回合推演失败";
+        throw new Error(message);
+      }
+      if (!response.body) throw new Error("浏览器未收到回合响应流");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      for await (const value of response.body) {
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line) applyEvent(worldTurnEventSchema.parse(JSON.parse(line)));
+        }
+      }
+
+      buffer += decoder.decode();
+      if (buffer.trim()) applyEvent(worldTurnEventSchema.parse(JSON.parse(buffer)));
+    } catch (error) {
+      console.error("[岔路] 回合响应流失败", error);
+      setTurnError(error instanceof Error ? error.message : "回合推演失败");
+    } finally {
+      setIsResolving(false);
+    }
   }
 
   return (
@@ -163,7 +255,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
             <Separator />
 
             <ItemGroup className="gap-1">
-              {cast.agentCharacters.map((character, index) => (
+              {cast.agentCharacters.map((character) => (
                 <Item key={character.id} size="xs">
                   <ItemMedia>
                     <Avatar size="sm">
@@ -177,11 +269,23 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                   <ItemActions>
                     <span
                       className={
-                        index < 2
+                        agentStatuses[character.id] === "done"
                           ? "size-2 rounded-full bg-emerald-500"
-                          : "size-2 rounded-full bg-amber-500"
+                          : agentStatuses[character.id] === "thinking"
+                            ? "size-2 animate-pulse rounded-full bg-amber-500"
+                            : agentStatuses[character.id] === "error"
+                              ? "bg-destructive size-2 rounded-full"
+                              : "bg-muted-foreground/30 size-2 rounded-full"
                       }
-                      aria-label={index < 2 ? "已表态" : "观察中"}
+                      aria-label={
+                        agentStatuses[character.id] === "done"
+                          ? "已回应"
+                          : agentStatuses[character.id] === "thinking"
+                            ? "思考中"
+                            : agentStatuses[character.id] === "error"
+                              ? "回应失败"
+                              : "等待中"
+                      }
                     />
                   </ItemActions>
                 </Item>
@@ -250,7 +354,52 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                             <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
                               {submittedDecision}
                             </div>
-                            <MessageFooter>{decisionModes[decisionMode].label}</MessageFooter>
+                            <MessageFooter>{decisionModes[submittedMode].label}</MessageFooter>
+                          </MessageContent>
+                        </Message>
+                      </MessageScrollerItem>
+                    ) : null}
+
+                    {reactions.map(({ agentId, reaction }) => {
+                      const character = cast.agentCharacters.find(
+                        (candidate) => candidate.id === agentId,
+                      );
+                      if (!character) return null;
+
+                      return (
+                        <MessageScrollerItem key={`reaction-${agentId}`} scrollAnchor>
+                          <Message>
+                            <MessageAvatar className="size-8">
+                              {character.name.slice(0, 1)}
+                            </MessageAvatar>
+                            <MessageContent>
+                              <MessageHeader className="gap-2">
+                                <span>{character.name}</span>
+                                <Badge variant="outline">{stanceLabels[reaction.stance]}</Badge>
+                              </MessageHeader>
+                              <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
+                                {reaction.speech}
+                              </div>
+                              <MessageFooter className="max-w-2xl items-start leading-5">
+                                行动：{reaction.action} · 影响：{reaction.impact}
+                              </MessageFooter>
+                            </MessageContent>
+                          </Message>
+                        </MessageScrollerItem>
+                      );
+                    })}
+
+                    {isTurnComplete ? (
+                      <MessageScrollerItem scrollAnchor>
+                        <Message>
+                          <MessageAvatar className="size-8 bg-emerald-100 text-emerald-700">
+                            <Check className="size-4" />
+                          </MessageAvatar>
+                          <MessageContent>
+                            <MessageHeader>本回合回应完成</MessageHeader>
+                            <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
+                              各方行动已经收齐，可以进入冲突裁决。
+                            </div>
                           </MessageContent>
                         </Message>
                       </MessageScrollerItem>
@@ -292,6 +441,7 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                   placeholder={decisionModes[decisionMode].placeholder}
                   rows={3}
                   maxLength={600}
+                  disabled={isResolving || Boolean(submittedDecision)}
                 />
                 <InputGroupAddon align="block-end" className="border-t">
                   <InputGroupText className="text-xs tabular-nums">
@@ -302,21 +452,35 @@ function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps
                     variant="default"
                     size="sm"
                     className="ml-auto"
-                    disabled={!decision.trim()}
+                    disabled={!decision.trim() || isResolving || Boolean(submittedDecision)}
                   >
                     提交决策
                     <SendHorizontal />
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
-              {submittedDecision ? (
+              {isResolving ? (
                 <div
                   className="text-muted-foreground mt-3 flex items-center gap-2 text-xs"
                   aria-live="polite"
                 >
                   <LoaderCircle className="size-3.5 animate-spin" />
-                  决策已锁定，各方正在评估局势
+                  已收到 {reactions.length} / {cast.agentCharacters.length} 条回应
                 </div>
+              ) : null}
+              {isTurnComplete ? (
+                <div
+                  className="mt-3 flex items-center gap-2 text-xs text-emerald-700"
+                  aria-live="polite"
+                >
+                  <Check className="size-3.5" />
+                  本回合各方表态完成
+                </div>
+              ) : null}
+              {turnError ? (
+                <p className="text-destructive mt-3 text-xs" role="alert">
+                  {turnError}
+                </p>
               ) : null}
             </form>
           </CardContent>
