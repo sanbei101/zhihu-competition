@@ -44,3 +44,16 @@ export const worldCastSchema = z.object({
 });
 
 export type WorldCast = z.infer<typeof worldCastSchema>;
+
+export const worldCouncilSessionSchema = z.object({
+  scenarioId: z.string(),
+  scenarioTitle: z.string(),
+  playerId: z.string(),
+  cast: worldCastSchema,
+});
+
+export type WorldCouncilSession = z.infer<typeof worldCouncilSessionSchema>;
+
+export function worldCouncilStorageKey(scenarioId: string) {
+  return `world-council:${scenarioId}`;
+}

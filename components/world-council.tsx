@@ -14,7 +14,9 @@ import {
   Shield,
   UserRound,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -53,12 +55,19 @@ import {
 } from "@/components/ui/message-scroller";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { WorldCast } from "@/lib/world-cast";
+import {
+  type WorldCast,
+  type WorldCouncilSession,
+  worldCouncilSessionSchema,
+  worldCouncilStorageKey,
+} from "@/lib/world-cast";
 
 interface WorldCouncilProps {
   cast: WorldCast;
   player: WorldCast["playerCharacters"][number];
+  scenarioTitle: string;
   onBack: () => void;
 }
 
@@ -86,7 +95,7 @@ const decisionModes = {
 
 type DecisionMode = keyof typeof decisionModes;
 
-export function WorldCouncil({ cast, player, onBack }: WorldCouncilProps) {
+function WorldCouncil({ cast, player, scenarioTitle, onBack }: WorldCouncilProps) {
   const [decisionMode, setDecisionMode] = useState<DecisionMode>("public");
   const [decision, setDecision] = useState("");
   const [submittedDecision, setSubmittedDecision] = useState("");
@@ -116,6 +125,7 @@ export function WorldCouncil({ cast, player, onBack }: WorldCouncilProps) {
               </Badge>
             </div>
             <h2 className="mt-2 text-xl font-semibold">危机议事</h2>
+            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">{scenarioTitle}</p>
           </div>
         </div>
         <div className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -393,5 +403,70 @@ export function WorldCouncil({ cast, player, onBack }: WorldCouncilProps) {
         </Card>
       </div>
     </div>
+  );
+}
+
+export function WorldCouncilSession({ worldId }: { worldId: string }) {
+  const router = useRouter();
+  const [session, setSession] = useState<WorldCouncilSession | null>();
+
+  useEffect(() => {
+    const storedSession = sessionStorage.getItem(worldCouncilStorageKey(worldId));
+
+    if (!storedSession) {
+      setSession(null);
+      return;
+    }
+
+    try {
+      const parsedSession = worldCouncilSessionSchema.parse(JSON.parse(storedSession));
+      setSession(parsedSession.scenarioId === worldId ? parsedSession : null);
+    } catch (error) {
+      console.error("[岔路] 对局会话恢复失败", error);
+      sessionStorage.removeItem(worldCouncilStorageKey(worldId));
+      setSession(null);
+    }
+  }, [worldId]);
+
+  if (session === undefined) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
+        <Skeleton className="h-80" />
+        <Skeleton className="h-160" />
+        <Skeleton className="h-80" />
+      </div>
+    );
+  }
+
+  const player = session?.cast.playerCharacters.find(
+    (character) => character.id === session.playerId,
+  );
+
+  if (!session || !player) {
+    return (
+      <Card className="mx-auto max-w-lg shadow-none">
+        <CardHeader>
+          <CardTitle>对局尚未建立</CardTitle>
+          <p className="text-muted-foreground text-sm leading-6">
+            请先返回世界线页面生成阵容并选择角色。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}>
+            返回世界线
+            <ArrowLeft data-icon="inline-end" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <WorldCouncil
+      cast={session.cast}
+      player={player}
+      scenarioTitle={session.scenarioTitle}
+      onBack={() => router.back()}
+    />
   );
 }
