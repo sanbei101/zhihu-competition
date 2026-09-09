@@ -245,7 +245,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(session));
     } catch (error) {
-      console.error("[岔路] 对局存档写入失败", error);
+      console.error("对局存档写入失败", error);
     }
   }, [
     cast,
@@ -423,12 +423,12 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       try {
         parsedJson = JSON.parse(trimmed);
       } catch (error) {
-        console.error("[岔路] 回合事件不是合法 JSON", error, trimmed.slice(0, 200));
+        console.error("回合事件不是合法 JSON", error, trimmed.slice(0, 200));
         return;
       }
       const parsedEvent = worldTurnEventSchema.safeParse(parsedJson);
       if (!parsedEvent.success) {
-        console.error("[岔路] 回合事件结构不匹配", parsedEvent.error, trimmed.slice(0, 200));
+        console.error("回合事件结构不匹配", parsedEvent.error, trimmed.slice(0, 200));
         return;
       }
       applyEvent(parsedEvent.data);
@@ -478,7 +478,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       buffer += decoder.decode();
       if (buffer.trim()) applyLine(buffer);
     } catch (error) {
-      console.error("[岔路] 回合响应流失败", error);
+      console.error("回合响应流失败", error);
       const message = error instanceof Error ? error.message : "回合推演失败";
       setTurnError(message);
       toast.add({ title: "回合推演失败", description: message, type: "error" });
@@ -982,7 +982,7 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
       const parsed = worldGameSessionSchema.safeParse(raw);
       setSession(parsed.success && parsed.data.scenarioId === worldId ? parsed.data : null);
     } catch (error) {
-      console.error("[岔路] 对局会话恢复失败", error);
+      console.error("对局会话恢复失败", error);
       sessionStorage.removeItem(key);
       setSession(null);
     }

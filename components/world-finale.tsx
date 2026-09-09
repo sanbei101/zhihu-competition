@@ -87,7 +87,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         }
       }
     } catch (err) {
-      console.error("[岔路] 终章存档恢复失败", err);
+      console.error("终章存档恢复失败", err);
       setSession(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,7 +119,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     try {
       sessionStorage.setItem(finaleCacheKey(worldId), JSON.stringify(result.data));
     } catch (err) {
-      console.error("[岔路] 终章缓存写入失败", err);
+      console.error("终章缓存写入失败", err);
     }
   }
 
@@ -289,7 +289,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               size="sm"
               onClick={() =>
                 void copyText(
-                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n——岔路世界线推演`,
+                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n——知乎脑洞世界线推演`,
                 ).then((ok) => {
                   if (ok) setCopied("article");
                   else

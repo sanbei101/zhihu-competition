@@ -71,7 +71,7 @@ ${cast.agentCharacters
           const reaction = agentReactionSchema.parse(object);
           send({ type: "agent-reaction", agentId: character.id, reaction });
         } catch (error) {
-          console.error(`[岔路] ${character.name} Agent 回应失败`, error);
+          console.error(`${character.name} Agent 回应失败`, error);
           send({
             type: "agent-error",
             agentId: character.id,

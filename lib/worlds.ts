@@ -63,19 +63,6 @@ export async function getWorldScenarios(accessSecret: string): Promise<WorldScen
     .filter((scenario): scenario is WorldScenario => scenario !== null)
     .filter((scenario) => scenarioTitlePattern.test(scenario.title));
 
-  console.info("[岔路] 知乎副本搜索结果", {
-    rawCount: Items.length,
-    matchedCount: scenarios.length,
-    hasMore: data.HasMore,
-    items: scenarios.map(({ id, title, author, votes, comments }) => ({
-      id,
-      title,
-      author,
-      votes,
-      comments,
-    })),
-  });
-
   if (!scenarios.length) {
     throw new ZhihuApiError(404, "知乎搜索没有返回符合条件的假设题");
   }

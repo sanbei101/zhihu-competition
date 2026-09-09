@@ -226,7 +226,7 @@ export default async function Home() {
   try {
     scenarios = await getWorldScenarios(requireZhihuAccessSecret());
   } catch (error) {
-    console.error("[岔路] 首页副本加载失败", error);
+    console.error("首页副本加载失败", error);
     loadError =
       error instanceof ZhihuApiError
         ? `知乎搜索暂时不可用（${error.message}），稍后重试即可。`
@@ -241,12 +241,12 @@ export default async function Home() {
             <Link
               href="/"
               className="flex items-center gap-3 transition-opacity hover:opacity-90"
-              aria-label="岔路首页"
+              aria-label="知乎脑洞首页"
             >
               <span className="bg-primary text-primary-foreground shadow-primary/20 grid size-9 place-items-center rounded-lg shadow-sm">
                 <GitBranch className="size-5" />
               </span>
-              <span className="text-base font-semibold tracking-tight">岔路</span>
+              <span className="text-base font-semibold tracking-tight">知乎脑洞</span>
             </Link>
           </div>
         </header>
@@ -279,12 +279,12 @@ export default async function Home() {
           <Link
             href="/"
             className="flex items-center gap-3 transition-opacity hover:opacity-90"
-            aria-label="岔路首页"
+            aria-label="知乎脑洞首页"
           >
             <span className="bg-primary text-primary-foreground shadow-primary/20 grid size-9 place-items-center rounded-lg shadow-sm">
               <GitBranch className="size-5" />
             </span>
-            <span className="text-base font-semibold tracking-tight">岔路</span>
+            <span className="text-base font-semibold tracking-tight">知乎脑洞</span>
             <Separator orientation="vertical" className="bg-border/60 hidden h-4 sm:block" />
             <span className="text-muted-foreground hidden text-xs tracking-wider uppercase sm:block">
               Worldline Archives
@@ -408,7 +408,7 @@ export default async function Home() {
         <div className="text-muted-foreground mx-auto flex max-w-7xl flex-col gap-4 px-5 py-8 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-center gap-2 font-mono">
             <span className="bg-primary size-2 rounded-full" />
-            <span className="text-foreground font-semibold">岔路 / WORLDLINE LAB</span>
+            <span className="text-foreground font-semibold">知乎脑洞 / WORLDLINE LAB</span>
           </div>
           {featured.url ? (
             <Button

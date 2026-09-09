@@ -40,7 +40,7 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
   try {
     scenario = await getWorldScenario(requireZhihuAccessSecret(), id, query.q);
   } catch (error) {
-    console.error("[岔路] 世界线母本加载失败", error);
+    console.error("世界线母本加载失败", error);
     loadError =
       error instanceof ZhihuApiError
         ? `该知乎母本暂时无法载入(${error.message}),可能是内容已删除或搜索暂时搜不到它。`
@@ -52,11 +52,11 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
       <main className="bg-muted/30 text-foreground min-h-screen">
         <header className="bg-background border-b">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
-            <Link href="/" className="flex items-center gap-3" aria-label="返回岔路首页">
+            <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
               <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
                 <GitBranch className="size-5" />
               </span>
-              <span className="font-semibold tracking-tight">岔路</span>
+              <span className="font-semibold tracking-tight">知乎脑洞</span>
             </Link>
             <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
               <ArrowLeft data-icon="inline-start" />
@@ -104,11 +104,11 @@ export default async function WorldPage({ params, searchParams }: WorldPageProps
     <main className="bg-muted/30 text-foreground min-h-screen">
       <header className="bg-background border-b">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="返回岔路首页">
+          <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
             <span className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-lg">
               <GitBranch className="size-5" />
             </span>
-            <span className="font-semibold tracking-tight">岔路</span>
+            <span className="font-semibold tracking-tight">知乎脑洞</span>
           </Link>
           <Button variant="ghost" size="sm" render={<Link href="/#archives" />}>
             <ArrowLeft data-icon="inline-start" />

@@ -73,7 +73,7 @@ export class ZhihuClient {
     try {
       body = (await res.json()) as ZhihuResponse<ZhihuSearchData>;
     } catch (err) {
-      console.error(`[ZhihuClient] 响应解析 JSON 失败 (HTTP 状态码: ${res.status}):`, err);
+      console.error(`响应解析 JSON 失败 (HTTP 状态码: ${res.status}):`, err);
       throw new ZhihuApiError(90001, `响应解析失败,HTTP 状态码: ${res.status}`);
     }
     if (body.Code !== 0) {

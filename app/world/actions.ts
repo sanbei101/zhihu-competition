@@ -65,7 +65,7 @@ export async function generateCastAction(
 
     return { ok: true, data: worldCastSchema.parse(object) };
   } catch (error) {
-    console.error("[岔路] 角色阵容生成失败", error);
+    console.error("角色阵容生成失败", error);
     return fail(
       "角色生成失败",
       error instanceof Error ? `${error.name}: ${error.message}` : String(error),
@@ -114,7 +114,7 @@ ${summarizeTurnsForPrompt(history)}
 
     return { ok: true, data: roundOptionsSchema.parse(object) };
   } catch (error) {
-    console.error("[岔路] 回合选项生成失败", error);
+    console.error("回合选项生成失败", error);
     return fail(
       "选项生成失败",
       error instanceof Error ? `${error.name}: ${error.message}` : String(error),
@@ -209,7 +209,7 @@ ${summarizeReactionsForPrompt(reactions)}
       }),
     };
   } catch (error) {
-    console.error("[岔路] 回合裁决失败", error);
+    console.error("回合裁决失败", error);
     return fail(
       "冲突裁决失败",
       error instanceof Error ? `${error.name}: ${error.message}` : String(error),
@@ -268,7 +268,7 @@ ${summarizeTurnsForPrompt(turns, 4000)}
 
     return { ok: true, data: finaleSchema.parse(object) };
   } catch (error) {
-    console.error("[岔路] 终章结算失败", error);
+    console.error("终章结算失败", error);
     return fail(
       "终章生成失败",
       error instanceof Error ? `${error.name}: ${error.message}` : String(error),

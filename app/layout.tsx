@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toast";
 
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "岔路 | 世界线档案库",
+  title: "知乎脑洞 | 世界线档案库",
   description: "从知乎假设题进入另一条世界线。",
 };
 

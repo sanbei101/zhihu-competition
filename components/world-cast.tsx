@@ -78,7 +78,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
         type: "success",
       });
     } catch (cause) {
-      console.error("[岔路] 角色阵容请求失败", cause);
+      console.error("角色阵容请求失败", cause);
       const message = cause instanceof Error ? cause.message : "角色生成失败";
       setError(message);
       toast.add({ title: "角色生成失败", description: message, type: "error" });
