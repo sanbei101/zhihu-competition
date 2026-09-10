@@ -70,14 +70,17 @@ export function PixelSprite({
         const values = frames.map((_, index) => (index === frameIndex ? 1 : 0)).join(";");
         return (
           <g key={frameIndex} opacity={frameIndex === 0 ? 1 : 0}>
-            <animate
-              attributeName="opacity"
-              values={values}
-              keyTimes={keyTimes}
-              calcMode="discrete"
-              dur={`${duration}ms`}
-              repeatCount="indefinite"
-            />
+            {/* 单帧不退化成动画:立绘的律动交给外层 CSS,别在这里空转一条 SMIL */}
+            {total > 1 ? (
+              <animate
+                attributeName="opacity"
+                values={values}
+                keyTimes={keyTimes}
+                calcMode="discrete"
+                dur={`${duration}ms`}
+                repeatCount="indefinite"
+              />
+            ) : null}
             {frameToRects(frame, palette).map((rect) => (
               <rect
                 key={`${rect.x}-${rect.y}-${rect.width}`}

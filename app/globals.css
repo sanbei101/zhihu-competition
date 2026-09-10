@@ -13,6 +13,29 @@
 @theme {
   --font-pixel:
     "Pixel Subset", ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 议事厅舞台立绘的律动:闲置时缓慢呼吸,发言时加快并轻微放大 */
+  --animate-portrait-idle: portrait-idle 3.2s ease-in-out infinite;
+  --animate-portrait-talk: portrait-talk 1.05s ease-in-out infinite;
+}
+
+@keyframes portrait-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes portrait-talk {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.015);
+  }
 }
 
 /* 整屏演出的横向题库架与滚动容器都不显示滚动条,靠导航轨指示位置 */

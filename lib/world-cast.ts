@@ -6,11 +6,39 @@ export const worldCastRequestSchema = z.object({
   content: z.string().trim().max(6000),
 });
 
+/**
+ * 立绘原型:决定议事厅舞台上这个人物的像素造型(冠帽、衣着、手持物)。
+ * 只用来选造型,不影响任何玩法数值。
+ */
+export const characterArchetypeSchema = z.enum([
+  "official",
+  "general",
+  "envoy",
+  "magnate",
+  "technician",
+  "commoner",
+]);
+export type CharacterArchetype = z.infer<typeof characterArchetypeSchema>;
+
+export const archetypeLabels: Record<CharacterArchetype, string> = {
+  official: "文臣",
+  general: "武将",
+  envoy: "使者",
+  magnate: "商贾",
+  technician: "技术",
+  commoner: "平民",
+};
+
 const characterSchema = z.object({
   id: z.string().describe("角色唯一的简短英文标识"),
   name: z.string().describe("符合时代背景的角色姓名"),
   identity: z.string().describe("角色的身份与职务"),
   faction: z.string().describe("角色所属阵营或利益群体"),
+  archetype: characterArchetypeSchema
+    .optional()
+    .describe(
+      "这个角色的立绘原型,只能从 official(文臣/幕僚/学者)、general(将帅/武人)、envoy(使者/说客/中间人)、magnate(商贾/资本/东家)、technician(技术/科研/工程)、commoner(平民/匠人/渔农) 里挑最贴近身份的一个,必须填写",
+    ),
   personality: z.string().describe("两到三个鲜明且会影响决策的性格特征"),
   publicGoal: z.string().describe("角色公开追求的目标"),
   secret: z.string().describe("只有角色自己知道的秘密或真实动机"),

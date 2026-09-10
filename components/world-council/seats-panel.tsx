@@ -3,8 +3,7 @@
 import { ShieldQuestion, Swords, UserRound } from "lucide-react";
 
 import { PixelSprite } from "@/components/pixel/pixel-sprite";
-import { spritesForSkin } from "@/components/pixel/sprites";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { portraitFor } from "@/components/pixel/portraits";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -36,6 +35,8 @@ interface SeatsPanelProps {
   agentStatuses: Record<string, AgentStatus>;
   relations: AgentRelation[];
   ultimatum: WorldUltimatum | null;
+  /** 台上正在发言的人(玩家的抉择也算):点亮他那一席,其余压暗 */
+  speakingId?: string | null;
   skin: ScenarioSkin;
 }
 
@@ -62,9 +63,11 @@ export function SeatsPanel({
   agentStatuses,
   relations,
   ultimatum,
+  speakingId,
   skin,
 }: SeatsPanelProps) {
-  const sprites = spritesForSkin(skin);
+  const playerPortrait = portraitFor(activePlayer, skin);
+  const playerSpeaking = speakingId === activePlayer.id;
 
   return (
     <Card className="order-2 shadow-none lg:order-1">
@@ -76,15 +79,35 @@ export function SeatsPanel({
       </CardHeader>
       <CardContent className="space-y-5">
         <HoverCard>
-          <HoverCardTrigger render={<Item variant="muted" className="hover:bg-muted" />}>
+          <HoverCardTrigger
+            render={
+              <Item
+                variant="muted"
+                className={`hover:bg-muted transition-opacity ${playerSpeaking ? "bg-primary/5 ring-primary/30 ring-1" : speakingId ? "opacity-55" : ""}`}
+              />
+            }
+          >
             <ItemMedia>
-              <Avatar>
-                <AvatarFallback>{activePlayer.name.slice(0, 1)}</AvatarFallback>
-              </Avatar>
+              <div
+                className={
+                  playerSpeaking ? "animate-portrait-talk motion-reduce:animate-none" : undefined
+                }
+              >
+                <PixelSprite
+                  frames={playerPortrait.frames}
+                  palette={playerPortrait.palette}
+                  scale={2}
+                  label={playerPortrait.label}
+                />
+              </div>
             </ItemMedia>
             <ItemContent className="min-w-0">
               <ItemTitle>{activePlayer.name}</ItemTitle>
-              <p className="text-muted-foreground truncate text-xs">{activePlayer.identity}</p>
+              {playerSpeaking ? (
+                <p className="text-primary text-xs">正在台上</p>
+              ) : (
+                <p className="text-muted-foreground truncate text-xs">{activePlayer.identity}</p>
+              )}
             </ItemContent>
             <ItemActions>
               <Badge variant="outline" className="px-1.5">
@@ -127,36 +150,49 @@ export function SeatsPanel({
         <Separator />
 
         <ItemGroup className="gap-3">
-          {cast.agentCharacters.map((character, index) => {
+          {cast.agentCharacters.map((character) => {
             const relation = relationOf(relations, character.id);
             const trust = relation?.trust ?? 52;
             const attitude = relation?.attitude ?? "wary";
             const dot = statusDot(agentStatuses[character.id]);
-            const sprite = sprites[index % Math.max(1, sprites.length)];
+            const portrait = portraitFor(character, skin);
             const hasUltimatum = ultimatum?.agentId === character.id;
+            const speaking = speakingId === character.id;
 
             return (
               <HoverCard key={character.id}>
-                <HoverCardTrigger render={<Item size="xs" className="flex-col" />}>
+                <HoverCardTrigger
+                  render={
+                    <Item
+                      size="xs"
+                      className={`flex-col transition-opacity ${speaking ? "bg-primary/5 ring-primary/30 ring-1" : speakingId ? "opacity-55" : ""}`}
+                    />
+                  }
+                >
                   <div className="flex w-full items-center gap-2">
                     <ItemMedia>
-                      {sprite ? (
+                      <div
+                        className={
+                          speaking ? "animate-portrait-talk motion-reduce:animate-none" : undefined
+                        }
+                      >
                         <PixelSprite
-                          frames={sprite.frames}
-                          palette={sprite.palette}
+                          frames={portrait.frames}
+                          palette={portrait.palette}
                           scale={2}
-                          duration={sprite.duration}
-                          label={`${character.name}:${sprite.label}`}
+                          label={portrait.label}
                         />
-                      ) : (
-                        <Avatar size="sm">
-                          <AvatarFallback>{character.name.slice(0, 1)}</AvatarFallback>
-                        </Avatar>
-                      )}
+                      </div>
                     </ItemMedia>
                     <ItemContent className="min-w-0">
                       <ItemTitle>{character.name}</ItemTitle>
-                      <p className="text-muted-foreground truncate text-xs">{character.faction}</p>
+                      {speaking ? (
+                        <p className="text-primary text-xs">正在台上</p>
+                      ) : (
+                        <p className="text-muted-foreground truncate text-xs">
+                          {character.faction}
+                        </p>
+                      )}
                     </ItemContent>
                     <ItemActions className="flex-col items-end gap-1">
                       <span className={dot.className} aria-label={dot.label} />

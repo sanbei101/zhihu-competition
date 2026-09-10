@@ -3,7 +3,7 @@
 import { ArrowLeft, CircleDot, Clock3, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { generateOptionsAction, judgeTurnAction } from "@/app/world/actions";
 import { ThemeScene } from "@/components/pixel/theme-scene";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { DecisionPanel } from "@/components/world-council/decision-panel";
 import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-panel";
+import { SpeechStage, type StageBeat } from "@/components/world-council/speech-stage";
 import { Timeline } from "@/components/world-council/timeline";
 import { WorldTabs } from "@/components/world-council/world-tabs";
 import { WorldIntro } from "@/components/world-intro";
@@ -36,6 +37,7 @@ import {
   worldGameSessionSchema,
   type AgentRelation,
   type AppliedDeltas,
+  type JudgeResult,
   type RetortRecord,
   type TurnReactionRecord,
   type WorldCrisis,
@@ -110,12 +112,117 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     situation: string;
   } | null>(null);
 
+  // 舞台演出:本回合的每一拍排成一条队列,一次只演一拍,逐字说完才推进下一拍
+  const [playIndex, setPlayIndex] = useState(0);
+  const [skipped, setSkipped] = useState(false);
+  const [isPerforming, setIsPerforming] = useState(false);
+  // 裁决先攥在手里,等演出收尾再提交 —— 否则裁决卡会在别人还在说话时弹出来
+  const pendingVerdictRef = useRef<JudgeResult | null>(null);
+  const [hasPendingVerdict, setHasPendingVerdict] = useState(false);
+
   const ended = ending !== null;
   const currentTurnSettled = turns.some((turn) => turn.round === round);
   const storageKey = worldCouncilStorageKey(worldId);
   const idleOption = idleOptionFor(cast);
   const pressure = pressureLevel(metrics);
   const entropy = entropyForRound(round);
+
+  const agentById = useMemo(
+    () => new Map(cast.agentCharacters.map((character) => [character.id, character])),
+    [cast],
+  );
+
+  /**
+   * 本回合的演出队列:你的抉择 → 各方表态 → 面对面的交锋。
+   * 四个人不再是同时冒出来的一堆气泡,而是排成一队、一个一个上台。
+   */
+  const beats = useMemo<StageBeat[]>(() => {
+    const list: StageBeat[] = [];
+
+    if (submittedDecision && player) {
+      list.push({
+        key: `decision:${round}`,
+        speaker: player,
+        speech: submittedDecision,
+        variant: "decision",
+      });
+    }
+
+    for (const record of reactions) {
+      const character = agentById.get(record.agentId);
+      if (!character) continue;
+      const { reaction } = record;
+      list.push({
+        key: `reaction:${round}:${record.agentId}`,
+        speaker: character,
+        speech: reaction.speech,
+        variant: "reaction",
+        stance: reaction.stance,
+        action: reaction.action,
+        target: reaction.target,
+        impact: reaction.impact,
+      });
+    }
+
+    for (const record of retorts) {
+      const character = agentById.get(record.agentId);
+      if (!character) continue;
+      const { reaction } = record;
+      list.push({
+        key: `retort:${round}:${record.agentId}`,
+        speaker: character,
+        speech: reaction.speech,
+        variant: "retort",
+        stance: reaction.stance,
+        againstName: agentById.get(record.againstId)?.name ?? record.againstId,
+        action: reaction.action,
+        target: reaction.target,
+        impact: reaction.impact,
+      });
+    }
+
+    return list;
+  }, [agentById, player, reactions, retorts, round, submittedDecision]);
+
+  const currentBeat =
+    isPerforming && !skipped && playIndex < beats.length ? beats[playIndex] : null;
+
+  const stagePhase: "idle" | "performing" | "waiting" | "judging" = !isPerforming
+    ? "idle"
+    : currentBeat
+      ? "performing"
+      : isResolving
+        ? "waiting"
+        : "judging";
+
+  const stageIdleHint = ended
+    ? "这条世界线已经收束,去终章看看它留下了什么。"
+    : isTurnComplete
+      ? "本轮已经裁决。看完下面的结果,再决定要不要往下走。"
+      : "该你下令了 —— 从下面的选项里挑一个。";
+
+  /**
+   * 演出的收尾闸门:每一拍都演完(或被跳过)、流式回应收齐、裁决结果到手,
+   * 三件事同时满足才把裁决落进存档。
+   */
+  useEffect(() => {
+    if (!hasPendingVerdict || !isPerforming || isResolving) return;
+    if (!skipped && playIndex < beats.length) return;
+    const judged = pendingVerdictRef.current;
+    if (!judged) return;
+    pendingVerdictRef.current = null;
+    setHasPendingVerdict(false);
+    commitJudgement(judged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 提交动作每帧重建,靠上面三道门槛保证只提交一次
+  }, [beats.length, hasPendingVerdict, isPerforming, isResolving, playIndex, skipped]);
+
+  function handleBeatDone() {
+    setPlayIndex((index) => index + 1);
+  }
+
+  function skipPerformance() {
+    setSkipped(true);
+  }
 
   useEffect(() => {
     const session: WorldGameSession = {
@@ -243,8 +350,13 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     }
 
     pendingJudgeRef.current = null;
-    const judged = result.data;
+    // 先攥在手里:等台上的戏演完再提交,不然裁决卡会插在别人说话中间
+    pendingVerdictRef.current = result.data;
+    setHasPendingVerdict(true);
+  }
 
+  /** 把裁决落进存档。只在演出收尾之后调用,所以它是「一幕」的最后一个动作。 */
+  function commitJudgement(judged: JudgeResult) {
     // 找出这一回合新离心的人,单独提醒
     const newlyDefected = judged.relations.filter(
       (relation) =>
@@ -264,9 +376,9 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       ...current,
       {
         round,
-        decision: judgeDecision,
-        reactions: collected,
-        retorts: retortRecords,
+        decision: pendingJudgeRef.current?.decision ?? submittedDecision,
+        reactions,
+        retorts,
         events: judged.events,
         narration: judged.narration,
         deltas: judged.deltas,
@@ -285,6 +397,10 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       setEnding(judged.ending);
     }
     setIsTurnComplete(true);
+    // 落幕:舞台交还给玩家,等下一步指令
+    setIsPerforming(false);
+    setSkipped(false);
+    setPlayIndex(0);
     toast.add({ title: `第 ${round} 回合已裁决`, type: "success" });
 
     for (const defector of newlyDefected) {
@@ -332,6 +448,10 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setIsTurnComplete(false);
     setTurnError("");
     setJudgeError("");
+    // 新的一幕,舞台重新开场
+    setIsPerforming(false);
+    setSkipped(false);
+    setPlayIndex(0);
   }
 
   function closeVoluntarily() {
@@ -358,6 +478,12 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setIsTurnComplete(false);
     setTurnError("");
     setJudgeError("");
+    // 开幕:先从你的抉择演起
+    setIsPerforming(true);
+    setSkipped(false);
+    setPlayIndex(0);
+    pendingVerdictRef.current = null;
+    setHasPendingVerdict(false);
 
     const collected: TurnReactionRecord[] = [];
     const retortRecords: RetortRecord[] = [];
@@ -496,6 +622,8 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const activePlayer = player;
   const choiceDisabled = isResolving || isJudging || isTurnComplete || ended;
   const canCloseVoluntarily = !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE;
+  /** 台上正在发言的人(玩家的抉择也算):左栏据此点亮他那一席、压暗其余 */
+  const stageSpeakerId = currentBeat ? currentBeat.speaker.id : null;
 
   return (
     <div className="space-y-4">
@@ -552,53 +680,62 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           agentStatuses={agentStatuses}
           relations={relations}
           ultimatum={ultimatum}
+          speakingId={stageSpeakerId}
           skin={skin}
         />
 
-        <Card className="order-1 min-w-0 shadow-none lg:order-2">
-          <CardContent className="p-0">
-            <Timeline
-              cast={cast}
-              activePlayer={activePlayer}
-              turns={turns}
-              submittedDecision={submittedDecision}
-              reactions={reactions}
-              retorts={retorts}
-              currentTurnSettled={currentTurnSettled}
-              ended={ended}
-              ending={ending}
-              openingAnimate={!showIntro && initial.turns.length === 0}
-              onGoFinale={goFinale}
-            />
-            <DecisionPanel
-              cast={cast}
-              ended={ended}
-              currentTurnSettled={currentTurnSettled}
-              submittedDecision={submittedDecision}
-              isGeneratingOptions={isGeneratingOptions}
-              options={options}
-              optionsError={optionsError}
-              onRetryOptions={retryOptions}
-              choiceDisabled={choiceDisabled}
-              onChooseOption={(option) => void chooseOption(option)}
-              isResolving={isResolving}
-              reactions={reactions}
-              isJudging={isJudging}
-              judgeError={judgeError}
-              onRetryJudge={retryJudge}
-              isTurnComplete={isTurnComplete}
-              turnsCount={turns.length}
-              onStartNextRound={startNextRound}
-              canCloseVoluntarily={canCloseVoluntarily}
-              onCloseVoluntarily={closeVoluntarily}
-              onGoFinale={goFinale}
-              turnError={turnError}
-              crisis={crisis}
-              ultimatum={ultimatum}
-              idleOption={idleOption}
-            />
-          </CardContent>
-        </Card>
+        <div className="order-1 min-w-0 space-y-4 lg:order-2">
+          <SpeechStage
+            skin={skin}
+            beat={currentBeat}
+            player={activePlayer}
+            phase={stagePhase}
+            idleHint={stageIdleHint}
+            onBeatDone={handleBeatDone}
+            onSkip={skipPerformance}
+          />
+
+          <Card className="shadow-none">
+            <CardContent className="p-0">
+              <Timeline
+                cast={cast}
+                activePlayer={activePlayer}
+                turns={turns}
+                ended={ended}
+                ending={ending}
+                openingAnimate={!showIntro && initial.turns.length === 0}
+                onGoFinale={goFinale}
+              />
+              <DecisionPanel
+                cast={cast}
+                ended={ended}
+                currentTurnSettled={currentTurnSettled}
+                submittedDecision={submittedDecision}
+                isGeneratingOptions={isGeneratingOptions}
+                options={options}
+                optionsError={optionsError}
+                onRetryOptions={retryOptions}
+                choiceDisabled={choiceDisabled}
+                onChooseOption={(option) => void chooseOption(option)}
+                isResolving={isResolving}
+                reactions={reactions}
+                isJudging={isJudging}
+                judgeError={judgeError}
+                onRetryJudge={retryJudge}
+                isTurnComplete={isTurnComplete}
+                turnsCount={turns.length}
+                onStartNextRound={startNextRound}
+                canCloseVoluntarily={canCloseVoluntarily}
+                onCloseVoluntarily={closeVoluntarily}
+                onGoFinale={goFinale}
+                turnError={turnError}
+                crisis={crisis}
+                ultimatum={ultimatum}
+                idleOption={idleOption}
+              />
+            </CardContent>
+          </Card>
+        </div>
 
         <WorldTabs
           cast={cast}

@@ -26,36 +26,27 @@ import {
   ReactionMessage,
 } from "@/components/world-council/messages";
 import { type WorldCast } from "@/lib/world-cast";
-import {
-  endingLabels,
-  type RetortRecord,
-  type TurnReactionRecord,
-  type WorldEnding,
-  type WorldGameSession,
-} from "@/lib/world-ending";
+import { endingLabels, type WorldEnding, type WorldGameSession } from "@/lib/world-ending";
 
 interface TimelineProps {
   cast: WorldCast;
   activePlayer: WorldCast["playerCharacters"][number];
   turns: WorldGameSession["turns"];
-  submittedDecision: string;
-  reactions: TurnReactionRecord[];
-  retorts: RetortRecord[];
-  currentTurnSettled: boolean;
   ended: boolean;
   ending: WorldEnding | null;
   openingAnimate: boolean;
   onGoFinale: () => void;
 }
 
+/**
+ * 舞台下方的历史流:只放已经落幕的内容 —— 开场、已裁决的回合、终局。
+ * 本回合正在演的那几条不在这里,它们在舞台上一条一条过;
+ * 演完由 commitJudgement 整回合落进 turns,顺序与信息都不会重复。
+ */
 export function Timeline({
   cast,
   activePlayer,
   turns,
-  submittedDecision,
-  reactions,
-  retorts,
-  currentTurnSettled,
   ended,
   ending,
   openingAnimate,
@@ -134,7 +125,8 @@ export function Timeline({
                     </MessageScrollerItem>
                   );
                 })}
-                <MessageScrollerItem>
+                {/* 裁决是这一幕的最后一拍:演出散场后让视图跟到它,别让玩家自己找 */}
+                <MessageScrollerItem scrollAnchor>
                   <DirectorNarrationMessage
                     title={`世界线导演 · 第 ${turn.round} 回合裁决`}
                     narration={turn.narration}
@@ -148,54 +140,6 @@ export function Timeline({
                 </MessageScrollerItem>
               </Fragment>
             ))}
-
-            {!currentTurnSettled && submittedDecision ? (
-              <MessageScrollerItem scrollAnchor>
-                <PlayerDecisionMessage
-                  playerName={activePlayer.name}
-                  decision={submittedDecision}
-                />
-              </MessageScrollerItem>
-            ) : null}
-
-            {!currentTurnSettled
-              ? reactions.map(({ agentId, reaction }, index) => {
-                  const character = cast.agentCharacters.find(
-                    (candidate) => candidate.id === agentId,
-                  );
-                  if (!character) return null;
-
-                  return (
-                    <MessageScrollerItem key={`reaction-${agentId}`} scrollAnchor>
-                      <ReactionMessage
-                        characterName={character.name}
-                        reaction={reaction}
-                        animate={index === reactions.length - 1}
-                      />
-                    </MessageScrollerItem>
-                  );
-                })
-              : null}
-
-            {!currentTurnSettled
-              ? retorts.map(({ agentId, againstId, reaction }, index) => {
-                  const character = cast.agentCharacters.find(
-                    (candidate) => candidate.id === agentId,
-                  );
-                  if (!character) return null;
-
-                  return (
-                    <MessageScrollerItem key={`retort-${agentId}`} scrollAnchor>
-                      <ReactionMessage
-                        characterName={character.name}
-                        reaction={reaction}
-                        againstName={nameOf(againstId)}
-                        animate={index === retorts.length - 1}
-                      />
-                    </MessageScrollerItem>
-                  );
-                })
-              : null}
 
             {ended && ending ? (
               <MessageScrollerItem scrollAnchor>

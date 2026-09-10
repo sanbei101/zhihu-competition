@@ -1,6 +1,6 @@
 "use client";
 
-import { Crosshair, GitBranch, Swords, TriangleAlert, Waves, Zap } from "lucide-react";
+import { GitBranch, Swords, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -25,14 +25,14 @@ import {
 } from "@/lib/world-ending";
 import { type AgentReaction } from "@/lib/world-turn";
 
-const stanceLabels: Record<AgentReaction["stance"], string> = {
+export const stanceLabels: Record<AgentReaction["stance"], string> = {
   support: "支持",
   oppose: "反对",
   negotiate: "交涉",
   exploit: "借势",
 };
 
-const stanceStyles: Record<AgentReaction["stance"], { bubble: string; badge: string }> = {
+export const stanceStyles: Record<AgentReaction["stance"], { bubble: string; badge: string }> = {
   support: {
     bubble: "border-l-emerald-500 bg-emerald-50/70",
     badge: "border-emerald-500/60 bg-emerald-100 text-emerald-700",
@@ -85,7 +85,7 @@ export function useTypewriter(
   return { typed: text.slice(0, count), isTyping: count < text.length, done: count >= text.length };
 }
 
-function TypingCaret({ visible }: { visible: boolean }) {
+export function TypingCaret({ visible }: { visible: boolean }) {
   return visible ? <span className="animate-pulse">{TYPING_CARET}</span> : null;
 }
 
@@ -169,23 +169,11 @@ export function PlayerDecisionMessage({
   );
 }
 
-/** 一条行动记录:做了什么 / 冲着谁 / 后果。 */
-function ActionLine({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Zap;
-  label: string;
-  value: string;
-}) {
+function ActionNote({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3 px-3.5 py-2.5">
-      <dt className="text-muted-foreground flex w-20 shrink-0 items-center gap-1.5">
-        <Icon className="size-3.5" />
-        {label}
-      </dt>
-      <dd className="text-foreground min-w-0 leading-6">{value}</dd>
+    <div className="flex items-start gap-2">
+      <dt className="w-14 shrink-0">{label}</dt>
+      <dd className="min-w-0">{value}</dd>
     </div>
   );
 }
@@ -231,10 +219,10 @@ export function ReactionMessage({
           {typed}
           <TypingCaret visible={isTyping} />
         </div>
-        <dl className="border-border bg-muted/40 max-w-2xl divide-y rounded-lg border text-xs">
-          <ActionLine icon={Zap} label="做了什么" value={reaction.action} />
-          <ActionLine icon={Crosshair} label="冲着谁" value={reaction.target} />
-          <ActionLine icon={Waves} label="后果" value={reaction.impact} />
+        <dl className="text-muted-foreground max-w-2xl space-y-1 text-xs leading-5">
+          <ActionNote label="做了什么" value={reaction.action} />
+          <ActionNote label="冲着谁" value={reaction.target} />
+          <ActionNote label="后果" value={reaction.impact} />
         </dl>
         {reaction.ultimatum ? (
           <UltimatumNotice
