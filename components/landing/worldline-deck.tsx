@@ -1,6 +1,4 @@
 "use client";
-
-import { Layers } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CoverPanel, OutroPanel } from "@/components/landing/cover-panels";
@@ -16,8 +14,6 @@ const THEME_COUNT = SCENARIO_THEMES.length;
 const PANEL_COUNT = THEME_COUNT + 2;
 /** 只有当前屏前后一屏真正挂载像素演出,首屏 HTML 不会塞进整个精灵库 */
 const MOUNT_WINDOW = 1;
-
-const TOPIC_COUNT = SCENARIO_THEMES.reduce((sum, theme) => sum + theme.scenarios.length, 0);
 
 interface NavItem {
   id: string;
@@ -89,11 +85,6 @@ function TopBar({
             );
           })}
         </nav>
-
-        <div className="text-muted-foreground flex shrink-0 items-center gap-1.5 font-mono text-[11px]">
-          <Layers className="size-3.5" />
-          {THEME_COUNT} 片乐园 / {TOPIC_COUNT} 个副本
-        </div>
       </div>
 
       {/* 整屏进度:滚动到第几屏一眼可见 */}

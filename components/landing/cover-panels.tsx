@@ -6,7 +6,6 @@ import { spritesForSkin } from "@/components/pixel/sprites";
 import TextType from "@/components/ui/TextType";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { SCENARIO_THEMES } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 import { cn } from "@/lib/utils";
@@ -49,7 +48,6 @@ function WorldParade() {
 
 export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
   const skin = getSkin(undefined);
-  const topicCount = SCENARIO_THEMES.reduce((sum, theme) => sum + theme.scenarios.length, 0);
 
   return (
     <section
@@ -128,12 +126,6 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
                 </button>
               );
             })}
-          </div>
-
-          <div className="text-muted-foreground flex items-center gap-3 font-mono text-[11px]">
-            <span>{SCENARIO_THEMES.length} 片主题乐园</span>
-            <Separator orientation="vertical" className="h-3 self-center" />
-            <span>{topicCount} 个副本</span>
           </div>
 
           <div className="text-muted-foreground flex flex-col items-center gap-1">
