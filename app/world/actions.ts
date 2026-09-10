@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 import { generateStructured } from "@/lib/deepseek";
-import { worldCastRequestSchema, worldCastSchema } from "@/lib/world-cast";
+import { worldCastRequestSchema, worldCastSchema, type WorldCast } from "@/lib/world-cast";
 import {
   MAX_ROUNDS,
   applyMetricDeltas,
@@ -18,11 +18,105 @@ import {
   summarizeTurnsForPrompt,
   turnReactionRecordSchema,
   turnRecordSchema,
+  type FinaleRating,
   type JudgeResult,
+  type TurnReactionRecord,
+  type TurnRecord,
   type WorldFinale,
+  type WorldMetrics,
 } from "@/lib/world-ending";
 import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
 import { worldEventSchema } from "@/lib/world-turn";
+
+// ==================== 提示词 ====================
+
+const CAST_INSTRUCTIONS = `你是一名严谨的架空历史推演导演和剧本杀作者。根据知乎假设题建立第一幕角色阵容。
+
+角色必须扎根于题目给出的时代、制度和技术条件,不能使用穿越者或全知视角来偷懒。三个玩家候选角色要拥有不同的权力来源、道德困境和玩法;四个 AI 角色要代表不同利益集团,彼此目标不能完全一致。人物关系中必须包含合作、冲突或债务,使他们在第一回合就有采取行动的理由。
+
+必须完整填写 schema 中的每个字段:setting.rules 输出三到六条硬约束;全部七个角色都要填写 voice 和 redLine;三个玩家角色填写 decisionPower;四个 Agent 角色填写 pressureMethod 和 openingLine。不要遗漏字段,不要增加角色数量。
+
+不要续写完整历史,不要提前给出结局,只建立危机爆发时的舞台和可博弈角色。使用简体中文,内容具体、克制。角色 id 使用唯一的简短英文小写标识。`;
+
+const buildCastPrompt = (input: { scenarioId: string; title: string; content?: string }) =>
+  `为下面这条世界线生成开场角色阵容。\n\n知乎问题编号:${input.scenarioId}\n问题:${input.title}\n补充描述:${input.content || "无"}`;
+
+const OPTIONS_INSTRUCTIONS = `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
+四个选项必须立场/代价明显不同,覆盖稳、险、赌三种风险;只写本回合能做的具体行动,不提前揭示结局。选项必须遵守世界硬约束,并优先推动此前回合留下的未解决后果。不要写抽象口号。使用简体中文。`;
+
+type PlayerCharacter = WorldCast["playerCharacters"][number];
+
+const buildOptionsPrompt = (input: {
+  cast: WorldCast;
+  player: PlayerCharacter;
+  round: number;
+  metrics: WorldMetrics;
+  history: TurnRecord[];
+}) =>
+  `当前是第 ${input.round} / ${MAX_ROUNDS} 回合。
+时间:${input.cast.setting.time};地点:${input.cast.setting.location};危机:${input.cast.setting.crisis}
+世界硬约束:
+${input.cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
+玩家:${input.player.name}(${input.player.identity}),可调动:${input.player.decisionPower}
+当前四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+
+此前已结算回合:
+${summarizeTurnsForPrompt(input.history)}
+
+请给出本回合处境与四个选项。`;
+
+const JUDGE_INSTRUCTIONS = `你是冷酷公正的世界线裁决者。你只根据玩家决策与各方行动推演世界四维指标(政权稳定/军心士气/民众支持/战略资源)的单回合增量,并写一段承上启下的旁白,同时记录真实发生的公开事件。
+
+规则:增量每项 -20 到 20;奖惩对称、克制,顺风不乱加,逆风不乱踩;每个指标都必须给出具体原因;事件必须有来源、参与者和可观察后果;nextSituation 必须从本回合行动自然推导。旁白不超过三百字,简体中文,具体而不煽情。你只负责本回合的增量、事件和旁白,最终是否结束由系统按规则计算。`;
+
+const buildJudgePrompt = (input: {
+  cast: WorldCast;
+  player: PlayerCharacter;
+  round: number;
+  metrics: WorldMetrics;
+  situation: string;
+  decision: string;
+  reactions: TurnReactionRecord[];
+  history: TurnRecord[];
+}) =>
+  `当前是第 ${input.round} / ${MAX_ROUNDS} 回合。
+时间:${input.cast.setting.time};地点:${input.cast.setting.location};危机:${input.cast.setting.crisis}
+世界硬约束:
+${input.cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
+本回合突发处境:${input.situation}
+当前四维指标:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+
+此前已结算回合:
+${summarizeTurnsForPrompt(input.history)}
+
+本回合玩家(${input.player.name},${input.player.identity})作出抉择:${input.decision}
+
+本回合各方行动:
+${summarizeReactionsForPrompt(input.reactions)}
+
+请给出事件、四维增量、逐项变化原因、世界旁白和下一回合危机。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`;
+
+const FINALE_INSTRUCTIONS = `你是知乎硬核历史区/科幻区的高赞答主兼世界线史官。根据玩家的真实推演记录,整理一篇格式严密的'知乎体深度长文回答'。
+
+       要求:只写推演记录里真实发生过的事,不编造新史实;引用至少两处玩家原话;结构为:开篇钩子 / 分幕推演 / 关键抉择复盘 / 未选择方案的合理推测(明确标注为推测) / 结论与开放讨论;简体中文,克制、有信息量;timeline 必须引用每回合真实发生的事件;shareText 是 200 字内的社区分享卡文案,含结局与评级。`;
+
+const buildFinalePrompt = (input: {
+  scenarioTitle: string;
+  player: PlayerCharacter;
+  ending: { type: string; title: string; reason: string };
+  metrics: WorldMetrics;
+  fallbackRating: FinaleRating;
+  turns: TurnRecord[];
+}) =>
+  `知乎母本问题:${input.scenarioTitle}
+玩家扮演:${input.player.name}(${input.player.identity}),阵营 ${input.player.faction},公开目标:${input.player.publicGoal}
+最终结局:${input.ending.title} -- ${input.ending.reason}
+终局四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}(参考评级 ${input.fallbackRating})
+
+完整推演记录:
+${summarizeTurnsForPrompt(input.turns, 4000)}
+
+请输出 verdictTitle(一句话判词标题)、verdictLine(一句话点评)、rating(S/A/B/C)、timeline、articleMarkdown(2000 字左右的知乎体长文)、shareText。`;
 
 // ==================== 返回包络 ====================
 
@@ -54,14 +148,8 @@ export async function generateCastAction(
   try {
     const { scenarioId, title, content } = parsed.data;
     const object = await generateStructured({
-      instructions: `你是一名严谨的架空历史推演导演和剧本杀作者。根据知乎假设题建立第一幕角色阵容。
-
-角色必须扎根于题目给出的时代、制度和技术条件,不能使用穿越者或全知视角来偷懒。三个玩家候选角色要拥有不同的权力来源、道德困境和玩法;四个 AI 角色要代表不同利益集团,彼此目标不能完全一致。人物关系中必须包含合作、冲突或债务,使他们在第一回合就有采取行动的理由。
-
-必须完整填写 schema 中的每个字段:setting.rules 输出三到六条硬约束;全部七个角色都要填写 voice 和 redLine;三个玩家角色填写 decisionPower;四个 Agent 角色填写 pressureMethod 和 openingLine。不要遗漏字段,不要增加角色数量。
-
-不要续写完整历史,不要提前给出结局,只建立危机爆发时的舞台和可博弈角色。使用简体中文,内容具体、克制。角色 id 使用唯一的简短英文小写标识。`,
-      prompt: `为下面这条世界线生成开场角色阵容。\n\n知乎问题编号:${scenarioId}\n问题:${title}\n补充描述:${content || "无"}`,
+      instructions: CAST_INSTRUCTIONS,
+      prompt: buildCastPrompt({ scenarioId, title, content }),
       schema: worldCastSchema,
       temperature: 0.6,
       maxOutputTokens: 14000,
@@ -100,19 +188,8 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
 
   try {
     const object = await generateStructured({
-      instructions: `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
-四个选项必须立场/代价明显不同,覆盖稳、险、赌三种风险;只写本回合能做的具体行动,不提前揭示结局。选项必须遵守世界硬约束,并优先推动此前回合留下的未解决后果。不要写抽象口号。使用简体中文。`,
-      prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
-时间:${cast.setting.time};地点:${cast.setting.location};危机:${cast.setting.crisis}
-世界硬约束:
-${cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
-玩家:${player.name}(${player.identity}),可调动:${player.decisionPower}
-当前四维:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}
-
-此前已结算回合:
-${summarizeTurnsForPrompt(history)}
-
-请给出本回合处境与四个选项。`,
+      instructions: OPTIONS_INSTRUCTIONS,
+      prompt: buildOptionsPrompt({ cast, player, round, metrics, history }),
       schema: roundOptionsSchema,
       temperature: 0.8,
       maxOutputTokens: 1500,
@@ -180,25 +257,17 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
 
   try {
     const draft = await generateStructured({
-      instructions: `你是冷酷公正的世界线裁决者。你只根据玩家决策与各方行动推演世界四维指标(政权稳定/军心士气/民众支持/战略资源)的单回合增量,并写一段承上启下的旁白,同时记录真实发生的公开事件。
-
-规则:增量每项 -20 到 20;奖惩对称、克制,顺风不乱加,逆风不乱踩;每个指标都必须给出具体原因;事件必须有来源、参与者和可观察后果;nextSituation 必须从本回合行动自然推导。旁白不超过三百字,简体中文,具体而不煽情。你只负责本回合的增量、事件和旁白,最终是否结束由系统按规则计算。`,
-      prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
-时间:${cast.setting.time};地点:${cast.setting.location};危机:${cast.setting.crisis}
-世界硬约束:
-${cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
-本回合突发处境:${situation}
-当前四维指标:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}
-
-此前已结算回合:
-${summarizeTurnsForPrompt(history)}
-
-本回合玩家(${player.name},${player.identity})作出抉择:${decision}
-
-本回合各方行动:
-${summarizeReactionsForPrompt(reactions)}
-
-请给出事件、四维增量、逐项变化原因、世界旁白和下一回合危机。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`,
+      instructions: JUDGE_INSTRUCTIONS,
+      prompt: buildJudgePrompt({
+        cast,
+        player,
+        round,
+        metrics,
+        situation,
+        decision,
+        reactions,
+        history,
+      }),
       schema: judgeDraftSchema,
       temperature: 0.4,
       maxOutputTokens: 2400,
@@ -271,18 +340,8 @@ export async function generateFinaleAction(input: unknown): Promise<ActionResult
 
   try {
     const object = await generateStructured({
-      instructions: `你是知乎硬核历史区/科幻区的高赞答主兼世界线史官。根据玩家的真实推演记录,整理一篇格式严密的'知乎体深度长文回答'。
-
-       要求:只写推演记录里真实发生过的事,不编造新史实;引用至少两处玩家原话;结构为:开篇钩子 / 分幕推演 / 关键抉择复盘 / 未选择方案的合理推测(明确标注为推测) / 结论与开放讨论;简体中文,克制、有信息量;timeline 必须引用每回合真实发生的事件;shareText 是 200 字内的社区分享卡文案,含结局与评级。`,
-      prompt: `知乎母本问题:${scenarioTitle}
-玩家扮演:${player.name}(${player.identity}),阵营 ${player.faction},公开目标:${player.publicGoal}
-最终结局:${ending.title} -- ${ending.reason}
-终局四维:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}(参考评级 ${fallbackRating})
-
-完整推演记录:
-${summarizeTurnsForPrompt(turns, 4000)}
-
-请输出 verdictTitle(一句话判词标题)、verdictLine(一句话点评)、rating(S/A/B/C)、timeline、articleMarkdown(2000 字左右的知乎体长文)、shareText。`,
+      instructions: FINALE_INSTRUCTIONS,
+      prompt: buildFinalePrompt({ scenarioTitle, player, ending, metrics, fallbackRating, turns }),
       schema: finaleSchema,
       temperature: 0.7,
       maxOutputTokens: 8000,
