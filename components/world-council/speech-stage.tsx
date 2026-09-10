@@ -4,7 +4,7 @@ import { FastForward, Gavel, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { PixelSprite } from "@/components/pixel/pixel-sprite";
-import { portraitFor, type PortraitSubject } from "@/components/pixel/portraits";
+import { directorEmblem, portraitFor, type PortraitSubject } from "@/components/pixel/portraits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,16 +19,22 @@ import { type AgentReaction } from "@/lib/world-turn";
 /** 台词说完到换人之间的停顿,留一口气,不然像在赶场 */
 const HANDOVER_PAUSE_MS = 520;
 
+export type StagePhase = "idle" | "performing" | "waiting" | "judging";
+
 export interface StageBeat {
   /** 每一拍唯一:换了这一拍,立绘与气泡都要重来 */
   key: string;
   speaker: PortraitSubject;
   /** 他当场说的话 */
   speech: string;
-  variant: "decision" | "reaction" | "retort";
+  variant: "opening" | "decision" | "reaction" | "retort";
+  /** 开场那几条的由头,如「公开表态」 */
+  label?: string;
+  /** 这一拍的主角是导演(没有立绘,用徽记出场) */
+  emblem?: boolean;
   stance?: AgentReaction["stance"];
-  /** 第二轮交锋时,他回击的是谁 */
-  againstName?: string;
+  /** 第二轮交锋:站在他对面的人。有值就是两人同框 */
+  against?: PortraitSubject;
   /** 行动的三个要素,在这里拼成一句旁白,不再当成三个字段摆出来 */
   action?: string;
   target?: string;
@@ -50,13 +56,51 @@ export function actionNoteOf(beat: StageBeat): string {
   return parts.length ? `${parts.join("。")}。` : "";
 }
 
+/** 台上的一张立绘(或导演的徽记)。闲置缓慢呼吸,说话时加快;对面那个人压暗一档把视线让出来。 */
+function StageFigure({
+  skin,
+  subject,
+  emblem,
+  talking,
+  dimmed,
+  scale,
+}: {
+  skin: ScenarioSkin;
+  subject: PortraitSubject;
+  emblem?: boolean;
+  talking: boolean;
+  dimmed?: boolean;
+  scale: number;
+}) {
+  const art = useMemo(
+    () => (emblem ? directorEmblem(skin) : portraitFor(subject, skin)),
+    [emblem, subject, skin],
+  );
+
+  return (
+    <div className={dimmed ? "opacity-45" : undefined}>
+      <div
+        className={
+          talking
+            ? "animate-portrait-talk motion-reduce:animate-none"
+            : "animate-portrait-idle motion-reduce:animate-none"
+        }
+      >
+        <div className="origin-bottom scale-[0.72] sm:scale-100">
+          <PixelSprite frames={art.frames} palette={art.palette} scale={scale} label={art.label} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface SpeechStageProps {
   skin: ScenarioSkin;
   /** 这一拍在演的;null 表示台上没人 */
   beat: StageBeat | null;
   /** 空场时站在台上的玩家,免得舞台空着 */
   player: PortraitSubject;
-  phase: "idle" | "performing" | "waiting" | "judging";
+  phase: StagePhase;
   /** 空场时气泡里说什么 */
   idleHint?: string;
   onBeatDone: () => void;
@@ -93,7 +137,6 @@ export function SpeechStage({
   }, [beat, done]);
 
   const onStage = beat ? beat.speaker : player;
-  const portrait = useMemo(() => portraitFor(onStage, skin), [onStage, skin]);
   const stance = beat?.stance ? stanceStyles[beat.stance] : null;
   const note = beat ? actionNoteOf(beat) : "";
 
@@ -108,17 +151,22 @@ export function SpeechStage({
     <section className="bg-card relative overflow-hidden rounded-lg border" aria-label="议事舞台">
       <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
         <span className="text-sm font-medium">{onStage.name}</span>
-        {beat ? <span className="text-muted-foreground text-xs">{onStage.identity}</span> : null}
+        {beat && onStage.identity ? (
+          <span className="text-muted-foreground text-xs">{onStage.identity}</span>
+        ) : null}
+        {beat?.variant === "opening" && beat.label ? (
+          <Badge variant="outline">{beat.label}</Badge>
+        ) : null}
         {beat?.variant === "decision" ? <Badge variant="secondary">你的抉择</Badge> : null}
         {beat?.stance && stance ? (
           <Badge variant="outline" className={stance.badge}>
             {stanceLabels[beat.stance]}
           </Badge>
         ) : null}
-        {beat?.againstName ? (
+        {beat?.against ? (
           <span className="text-destructive/90 flex items-center gap-1 text-xs">
             <Swords className="size-3" />
-            当场回击 {beat.againstName}
+            当场回击 {beat.against.name}
           </span>
         ) : null}
         <div className="ml-auto flex items-center gap-2">
@@ -160,22 +208,30 @@ export function SpeechStage({
           key={beat?.key ?? "idle"}
           className="animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none"
         >
-          <div
-            className={
-              isTyping
-                ? "animate-portrait-talk motion-reduce:animate-none"
-                : "animate-portrait-idle motion-reduce:animate-none"
-            }
-          >
-            <div className="origin-bottom scale-[0.72] sm:scale-100">
-              <PixelSprite
-                frames={portrait.frames}
-                palette={portrait.palette}
-                scale={6}
-                label={portrait.label}
-              />
+          {beat?.against ? (
+            <div className="flex items-end justify-center gap-3 sm:gap-10">
+              <div className="flex flex-col items-center gap-2">
+                <StageFigure skin={skin} subject={beat.speaker} talking={isTyping} scale={5} />
+                <span className="text-primary text-xs font-medium">{beat.speaker.name}</span>
+              </div>
+              <span className="text-destructive/80 flex flex-col items-center gap-1 self-center text-xs">
+                <Swords className="size-4" />
+                对峙
+              </span>
+              <div className="flex flex-col items-center gap-2">
+                <StageFigure skin={skin} subject={beat.against} talking={false} dimmed scale={5} />
+                <span className="text-muted-foreground text-xs">{beat.against.name}</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <StageFigure
+              skin={skin}
+              subject={onStage}
+              emblem={beat?.emblem}
+              talking={isTyping}
+              scale={6}
+            />
+          )}
         </div>
 
         {note ? (

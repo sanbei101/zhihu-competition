@@ -404,6 +404,100 @@ export function guessArchetype(text: string): CharacterArchetype {
   return "official";
 }
 
+// ==================== 导演徽记 ====================
+
+/** Bresenham 直线:徽记里的分岔是算出来的,手写 28 行斜线太容易错 */
+function strokeLine(
+  grid: string[][],
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number,
+  key: string,
+) {
+  let x = fromX;
+  let y = fromY;
+  const deltaX = Math.abs(toX - fromX);
+  const deltaY = Math.abs(toY - fromY);
+  const stepX = fromX < toX ? 1 : -1;
+  const stepY = fromY < toY ? 1 : -1;
+  let error = deltaX - deltaY;
+
+  for (;;) {
+    if (y >= 0 && y < CANVAS_H && x >= 0 && x < CANVAS_W) grid[y][x] = key;
+    if (x === toX && y === toY) break;
+    const doubled = 2 * error;
+    if (doubled > -deltaY) {
+      error -= deltaY;
+      x += stepX;
+    }
+    if (doubled < deltaX) {
+      error += deltaX;
+      y += stepY;
+    }
+  }
+}
+
+/** 十字节点:世界线两端的「事件点」 */
+function markNode(grid: string[][], x: number, y: number, key: string) {
+  const neighbours = [
+    [0, 0],
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  for (const [offsetX, offsetY] of neighbours) {
+    const targetX = x + offsetX;
+    const targetY = y + offsetY;
+    if (targetY < 0 || targetY >= CANVAS_H) continue;
+    if (targetX < 0 || targetX >= CANVAS_W) continue;
+    grid[targetY][targetX] = key;
+  }
+}
+
+/**
+ * 世界线导演的徽记:他不是人,所以没有立绘,给他一枚印章。
+ * 深色外圈 + 主色盘面 + 一条从底部升起、到中间分成两岔的世界线 ——
+ * 和界面里那个分叉图标是同一个隐喻,也就省掉了「导演长什么样」这个没法回答的问题。
+ */
+export function directorEmblem(skin: ScenarioSkin): PortraitDef {
+  const grid = makeCanvas();
+  const centerX = (CANVAS_W - 1) / 2;
+  const centerY = (CANVAS_H - 1) / 2;
+  const discRadius = 10.2;
+  const faceRadius = 9.2;
+
+  for (let y = 0; y < CANVAS_H; y += 1) {
+    for (let x = 0; x < CANVAS_W; x += 1) {
+      const distance = Math.hypot(x - centerX, y - centerY);
+      if (distance <= faceRadius) grid[y][x] = "x";
+      else if (distance <= discRadius) grid[y][x] = "o";
+    }
+  }
+
+  const forkY = 14;
+  // 主干:从底部升到分岔点
+  for (let y = forkY; y <= 22; y += 1) {
+    grid[y][11] = "y";
+    grid[y][12] = "y";
+  }
+  // 两条支线各朝一边斜上去
+  strokeLine(grid, 11, forkY, 6, 8, "y");
+  strokeLine(grid, 12, forkY, 17, 8, "y");
+  // 三个事件点:源头一个,两个分岔末端各一个
+  markNode(grid, 6, 8, "e");
+  markNode(grid, 17, 8, "e");
+  grid[22][11] = "e";
+  grid[22][12] = "e";
+
+  return {
+    frames: [grid.map((row) => row.join(""))],
+    palette: portraitPaletteOf(skin),
+    label: "世界线导演的徽记",
+  };
+}
+
 export interface PortraitDef {
   /** 单帧:律动交给 CSS 动画,不占帧 */
   frames: string[][];

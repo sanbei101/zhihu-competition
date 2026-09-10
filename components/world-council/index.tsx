@@ -14,7 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { DecisionPanel } from "@/components/world-council/decision-panel";
 import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-panel";
-import { SpeechStage, type StageBeat } from "@/components/world-council/speech-stage";
+import {
+  SpeechStage,
+  type StageBeat,
+  type StagePhase,
+} from "@/components/world-council/speech-stage";
 import { Timeline } from "@/components/world-council/timeline";
 import { WorldTabs } from "@/components/world-council/world-tabs";
 import { WorldIntro } from "@/components/world-intro";
@@ -60,6 +64,12 @@ interface WorldCouncilProps {
   onBack: () => void;
   skin: ScenarioSkin;
 }
+
+/**
+ * 世界线导演。他不是人,登场用一枚徽记而不是立绘。
+ * 这里给个最小身份对象,好让舞台与席位的接口不必为他开特例。
+ */
+const DIRECTOR_SUBJECT = { id: "director", name: "世界线导演" };
 
 function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const router = useRouter();
@@ -112,10 +122,12 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     situation: string;
   } | null>(null);
 
-  // 舞台演出:本回合的每一拍排成一条队列,一次只演一拍,逐字说完才推进下一拍
+  // 舞台演出:每一拍排成一条队列,一次只演一拍,逐字说完才推进下一拍。
+  // 开场白也走同一套机制 —— 第一眼的观感不该还是「四条消息自己在下面打字」。
   const [playIndex, setPlayIndex] = useState(0);
   const [skipped, setSkipped] = useState(false);
-  const [isPerforming, setIsPerforming] = useState(false);
+  const [performance, setPerformance] = useState<"none" | "opening" | "turn">("none");
+  const [openingStarted, setOpeningStarted] = useState(initial.turns.length > 0);
   // 裁决先攥在手里,等演出收尾再提交 —— 否则裁决卡会在别人还在说话时弹出来
   const pendingVerdictRef = useRef<JudgeResult | null>(null);
   const [hasPendingVerdict, setHasPendingVerdict] = useState(false);
@@ -133,10 +145,39 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   );
 
   /**
+   * 序幕的队列:导演先公布事件,然后四位 Agent 依次开口。
+   * 前两位是公开表态,后两位只是旁听插话,这个由头沿用历史流里的说法。
+   */
+  const openingBeats = useMemo<StageBeat[]>(() => {
+    const list: StageBeat[] = [
+      {
+        key: "opening:director",
+        speaker: DIRECTOR_SUBJECT,
+        speech: cast.setting.opening,
+        variant: "opening",
+        label: "事件公布",
+        emblem: true,
+      },
+    ];
+
+    cast.agentCharacters.forEach((character, index) => {
+      list.push({
+        key: `opening:${character.id}`,
+        speaker: character,
+        speech: character.openingLine,
+        variant: "opening",
+        label: index < 2 ? "公开表态" : "旁听发言",
+      });
+    });
+
+    return list;
+  }, [cast]);
+
+  /**
    * 本回合的演出队列:你的抉择 → 各方表态 → 面对面的交锋。
    * 四个人不再是同时冒出来的一堆气泡,而是排成一队、一个一个上台。
    */
-  const beats = useMemo<StageBeat[]>(() => {
+  const turnBeats = useMemo<StageBeat[]>(() => {
     const list: StageBeat[] = [];
 
     if (submittedDecision && player) {
@@ -174,7 +215,8 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
         speech: reaction.speech,
         variant: "retort",
         stance: reaction.stance,
-        againstName: agentById.get(record.againstId)?.name ?? record.againstId,
+        // 交锋是两人同框:被回击的那个人一起上台,压暗站在对面
+        against: agentById.get(record.againstId),
         action: reaction.action,
         target: reaction.target,
         impact: reaction.impact,
@@ -184,16 +226,21 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     return list;
   }, [agentById, player, reactions, retorts, round, submittedDecision]);
 
-  const currentBeat =
-    isPerforming && !skipped && playIndex < beats.length ? beats[playIndex] : null;
+  const beats = performance === "opening" ? openingBeats : turnBeats;
 
-  const stagePhase: "idle" | "performing" | "waiting" | "judging" = !isPerforming
-    ? "idle"
-    : currentBeat
-      ? "performing"
-      : isResolving
-        ? "waiting"
-        : "judging";
+  const currentBeat =
+    performance !== "none" && !skipped && playIndex < beats.length ? beats[playIndex] : null;
+
+  const stagePhase: StagePhase =
+    performance === "none"
+      ? "idle"
+      : currentBeat
+        ? "performing"
+        : performance === "opening"
+          ? "idle"
+          : isResolving
+            ? "waiting"
+            : "judging";
 
   const stageIdleHint = ended
     ? "这条世界线已经收束,去终章看看它留下了什么。"
@@ -202,11 +249,31 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       : "该你下令了 —— 从下面的选项里挑一个。";
 
   /**
-   * 演出的收尾闸门:每一拍都演完(或被跳过)、流式回应收齐、裁决结果到手,
+   * 片头过场散场后自动开演序幕。已经有回合的存档不再重演。
+   */
+  useEffect(() => {
+    if (showIntro || openingStarted) return;
+    setOpeningStarted(true);
+    setPerformance("opening");
+    setPlayIndex(0);
+    setSkipped(false);
+  }, [openingStarted, showIntro]);
+
+  /** 序幕散场:台上交还给玩家,四条开场白落进下方的历史流 */
+  useEffect(() => {
+    if (performance !== "opening") return;
+    if (!skipped && playIndex < beats.length) return;
+    setPerformance("none");
+    setPlayIndex(0);
+    setSkipped(false);
+  }, [beats.length, performance, playIndex, skipped]);
+
+  /**
+   * 回合的收尾闸门:每一拍都演完(或被跳过)、流式回应收齐、裁决结果到手,
    * 三件事同时满足才把裁决落进存档。
    */
   useEffect(() => {
-    if (!hasPendingVerdict || !isPerforming || isResolving) return;
+    if (performance !== "turn" || !hasPendingVerdict || isResolving) return;
     if (!skipped && playIndex < beats.length) return;
     const judged = pendingVerdictRef.current;
     if (!judged) return;
@@ -214,7 +281,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setHasPendingVerdict(false);
     commitJudgement(judged);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 提交动作每帧重建,靠上面三道门槛保证只提交一次
-  }, [beats.length, hasPendingVerdict, isPerforming, isResolving, playIndex, skipped]);
+  }, [beats.length, hasPendingVerdict, performance, isResolving, playIndex, skipped]);
 
   function handleBeatDone() {
     setPlayIndex((index) => index + 1);
@@ -398,7 +465,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     }
     setIsTurnComplete(true);
     // 落幕:舞台交还给玩家,等下一步指令
-    setIsPerforming(false);
+    setPerformance("none");
     setSkipped(false);
     setPlayIndex(0);
     toast.add({ title: `第 ${round} 回合已裁决`, type: "success" });
@@ -449,7 +516,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setTurnError("");
     setJudgeError("");
     // 新的一幕,舞台重新开场
-    setIsPerforming(false);
+    setPerformance("none");
     setSkipped(false);
     setPlayIndex(0);
   }
@@ -479,7 +546,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setTurnError("");
     setJudgeError("");
     // 开幕:先从你的抉择演起
-    setIsPerforming(true);
+    setPerformance("turn");
     setSkipped(false);
     setPlayIndex(0);
     pendingVerdictRef.current = null;
@@ -620,10 +687,16 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
   // 守卫之后收窄为非空别名
   const activePlayer = player;
-  const choiceDisabled = isResolving || isJudging || isTurnComplete || ended;
+  // 序幕演出期间不让下令:戏还没开演就点选项,序幕会被打断,那四条开场白就再也落不进历史流了
+  const choiceDisabled =
+    isResolving || isJudging || isTurnComplete || ended || performance === "opening";
   const canCloseVoluntarily = !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE;
-  /** 台上正在发言的人(玩家的抉择也算):左栏据此点亮他那一席、压暗其余 */
-  const stageSpeakerId = currentBeat ? currentBeat.speaker.id : null;
+  /** 台上正在发言的人(玩家的抉择也算):左栏据此点亮他那一席、压暗其余。导演没有席位,不参与 */
+  const stageSpeakerId = currentBeat && !currentBeat.emblem ? currentBeat.speaker.id : null;
+  /** 交锋时站在对面的那个人 */
+  const stageOpponentId = currentBeat?.against?.id ?? null;
+  /** 四条开场白只在「没在台上演」且片头已散场时才落进历史流,免得同一句话出现两次 */
+  const showOpening = !showIntro && performance !== "opening";
 
   return (
     <div className="space-y-4">
@@ -681,6 +754,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           relations={relations}
           ultimatum={ultimatum}
           speakingId={stageSpeakerId}
+          opposingId={stageOpponentId}
           skin={skin}
         />
 
@@ -703,7 +777,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
                 turns={turns}
                 ended={ended}
                 ending={ending}
-                openingAnimate={!showIntro && initial.turns.length === 0}
+                showOpening={showOpening}
                 onGoFinale={goFinale}
               />
               <DecisionPanel

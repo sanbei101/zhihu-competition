@@ -37,7 +37,28 @@ interface SeatsPanelProps {
   ultimatum: WorldUltimatum | null;
   /** 台上正在发言的人(玩家的抉择也算):点亮他那一席,其余压暗 */
   speakingId?: string | null;
+  /** 交锋时站在他对面的那个人:给一圈红边,和「正在说话」区分开 */
+  opposingId?: string | null;
   skin: ScenarioSkin;
+}
+
+type SeatState = "idle" | "speaking" | "opposing";
+
+function seatStateOf(
+  id: string,
+  speakingId?: string | null,
+  opposingId?: string | null,
+): SeatState {
+  if (speakingId === id) return "speaking";
+  if (opposingId === id) return "opposing";
+  return "idle";
+}
+
+/** 台上有人时,没上台的一律压暗,视线才知道往哪看 */
+function seatTone(state: SeatState, someoneOnStage: boolean) {
+  if (state === "speaking") return "bg-primary/5 ring-1 ring-primary/30";
+  if (state === "opposing") return "ring-1 ring-destructive/30";
+  return someoneOnStage ? "opacity-55" : "";
 }
 
 const attitudeTone: Record<AgentRelation["attitude"], string> = {
@@ -64,10 +85,13 @@ export function SeatsPanel({
   relations,
   ultimatum,
   speakingId,
+  opposingId,
   skin,
 }: SeatsPanelProps) {
   const playerPortrait = portraitFor(activePlayer, skin);
-  const playerSpeaking = speakingId === activePlayer.id;
+  const someoneOnStage = Boolean(speakingId || opposingId);
+  const playerState = seatStateOf(activePlayer.id, speakingId, opposingId);
+  const playerSpeaking = playerState === "speaking";
 
   return (
     <Card className="order-2 shadow-none lg:order-1">
@@ -83,7 +107,7 @@ export function SeatsPanel({
             render={
               <Item
                 variant="muted"
-                className={`hover:bg-muted transition-opacity ${playerSpeaking ? "bg-primary/5 ring-primary/30 ring-1" : speakingId ? "opacity-55" : ""}`}
+                className={`hover:bg-muted transition-opacity ${seatTone(playerState, someoneOnStage)}`}
               />
             }
           >
@@ -157,7 +181,8 @@ export function SeatsPanel({
             const dot = statusDot(agentStatuses[character.id]);
             const portrait = portraitFor(character, skin);
             const hasUltimatum = ultimatum?.agentId === character.id;
-            const speaking = speakingId === character.id;
+            const state = seatStateOf(character.id, speakingId, opposingId);
+            const speaking = state === "speaking";
 
             return (
               <HoverCard key={character.id}>
@@ -165,7 +190,7 @@ export function SeatsPanel({
                   render={
                     <Item
                       size="xs"
-                      className={`flex-col transition-opacity ${speaking ? "bg-primary/5 ring-primary/30 ring-1" : speakingId ? "opacity-55" : ""}`}
+                      className={`flex-col transition-opacity ${seatTone(state, someoneOnStage)}`}
                     />
                   }
                 >
@@ -188,6 +213,8 @@ export function SeatsPanel({
                       <ItemTitle>{character.name}</ItemTitle>
                       {speaking ? (
                         <p className="text-primary text-xs">正在台上</p>
+                      ) : state === "opposing" ? (
+                        <p className="text-destructive text-xs">正被回击</p>
                       ) : (
                         <p className="text-muted-foreground truncate text-xs">
                           {character.faction}

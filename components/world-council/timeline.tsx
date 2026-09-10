@@ -34,7 +34,8 @@ interface TimelineProps {
   turns: WorldGameSession["turns"];
   ended: boolean;
   ending: WorldEnding | null;
-  openingAnimate: boolean;
+  /** 四条开场白是否已经落进历史流(舞台上正在演的时候不显示,免得同一句话出现两次) */
+  showOpening: boolean;
   onGoFinale: () => void;
 }
 
@@ -49,7 +50,7 @@ export function Timeline({
   turns,
   ended,
   ending,
-  openingAnimate,
+  showOpening,
   onGoFinale,
 }: TimelineProps) {
   const nameOf = (agentId: string) =>
@@ -60,30 +61,42 @@ export function Timeline({
       <MessageScroller className="h-128">
         <MessageScrollerViewport>
           <MessageScrollerContent className="p-5 sm:p-6">
-            <MessageScrollerItem>
-              <Message>
-                <MessageAvatar className="bg-primary text-primary-foreground size-8">
-                  <GitBranch className="size-4" />
-                </MessageAvatar>
-                <MessageContent>
-                  <MessageHeader>世界线导演</MessageHeader>
-                  <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
-                    {cast.setting.opening}
-                  </div>
-                  <MessageFooter>事件公布</MessageFooter>
-                </MessageContent>
-              </Message>
-            </MessageScrollerItem>
-
-            {cast.agentCharacters.map((character, index) => (
-              <MessageScrollerItem key={character.id}>
-                <OpeningLineMessage
-                  character={character}
-                  footer={index < 2 ? "公开表态" : "旁听发言"}
-                  animate={openingAnimate}
-                />
+            {showOpening ? (
+              <MessageScrollerItem>
+                <Message>
+                  <MessageAvatar className="bg-primary text-primary-foreground size-8">
+                    <GitBranch className="size-4" />
+                  </MessageAvatar>
+                  <MessageContent>
+                    <MessageHeader>世界线导演</MessageHeader>
+                    <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
+                      {cast.setting.opening}
+                    </div>
+                    <MessageFooter>事件公布</MessageFooter>
+                  </MessageContent>
+                </Message>
               </MessageScrollerItem>
-            ))}
+            ) : null}
+
+            {showOpening
+              ? cast.agentCharacters.map((character, index) => (
+                  <MessageScrollerItem key={character.id}>
+                    <OpeningLineMessage
+                      character={character}
+                      footer={index < 2 ? "公开表态" : "旁听发言"}
+                      animate={false}
+                    />
+                  </MessageScrollerItem>
+                ))
+              : null}
+
+            {!showOpening && !turns.length && !ended ? (
+              <MessageScrollerItem>
+                <p className="text-muted-foreground px-3 py-10 text-center text-xs leading-6">
+                  戏在台上。散场之后,这里会留下这条世界线的全部记录。
+                </p>
+              </MessageScrollerItem>
+            ) : null}
 
             {turns.map((turn) => (
               <Fragment key={`turn-${turn.round}`}>
