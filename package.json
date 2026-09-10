@@ -10,13 +10,13 @@
     "lint": "oxlint"
   },
   "dependencies": {
-    "@ai-sdk/deepseek": "^3.0.39",
+    "@ai-sdk/deepseek": "^3.0.40",
     "@base-ui/react": "^1.8.0",
     "@shadcn/react": "^0.3.1",
-    "ai": "^7.0.93",
+    "ai": "^7.0.94",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
-    "lucide-react": "^1.42.0",
+    "lucide-react": "^1.43.0",
     "next": "^16.3.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -28,7 +28,7 @@
     "@types/node": "^26.5.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
-    "babel-plugin-react-compiler": "*",
+    "babel-plugin-react-compiler": "^1.0.0",
     "oxfmt": "^0.65.0",
     "oxlint": "^1.82.0",
     "oxlint-tsgolint": "^7.0.2001",
@@ -36,5 +36,5 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@12.3.4"
 }
