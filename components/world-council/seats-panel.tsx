@@ -1,7 +1,9 @@
 "use client";
 
-import { UserRound } from "lucide-react";
+import { ShieldQuestion, Swords, UserRound } from "lucide-react";
 
+import { PixelSprite } from "@/components/pixel/pixel-sprite";
+import { spritesForSkin } from "@/components/pixel/sprites";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,8 +16,17 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { type WorldCast } from "@/lib/world-cast";
+import {
+  attitudeHints,
+  attitudeLabels,
+  relationOf,
+  type AgentRelation,
+  type WorldUltimatum,
+} from "@/lib/world-ending";
+import type { ScenarioSkin } from "@/lib/scenario-skin";
 
 export type AgentStatus = "thinking" | "done" | "error";
 
@@ -23,9 +34,37 @@ interface SeatsPanelProps {
   cast: WorldCast;
   activePlayer: WorldCast["playerCharacters"][number];
   agentStatuses: Record<string, AgentStatus>;
+  relations: AgentRelation[];
+  ultimatum: WorldUltimatum | null;
+  skin: ScenarioSkin;
 }
 
-export function SeatsPanel({ cast, activePlayer, agentStatuses }: SeatsPanelProps) {
+const attitudeTone: Record<AgentRelation["attitude"], string> = {
+  loyal: "border-emerald-500/60 bg-emerald-100 text-emerald-700",
+  wary: "border-border bg-muted text-muted-foreground",
+  pressuring: "border-amber-500/60 bg-amber-100 text-amber-800",
+  defected: "border-red-500/60 bg-red-100 text-red-700",
+};
+
+function statusDot(status: AgentStatus | undefined) {
+  if (status === "done") return { className: "size-2 rounded-full bg-emerald-500", label: "已回应" };
+  if (status === "thinking")
+    return { className: "size-2 animate-pulse rounded-full bg-amber-500", label: "思考中" };
+  if (status === "error")
+    return { className: "bg-destructive size-2 rounded-full", label: "回应失败" };
+  return { className: "bg-muted-foreground/30 size-2 rounded-full", label: "等待中" };
+}
+
+export function SeatsPanel({
+  cast,
+  activePlayer,
+  agentStatuses,
+  relations,
+  ultimatum,
+  skin,
+}: SeatsPanelProps) {
+  const sprites = spritesForSkin(skin);
+
   return (
     <Card className="order-2 shadow-none lg:order-1">
       <CardHeader className="border-b">
@@ -69,76 +108,108 @@ export function SeatsPanel({ cast, activePlayer, agentStatuses }: SeatsPanelProp
                 <p className="text-muted-foreground text-xs">可调动资源</p>
                 <p className="text-xs leading-5">{activePlayer.decisionPower}</p>
               </div>
-              <div>
-                <p className="text-muted-foreground text-xs">你的秘密</p>
-                <p className="text-xs leading-5">{activePlayer.secret}</p>
-              </div>
             </div>
           </HoverCardContent>
         </HoverCard>
 
+        <div className="border-primary/30 bg-primary/5 rounded-md border p-3">
+          <p className="text-primary flex items-center gap-1.5 text-xs font-medium">
+            <ShieldQuestion className="size-3.5" />
+            只有你知道的私密目标
+          </p>
+          <p className="mt-1.5 text-xs leading-5">{activePlayer.privateGoal}</p>
+          <p className="text-muted-foreground mt-1 text-xs leading-5">
+            底线:{activePlayer.redLine}
+          </p>
+        </div>
+
         <Separator />
 
-        <ItemGroup className="gap-1">
-          {cast.agentCharacters.map((character) => (
-            <HoverCard key={character.id}>
-              <HoverCardTrigger render={<Item size="xs" className="hover:bg-muted" />}>
-                <ItemMedia>
-                  <Avatar size="sm">
-                    <AvatarFallback>{character.name.slice(0, 1)}</AvatarFallback>
-                  </Avatar>
-                </ItemMedia>
-                <ItemContent className="min-w-0">
-                  <ItemTitle>{character.name}</ItemTitle>
-                  <p className="text-muted-foreground truncate text-xs">{character.faction}</p>
-                </ItemContent>
-                <ItemActions>
-                  <span
-                    className={
-                      agentStatuses[character.id] === "done"
-                        ? "size-2 rounded-full bg-emerald-500"
-                        : agentStatuses[character.id] === "thinking"
-                          ? "size-2 animate-pulse rounded-full bg-amber-500"
-                          : agentStatuses[character.id] === "error"
-                            ? "bg-destructive size-2 rounded-full"
-                            : "bg-muted-foreground/30 size-2 rounded-full"
-                    }
-                    aria-label={
-                      agentStatuses[character.id] === "done"
-                        ? "已回应"
-                        : agentStatuses[character.id] === "thinking"
-                          ? "思考中"
-                          : agentStatuses[character.id] === "error"
-                            ? "回应失败"
-                            : "等待中"
-                    }
-                  />
-                </ItemActions>
-              </HoverCardTrigger>
-              <HoverCardContent side="right" align="start" className="w-72">
-                <div className="space-y-2">
-                  <div>
-                    <p className="font-medium">{character.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {character.identity} · {character.faction}
+        <ItemGroup className="gap-3">
+          {cast.agentCharacters.map((character, index) => {
+            const relation = relationOf(relations, character.id);
+            const trust = relation?.trust ?? 52;
+            const attitude = relation?.attitude ?? "wary";
+            const dot = statusDot(agentStatuses[character.id]);
+            const sprite = sprites[index % Math.max(1, sprites.length)];
+            const hasUltimatum = ultimatum?.agentId === character.id;
+
+            return (
+              <HoverCard key={character.id}>
+                <HoverCardTrigger render={<Item size="xs" className="flex-col" />}>
+                  <div className="flex w-full items-center gap-2">
+                    <ItemMedia>
+                      {sprite ? (
+                        <PixelSprite
+                          frames={sprite.frames}
+                          palette={sprite.palette}
+                          scale={2}
+                          duration={sprite.duration}
+                          label={`${character.name}:${sprite.label}`}
+                        />
+                      ) : (
+                        <Avatar size="sm">
+                          <AvatarFallback>{character.name.slice(0, 1)}</AvatarFallback>
+                        </Avatar>
+                      )}
+                    </ItemMedia>
+                    <ItemContent className="min-w-0">
+                      <ItemTitle>{character.name}</ItemTitle>
+                      <p className="text-muted-foreground truncate text-xs">{character.faction}</p>
+                    </ItemContent>
+                    <ItemActions className="flex-col items-end gap-1">
+                      <span className={dot.className} aria-label={dot.label} />
+                      <Badge variant="outline" className={`px-1.5 ${attitudeTone[attitude]}`}>
+                        {attitudeLabels[attitude]}
+                      </Badge>
+                    </ItemActions>
+                  </div>
+                  <div className="w-full">
+                    <Progress value={trust}>
+                      <ProgressLabel className="text-muted-foreground text-xs font-normal">
+                        对你的信任
+                      </ProgressLabel>
+                      <ProgressValue className="text-xs">{() => trust}</ProgressValue>
+                    </Progress>
+                  </div>
+                  {hasUltimatum ? (
+                    <p className="text-destructive flex items-center gap-1 text-xs">
+                      <Swords className="size-3" />
+                      已向你下最后通牒
                     </p>
+                  ) : null}
+                </HoverCardTrigger>
+                <HoverCardContent side="right" align="start" className="w-72">
+                  <div className="space-y-2">
+                    <div>
+                      <p className="font-medium">{character.name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {character.identity} · {character.faction}
+                      </p>
+                    </div>
+                    <p className="text-xs leading-5">{character.personality}</p>
+                    <div>
+                      <p className="text-muted-foreground text-xs">公开诉求</p>
+                      <p className="text-xs leading-5">{character.publicGoal}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">施压手段</p>
+                      <p className="text-xs leading-5">{character.pressureMethod}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">
+                        当前态度 · {attitudeLabels[attitude]}（信任 {trust}）
+                      </p>
+                      <p className="text-xs leading-5">{attitudeHints[attitude]}</p>
+                    </div>
+                    <blockquote className="text-muted-foreground border-l pl-2 text-xs leading-5">
+                      "{character.openingLine}"
+                    </blockquote>
                   </div>
-                  <p className="text-xs leading-5">{character.personality}</p>
-                  <div>
-                    <p className="text-muted-foreground text-xs">公开诉求</p>
-                    <p className="text-xs leading-5">{character.publicGoal}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">施压手段</p>
-                    <p className="text-xs leading-5">{character.pressureMethod}</p>
-                  </div>
-                  <blockquote className="text-muted-foreground border-l pl-2 text-xs leading-5">
-                    "{character.openingLine}"
-                  </blockquote>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          ))}
+                </HoverCardContent>
+              </HoverCard>
+            );
+          })}
         </ItemGroup>
       </CardContent>
     </Card>

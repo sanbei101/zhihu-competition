@@ -28,6 +28,7 @@ import {
 import { type WorldCast } from "@/lib/world-cast";
 import {
   endingLabels,
+  type RetortRecord,
   type TurnReactionRecord,
   type WorldEnding,
   type WorldGameSession,
@@ -39,6 +40,7 @@ interface TimelineProps {
   turns: WorldGameSession["turns"];
   submittedDecision: string;
   reactions: TurnReactionRecord[];
+  retorts: RetortRecord[];
   currentTurnSettled: boolean;
   ended: boolean;
   ending: WorldEnding | null;
@@ -52,12 +54,16 @@ export function Timeline({
   turns,
   submittedDecision,
   reactions,
+  retorts,
   currentTurnSettled,
   ended,
   ending,
   openingAnimate,
   onGoFinale,
 }: TimelineProps) {
+  const nameOf = (agentId: string) =>
+    cast.agentCharacters.find((candidate) => candidate.id === agentId)?.name ?? agentId;
+
   return (
     <MessageScrollerProvider>
       <MessageScroller className="h-128">
@@ -112,11 +118,29 @@ export function Timeline({
                     </MessageScrollerItem>
                   );
                 })}
+                {turn.retorts.map(({ agentId, againstId, reaction }) => {
+                  const character = cast.agentCharacters.find(
+                    (candidate) => candidate.id === agentId,
+                  );
+                  if (!character) return null;
+                  return (
+                    <MessageScrollerItem key={`turn-${turn.round}-retort-${agentId}`}>
+                      <ReactionMessage
+                        characterName={character.name}
+                        reaction={reaction}
+                        againstName={nameOf(againstId)}
+                        animate={false}
+                      />
+                    </MessageScrollerItem>
+                  );
+                })}
                 <MessageScrollerItem>
                   <DirectorNarrationMessage
                     title={`世界线导演 · 第 ${turn.round} 回合裁决`}
                     narration={turn.narration}
                     deltas={turn.deltas}
+                    entropy={turn.entropy}
+                    crisisPenalty={turn.crisisPenalty}
                     events={turn.events}
                     metricReasons={turn.metricReasons}
                     nextSituation={turn.nextSituation}
@@ -135,7 +159,7 @@ export function Timeline({
             ) : null}
 
             {!currentTurnSettled
-              ? reactions.map(({ agentId, reaction }) => {
+              ? reactions.map(({ agentId, reaction }, index) => {
                   const character = cast.agentCharacters.find(
                     (candidate) => candidate.id === agentId,
                   );
@@ -143,7 +167,31 @@ export function Timeline({
 
                   return (
                     <MessageScrollerItem key={`reaction-${agentId}`} scrollAnchor>
-                      <ReactionMessage characterName={character.name} reaction={reaction} />
+                      <ReactionMessage
+                        characterName={character.name}
+                        reaction={reaction}
+                        animate={index === reactions.length - 1}
+                      />
+                    </MessageScrollerItem>
+                  );
+                })
+              : null}
+
+            {!currentTurnSettled
+              ? retorts.map(({ agentId, againstId, reaction }, index) => {
+                  const character = cast.agentCharacters.find(
+                    (candidate) => candidate.id === agentId,
+                  );
+                  if (!character) return null;
+
+                  return (
+                    <MessageScrollerItem key={`retort-${agentId}`} scrollAnchor>
+                      <ReactionMessage
+                        characterName={character.name}
+                        reaction={reaction}
+                        againstName={nameOf(againstId)}
+                        animate={index === retorts.length - 1}
+                      />
                     </MessageScrollerItem>
                   );
                 })

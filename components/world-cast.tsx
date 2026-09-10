@@ -309,6 +309,10 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                         <p className="mt-1">{character.decisionPower}</p>
                       </div>
                       <div>
+                        <p className="text-muted-foreground text-xs">私密目标(只有你知道)</p>
+                        <p className="mt-1">{character.privateGoal}</p>
+                      </div>
+                      <div>
                         <p className="text-muted-foreground text-xs">关系钩子</p>
                         <p className="mt-1">{character.relationship}</p>
                       </div>

@@ -1,14 +1,31 @@
 "use client";
 
-import { Check, Flag, LoaderCircle, ScrollText } from "lucide-react";
+import { Check, Flag, LoaderCircle, PauseCircle, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MAX_ROUNDS, type TurnReactionRecord } from "@/lib/world-ending";
-import { type DecisionOption, type RoundOptions } from "@/lib/world-options";
+import { CrisisBanner, UltimatumBanner } from "@/components/world-council/messages";
+import { type WorldCast } from "@/lib/world-cast";
+import {
+  MIN_ROUND_TO_CLOSE,
+  metricKeys,
+  metricLabels,
+  type TurnReactionRecord,
+  type WorldCrisis,
+  type WorldUltimatum,
+} from "@/lib/world-ending";
+import {
+  leanLabels,
+  type DecisionOption,
+  type ForecastEntry,
+  type ImpactHint,
+  type Lean,
+  type RoundOptions,
+} from "@/lib/world-options";
 
 interface DecisionPanelProps {
+  cast: WorldCast;
   ended: boolean;
   currentTurnSettled: boolean;
   submittedDecision: string;
@@ -20,21 +37,77 @@ interface DecisionPanelProps {
   onChooseOption: (option: DecisionOption) => void;
   isResolving: boolean;
   reactions: TurnReactionRecord[];
-  agentCount: number;
   isJudging: boolean;
   judgeError: string;
   onRetryJudge: () => void;
   isTurnComplete: boolean;
-  round: number;
   turnsCount: number;
   onStartNextRound: () => void;
   canCloseVoluntarily: boolean;
   onCloseVoluntarily: () => void;
   onGoFinale: () => void;
   turnError: string;
+  crisis: WorldCrisis | null;
+  ultimatum: WorldUltimatum | null;
+  idleOption: DecisionOption | null;
+}
+
+const leanStyles: Record<Lean, string> = {
+  back: "border-emerald-500/60 bg-emerald-50 text-emerald-700",
+  doubt: "border-border bg-muted/60 text-muted-foreground",
+  oppose: "border-red-500/60 bg-red-50 text-red-700",
+};
+
+function ImpactRow({ impact }: { impact: ImpactHint }) {
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {metricKeys.map((key) => {
+        const hint = impact[key];
+        const tone = hint.startsWith("↑")
+          ? "text-emerald-600"
+          : hint.startsWith("↓")
+            ? "text-destructive"
+            : "text-muted-foreground";
+        return (
+          <span
+            key={key}
+            className="bg-muted/70 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+          >
+            <span className="text-muted-foreground">{metricLabels[key].slice(0, 2)}</span>
+            <span className={`font-mono font-medium ${tone}`}>{hint}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+function ForecastRow({
+  forecast,
+  nameById,
+}: {
+  forecast: ForecastEntry[];
+  nameById: Map<string, string>;
+}) {
+  if (!forecast.length) return null;
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span className="text-muted-foreground text-[11px]">朝堂预判</span>
+      {forecast.map((entry) => (
+        <span
+          key={entry.agentId}
+          className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] ${leanStyles[entry.lean]}`}
+        >
+          {nameById.get(entry.agentId) ?? entry.agentId}
+          <span className="opacity-80">{leanLabels[entry.lean]}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export function DecisionPanel({
+  cast,
   ended,
   currentTurnSettled,
   submittedDecision,
@@ -46,27 +119,39 @@ export function DecisionPanel({
   onChooseOption,
   isResolving,
   reactions,
-  agentCount,
   isJudging,
   judgeError,
   onRetryJudge,
   isTurnComplete,
-  round,
   turnsCount,
   onStartNextRound,
   canCloseVoluntarily,
   onCloseVoluntarily,
   onGoFinale,
   turnError,
+  crisis,
+  ultimatum,
+  idleOption,
 }: DecisionPanelProps) {
+  const nameById = new Map(cast.agentCharacters.map((character) => [character.id, character.name]));
+  const allOptions = options
+    ? idleOption
+      ? [...options.options, idleOption]
+      : options.options
+    : [];
+  const agentCount = cast.agentCharacters.length;
+
   return (
-    <div className="border-t p-4 sm:p-5">
+    <div className="space-y-3 border-t p-4 sm:p-5">
+      {!ended && crisis ? <CrisisBanner crisis={crisis} /> : null}
+      {!ended && ultimatum ? <UltimatumBanner ultimatum={ultimatum} /> : null}
+
       {!ended && !currentTurnSettled && !submittedDecision ? (
         <div aria-live="polite">
           {isGeneratingOptions ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {[0, 1, 2, 3].map((index) => (
-                <Skeleton key={index} className="h-24" />
+                <Skeleton key={index} className="h-28" />
               ))}
             </div>
           ) : null}
@@ -84,18 +169,22 @@ export function DecisionPanel({
             <div className="space-y-3">
               <p className="text-sm leading-7">{options.situation}</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {options.options.map((option, index) => (
+                {allOptions.map((option, index) => (
                   <Button
                     key={option.id}
                     type="button"
                     variant="outline"
                     disabled={choiceDisabled}
                     onClick={() => onChooseOption(option)}
-                    className="h-auto flex-col items-start gap-1 p-4 text-left"
+                    className="h-auto flex-col items-start gap-2 p-4 text-left"
                   >
                     <span className="flex w-full items-center gap-2">
                       <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded font-mono text-[11px]">
-                        {["A", "B", "C", "D"][index] ?? index + 1}
+                        {option.id === "idle" ? (
+                          <PauseCircle className="size-3.5" />
+                        ) : (
+                          (["A", "B", "C", "D", "E"][index] ?? index + 1)
+                        )}
                       </span>
                       <span className="font-medium">{option.title}</span>
                       <Badge variant="secondary" className="ml-auto shrink-0">
@@ -105,17 +194,22 @@ export function DecisionPanel({
                     <span className="text-muted-foreground text-xs leading-5 font-normal whitespace-normal">
                       {option.desc}
                     </span>
+                    <ImpactRow impact={option.impact} />
+                    <ForecastRow forecast={option.forecast} nameById={nameById} />
                   </Button>
                 ))}
               </div>
-              <p className="text-muted-foreground text-xs">点选其一即提交,不可更改</p>
+              <p className="text-muted-foreground text-xs">
+                点选其一即提交,不可更改。四维代价与朝堂预判都只是推演,不保证成真。
+              </p>
             </div>
           ) : null}
         </div>
       ) : null}
+
       {isResolving ? (
         <div
-          className="text-muted-foreground mt-3 flex items-center gap-2 text-xs"
+          className="text-muted-foreground flex items-center gap-2 text-xs"
           aria-live="polite"
         >
           <LoaderCircle className="size-3.5 animate-spin" />
@@ -124,7 +218,7 @@ export function DecisionPanel({
       ) : null}
       {isJudging ? (
         <div
-          className="text-muted-foreground mt-3 flex items-center gap-2 text-xs"
+          className="text-muted-foreground flex items-center gap-2 text-xs"
           aria-live="polite"
         >
           <LoaderCircle className="size-3.5 animate-spin" />
@@ -132,7 +226,7 @@ export function DecisionPanel({
         </div>
       ) : null}
       {judgeError ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-2" aria-live="polite">
           <p className="text-destructive text-xs" role="alert">
             {judgeError}
           </p>
@@ -142,27 +236,28 @@ export function DecisionPanel({
         </div>
       ) : null}
       {isTurnComplete && !ended && !isJudging && !judgeError ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-2" aria-live="polite">
           <div className="flex items-center gap-2 text-xs text-emerald-700">
             <Check className="size-3.5" />
-            本回合已裁决
-            {round >= MAX_ROUNDS ? "" : `(已演 ${turnsCount} / ${MAX_ROUNDS} 回合)`}
+            本回合已裁决(已演 {turnsCount} 回合)
           </div>
-          {round < MAX_ROUNDS ? (
-            <Button type="button" variant="outline" size="sm" onClick={onStartNextRound}>
-              开始下一回合
-            </Button>
-          ) : null}
+          <Button type="button" variant="outline" size="sm" onClick={onStartNextRound}>
+            开始下一回合
+          </Button>
           {canCloseVoluntarily ? (
             <Button type="button" variant="ghost" size="sm" onClick={onCloseVoluntarily}>
               <Flag data-icon="inline-start" />
               收束世界线
             </Button>
-          ) : null}
+          ) : (
+            <span className="text-muted-foreground text-xs">
+              演满 {MIN_ROUND_TO_CLOSE} 回合后可随时收束(拖得越久,大势损耗越快)
+            </span>
+          )}
         </div>
       ) : null}
       {ended ? (
-        <div className="mt-3 flex flex-wrap items-center gap-2" aria-live="polite">
+        <div className="flex flex-wrap items-center gap-2" aria-live="polite">
           <Button type="button" size="sm" onClick={onGoFinale}>
             <ScrollText data-icon="inline-start" />
             查看终章结算
@@ -170,7 +265,7 @@ export function DecisionPanel({
         </div>
       ) : null}
       {turnError ? (
-        <p className="text-destructive mt-3 text-xs" role="alert">
+        <p className="text-destructive text-xs" role="alert">
           {turnError}(可直接重选其一重试)
         </p>
       ) : null}

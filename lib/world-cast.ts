@@ -21,6 +21,11 @@ const characterSchema = z.object({
 
 export const playerCharacterSchema = characterSchema.extend({
   decisionPower: z.string().describe("玩家扮演此角色时能直接调动的关键资源或权力"),
+  privateGoal: z
+    .string()
+    .describe(
+      "只有玩家自己知道的私密目标,一句话、具体到可以被判定是否达成(如「无论如何保住幼弟性命」),不能与公开目标重复",
+    ),
 });
 
 export const agentCharacterSchema = characterSchema.extend({

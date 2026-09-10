@@ -9,6 +9,8 @@ import {
   LoaderCircle,
   RotateCcw,
   ScrollText,
+  ShieldQuestion,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -24,6 +26,7 @@ import { toast } from "@/components/ui/toast";
 import { WorldEventPanel } from "@/components/world-event";
 import { worldCouncilStorageKey } from "@/lib/world-cast";
 import {
+  attitudeLabels,
   endingLabels,
   metricKeys,
   metricLabels,
@@ -106,6 +109,8 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
       playerId: game.playerId,
       turns: game.turns,
       metrics: game.metrics,
+      relations: game.relations,
+      crisis: game.crisis,
       ending: game.ending,
     });
     setIsLoading(false);
@@ -139,7 +144,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         <CardHeader>
           <CardTitle>世界线尚未终局</CardTitle>
           <p className="text-muted-foreground text-sm leading-6">
-            请先回到议事厅完成推演(跑满 5 回合、触发提前结局,或第 3 回合后主动收束)。
+            请先回到议事厅完成推演:局势自行崩盘、提前定鼎,或者由你在演满 3 回合后主动收束。
           </p>
         </CardHeader>
         <CardContent>
@@ -210,6 +215,70 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {finale && player ? (
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <ShieldQuestion className="size-4" />
+              你的私密目标
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-muted-foreground text-xs leading-5">
+              「{player.privateGoal}」——这件事从头到尾没有第二个人知道。
+            </p>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={
+                  finale.privateGoalVerdict === "达成"
+                    ? "default"
+                    : finale.privateGoalVerdict === "部分达成"
+                      ? "secondary"
+                      : "destructive"
+                }
+              >
+                {finale.privateGoalVerdict}
+              </Badge>
+            </div>
+            <p className="text-sm leading-7">{finale.privateGoalNote}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {session.relations.length ? (
+        <Card className="shadow-none">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="size-4" />
+              终局人心
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {session.cast.agentCharacters.map((character) => {
+              const relation = session.relations.find((item) => item.agentId === character.id);
+              const trust = relation?.trust ?? 52;
+              const attitude = relation?.attitude ?? "wary";
+              return (
+                <div key={character.id} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{character.name}</span>
+                    <Badge variant="outline" className="ml-auto">
+                      {attitudeLabels[attitude]}
+                    </Badge>
+                  </div>
+                  <Progress value={trust}>
+                    <ProgressLabel className="text-muted-foreground text-xs font-normal">
+                      信任
+                    </ProgressLabel>
+                    <ProgressValue className="text-xs">{() => trust}</ProgressValue>
+                  </Progress>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {finale ? (
         <Card className="shadow-none">

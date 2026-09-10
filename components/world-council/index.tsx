@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CircleDot, Clock3 } from "lucide-react";
+import { ArrowLeft, CircleDot, Clock3, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -20,20 +20,36 @@ import { WorldIntro } from "@/components/world-intro";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
-  MAX_ROUNDS,
   MIN_ROUND_TO_CLOSE,
   actForRound,
   buildVoluntaryEnding,
+  createInitialRelations,
+  describeCrisis,
+  describeRelations,
+  describeUltimatum,
   endingLabels,
+  entropyForRound,
+  entropyNoteForRound,
+  pressureLabels,
+  pressureLevel,
   summarizeTurnsForPrompt,
   worldGameSessionSchema,
-  type MetricDeltas,
+  type AgentRelation,
+  type AppliedDeltas,
+  type RetortRecord,
   type TurnReactionRecord,
+  type WorldCrisis,
   type WorldEnding,
   type WorldGameSession,
   type WorldMetrics,
+  type WorldUltimatum,
 } from "@/lib/world-ending";
-import { decisionTextOf, type DecisionOption, type RoundOptions } from "@/lib/world-options";
+import {
+  decisionTextOf,
+  idleOptionFor,
+  type DecisionOption,
+  type RoundOptions,
+} from "@/lib/world-options";
 import { type WorldTurnEvent, worldTurnEventSchema } from "@/lib/world-turn";
 
 interface WorldCouncilProps {
@@ -52,6 +68,13 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const [metrics, setMetrics] = useState<WorldMetrics>(initial.metrics);
   const [turns, setTurns] = useState<WorldGameSession["turns"]>(initial.turns);
   const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
+  const [relations, setRelations] = useState<AgentRelation[]>(
+    initial.relations.length
+      ? initial.relations
+      : createInitialRelations(cast.agentCharacters.map((character) => character.id)),
+  );
+  const [crisis, setCrisis] = useState<WorldCrisis | null>(initial.crisis);
+  const [ultimatum, setUltimatum] = useState<WorldUltimatum | null>(initial.ultimatum);
 
   const [submittedDecision, setSubmittedDecision] = useState("");
   // 开场片头只在新开对局播一次:中途刷新、下一回合不再重播。
@@ -61,6 +84,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const [optionsError, setOptionsError] = useState("");
   const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [reactions, setReactions] = useState<TurnReactionRecord[]>([]);
+  const [retorts, setRetorts] = useState<RetortRecord[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isResolving, setIsResolving] = useState(false);
   const [isJudging, setIsJudging] = useState(false);
@@ -69,43 +93,29 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   );
   const [turnError, setTurnError] = useState("");
   const [judgeError, setJudgeError] = useState("");
-  const [lastDeltas, setLastDeltas] = useState<MetricDeltas | null>(
+  const [lastDeltas, setLastDeltas] = useState<AppliedDeltas | null>(
     initial.turns.length ? initial.turns[initial.turns.length - 1].deltas : null,
+  );
+  const [lastEntropy, setLastEntropy] = useState<AppliedDeltas | null>(
+    initial.turns.length ? initial.turns[initial.turns.length - 1].entropy : null,
+  );
+  const [lastCrisisPenalty, setLastCrisisPenalty] = useState<AppliedDeltas | null>(
+    initial.turns.length ? initial.turns[initial.turns.length - 1].crisisPenalty : null,
   );
 
   const pendingJudgeRef = useRef<{
     decision: string;
     collected: TurnReactionRecord[];
+    retortRecords: RetortRecord[];
     situation: string;
   } | null>(null);
-
-  if (!player) {
-    return (
-      <Card className="mx-auto max-w-lg shadow-none">
-        <CardHeader>
-          <CardTitle>玩家角色丢失</CardTitle>
-          <p className="text-muted-foreground text-sm leading-6">
-            存档中的角色与当前阵容不一致,请返回世界线页面重新建档。
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Button
-            nativeButton={false}
-            render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}
-          >
-            返回世界线
-            <ArrowLeft data-icon="inline-end" />
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
 
   const ended = ending !== null;
   const currentTurnSettled = turns.some((turn) => turn.round === round);
   const storageKey = worldCouncilStorageKey(worldId);
-  // 守卫之后收窄为非空别名
-  const activePlayer = player;
+  const idleOption = idleOptionFor(cast);
+  const pressure = pressureLevel(metrics);
+  const entropy = entropyForRound(round);
 
   useEffect(() => {
     const session: WorldGameSession = {
@@ -117,6 +127,9 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       metrics,
       round,
       turns,
+      relations,
+      crisis,
+      ultimatum,
       status: ending ? "ended" : "ongoing",
       ending,
     };
@@ -127,28 +140,35 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     }
   }, [
     cast,
+    crisis,
     ending,
     initial.playerId,
     initial.scenarioTitle,
     initial.scenarioUrl,
     metrics,
+    relations,
     round,
     storageKey,
     turns,
+    ultimatum,
     worldId,
   ]);
 
   useEffect(() => {
+    if (!player) return;
     if (ended || currentTurnSettled || submittedDecision || options) return;
     let cancelled = false;
     setIsGeneratingOptions(true);
     setOptionsError("");
     void generateOptionsAction({
       cast,
-      playerId: activePlayer.id,
+      playerId: player.id,
       metrics,
       round,
       history: turns,
+      relations,
+      crisis,
+      ultimatum,
     }).then((result) => {
       if (cancelled) return;
       setIsGeneratingOptions(false);
@@ -164,16 +184,19 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       cancelled = true;
     };
   }, [
-    activePlayer.id,
     cast,
+    crisis,
     currentTurnSettled,
     ended,
     metrics,
     options,
     optionsAttempt,
+    player,
+    relations,
     round,
     submittedDecision,
     turns,
+    ultimatum,
   ]);
 
   function retryOptions() {
@@ -184,9 +207,15 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   async function runJudge(
     judgeDecision: string,
     collected: TurnReactionRecord[],
+    retortRecords: RetortRecord[],
     judgeSituation: string,
   ) {
-    pendingJudgeRef.current = { decision: judgeDecision, collected, situation: judgeSituation };
+    pendingJudgeRef.current = {
+      decision: judgeDecision,
+      collected,
+      retortRecords,
+      situation: judgeSituation,
+    };
     setIsJudging(true);
     setJudgeError("");
 
@@ -198,7 +227,11 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       situation: judgeSituation,
       decision: judgeDecision,
       reactions: collected,
+      retorts: retortRecords,
       history: turns,
+      relations,
+      crisis,
+      ultimatum,
     });
 
     setIsJudging(false);
@@ -211,18 +244,40 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
     pendingJudgeRef.current = null;
     const judged = result.data;
+
+    // 找出这一回合新离心的人,单独提醒
+    const newlyDefected = judged.relations.filter(
+      (relation) =>
+        relation.attitude === "defected" &&
+        (relations.find((previous) => previous.agentId === relation.agentId)?.attitude ??
+          "wary") !== "defected",
+    );
+
     setMetrics(judged.metrics);
     setLastDeltas(judged.deltas);
+    setLastEntropy(judged.entropy);
+    setLastCrisisPenalty(judged.crisisPenalty);
+    setRelations(judged.relations);
+    setCrisis(judged.crisis);
+    setUltimatum(judged.ultimatum);
     setTurns((current) => [
       ...current,
       {
         round,
         decision: judgeDecision,
         reactions: collected,
+        retorts: retortRecords,
         events: judged.events,
         narration: judged.narration,
         deltas: judged.deltas,
+        entropy: judged.entropy,
+        crisisPenalty: judged.crisisPenalty,
         metricReasons: judged.metricReasons,
+        relations: judged.relations,
+        crisis: judged.crisis,
+        crisisResolved: judged.crisisResolved,
+        ultimatum: judged.ultimatum,
+        ultimatumOutcome: judged.ultimatumOutcome,
         nextSituation: judged.nextSituation,
       },
     ]);
@@ -231,20 +286,53 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     }
     setIsTurnComplete(true);
     toast.add({ title: `第 ${round} 回合已裁决`, type: "success" });
+
+    for (const defector of newlyDefected) {
+      const name =
+        cast.agentCharacters.find((character) => character.id === defector.agentId)?.name ??
+        defector.agentId;
+      toast.add({
+        title: `${name} 已离心`,
+        description: "他不再把命令当回事,下一回合可能自行其是。",
+        type: "error",
+      });
+    }
+    if (!crisis && judged.crisis) {
+      toast.add({
+        title: "新的突发事件压了上来",
+        description: judged.crisis.title,
+        type: "error",
+      });
+    }
+    if (judged.ultimatumOutcome === "defied") {
+      toast.add({
+        title: "最后通牒已被无视",
+        description: "有人不再等你表态。",
+        type: "error",
+      });
+    }
   }
 
   function retryJudge() {
     const pending = pendingJudgeRef.current;
-    if (pending) void runJudge(pending.decision, pending.collected, pending.situation);
+    if (pending) {
+      void runJudge(
+        pending.decision,
+        pending.collected,
+        pending.retortRecords,
+        pending.situation,
+      );
+    }
   }
 
   function startNextRound() {
-    if (ended || round >= MAX_ROUNDS) return;
+    if (ended) return;
     setRound(round + 1);
     setSubmittedDecision("");
     setOptions(null);
     setOptionsError("");
     setReactions([]);
+    setRetorts([]);
     setAgentStatuses({});
     setIsTurnComplete(false);
     setTurnError("");
@@ -253,7 +341,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
   function closeVoluntarily() {
     if (ended || round < MIN_ROUND_TO_CLOSE) return;
-    setEnding(buildVoluntaryEnding(round));
+    setEnding(buildVoluntaryEnding(round, metrics));
     setJudgeError("");
     toast.add({ title: "世界线已收束", description: "可查看终章结算", type: "success" });
   }
@@ -269,6 +357,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
     setSubmittedDecision(content);
     setReactions([]);
+    setRetorts([]);
     setAgentStatuses({});
     setIsResolving(true);
     setIsTurnComplete(false);
@@ -276,26 +365,29 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setJudgeError("");
 
     const collected: TurnReactionRecord[] = [];
+    const retortRecords: RetortRecord[] = [];
 
     function applyEvent(turnEvent: WorldTurnEvent) {
       if (turnEvent.type === "agent-start") {
-        setAgentStatuses((statuses) => ({
-          ...statuses,
-          [turnEvent.agentId]: "thinking",
-        }));
+        setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
       } else if (turnEvent.type === "agent-reaction") {
         const record = { agentId: turnEvent.agentId, reaction: turnEvent.reaction };
         collected.push(record);
         setReactions((current) => [...current, record]);
-        setAgentStatuses((statuses) => ({
-          ...statuses,
-          [turnEvent.agentId]: "done",
-        }));
+        setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
+      } else if (turnEvent.type === "retort-start") {
+        setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
+      } else if (turnEvent.type === "agent-retort") {
+        const record = {
+          agentId: turnEvent.agentId,
+          againstId: turnEvent.againstId,
+          reaction: turnEvent.reaction,
+        };
+        retortRecords.push(record);
+        setRetorts((current) => [...current, record]);
+        setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "agent-error") {
-        setAgentStatuses((statuses) => ({
-          ...statuses,
-          [turnEvent.agentId]: "error",
-        }));
+        setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "error" }));
       }
     }
 
@@ -327,7 +419,11 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           round,
           situation,
           metrics,
-          historySummary: summarizeTurnsForPrompt(turns, 3600),
+          historySummary: summarizeTurnsForPrompt(turns, 4000),
+          relationsSummary: describeRelations(relations),
+          crisisSummary: describeCrisis(crisis),
+          ultimatumSummary: describeUltimatum(ultimatum),
+          entropyNote: entropyNoteForRound(round),
           decision: content,
         }),
       });
@@ -375,12 +471,36 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
     setIsResolving(false);
     // 流式回应收齐后自动进入冲突裁决
-    await runJudge(content, collected, situation);
+    await runJudge(content, collected, retortRecords, situation);
   }
 
+  // hook 全部调用完之后才允许提前返回,避免条件调用 hook
+  if (!player) {
+    return (
+      <Card className="mx-auto max-w-lg shadow-none">
+        <CardHeader>
+          <CardTitle>玩家角色丢失</CardTitle>
+          <p className="text-muted-foreground text-sm leading-6">
+            存档中的角色与当前阵容不一致,请返回世界线页面重新建档。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            nativeButton={false}
+            render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}
+          >
+            返回世界线
+            <ArrowLeft data-icon="inline-end" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 守卫之后收窄为非空别名
+  const activePlayer = player;
   const choiceDisabled = isResolving || isJudging || isTurnComplete || ended;
-  const canCloseVoluntarily =
-    !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE && round < MAX_ROUNDS;
+  const canCloseVoluntarily = !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE;
 
   return (
     <div className="space-y-4">
@@ -399,11 +519,20 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge>{`回合 ${String(round).padStart(2, "0")} / ${String(MAX_ROUNDS).padStart(2, "0")}`}</Badge>
+              <Badge>{`回合 ${String(round).padStart(2, "0")}`}</Badge>
               <Badge variant="outline">
                 <CircleDot data-icon="inline-start" />
                 {actForRound(round)}
               </Badge>
+              {pressure !== "stable" ? (
+                <Badge variant="destructive">{pressureLabels[pressure]}</Badge>
+              ) : null}
+              {entropy > 0 ? (
+                <Badge variant="outline" className="gap-1">
+                  <TrendingDown className="size-3" />
+                  大势每回合流失 {entropy}
+                </Badge>
+              ) : null}
               <Badge variant="secondary">{skin.name}</Badge>
               {ended && ending ? (
                 <Badge variant="secondary">{endingLabels[ending.type]}</Badge>
@@ -422,7 +551,14 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-        <SeatsPanel cast={cast} activePlayer={activePlayer} agentStatuses={agentStatuses} />
+        <SeatsPanel
+          cast={cast}
+          activePlayer={activePlayer}
+          agentStatuses={agentStatuses}
+          relations={relations}
+          ultimatum={ultimatum}
+          skin={skin}
+        />
 
         <Card className="order-1 min-w-0 shadow-none lg:order-2">
           <CardContent className="p-0">
@@ -432,6 +568,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
               turns={turns}
               submittedDecision={submittedDecision}
               reactions={reactions}
+              retorts={retorts}
               currentTurnSettled={currentTurnSettled}
               ended={ended}
               ending={ending}
@@ -439,6 +576,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
               onGoFinale={goFinale}
             />
             <DecisionPanel
+              cast={cast}
               ended={ended}
               currentTurnSettled={currentTurnSettled}
               submittedDecision={submittedDecision}
@@ -450,18 +588,19 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
               onChooseOption={(option) => void chooseOption(option)}
               isResolving={isResolving}
               reactions={reactions}
-              agentCount={cast.agentCharacters.length}
               isJudging={isJudging}
               judgeError={judgeError}
               onRetryJudge={retryJudge}
               isTurnComplete={isTurnComplete}
-              round={round}
               turnsCount={turns.length}
               onStartNextRound={startNextRound}
               canCloseVoluntarily={canCloseVoluntarily}
               onCloseVoluntarily={closeVoluntarily}
               onGoFinale={goFinale}
               turnError={turnError}
+              crisis={crisis}
+              ultimatum={ultimatum}
+              idleOption={idleOption}
             />
           </CardContent>
         </Card>
@@ -471,11 +610,18 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           activePlayer={activePlayer}
           metrics={metrics}
           lastDeltas={lastDeltas}
+          lastEntropy={lastEntropy}
+          lastCrisisPenalty={lastCrisisPenalty}
+          round={round}
           turns={turns}
+          relations={relations}
           reactions={reactions}
+          retorts={retorts}
           submittedDecision={submittedDecision}
           currentTurnSettled={currentTurnSettled}
           isTurnComplete={isTurnComplete}
+          crisis={crisis}
+          ultimatum={ultimatum}
         />
       </div>
     </div>

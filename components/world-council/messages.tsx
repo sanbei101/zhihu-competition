@@ -1,6 +1,6 @@
 "use client";
 
-import { GitBranch } from "lucide-react";
+import { GitBranch, Swords, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -14,10 +14,14 @@ import {
 import { WorldEventPanel } from "@/components/world-event";
 import { type WorldCast } from "@/lib/world-cast";
 import {
+  crisisSeverityLabels,
   metricKeys,
   metricLabels,
+  type AppliedDeltas,
   type MetricDeltas,
+  type WorldCrisis,
   type WorldGameSession,
+  type WorldUltimatum,
 } from "@/lib/world-ending";
 import { type AgentReaction } from "@/lib/world-turn";
 
@@ -47,8 +51,8 @@ const stanceStyles: Record<AgentReaction["stance"], { bubble: string; badge: str
   },
 };
 
-const TYPE_INTERVAL_MS = 55;
-const TYPE_PAUSE_MS = 165;
+const TYPE_INTERVAL_MS = 42;
+const TYPE_PAUSE_MS = 130;
 const TYPING_CARET = "▍";
 
 export function useTypewriter(
@@ -101,6 +105,44 @@ export function SpeakingAvatar({
   );
 }
 
+export function TrustDeltaBadge({ delta }: { delta: number }) {
+  if (delta === 0) return null;
+  const rising = delta > 0;
+  return (
+    <Badge
+      variant="outline"
+      className={
+        rising
+          ? "border-emerald-500/60 bg-emerald-100 text-emerald-700"
+          : "border-red-500/60 bg-red-100 text-red-700"
+      }
+    >
+      {rising ? `对你的信任 +${delta}` : `对你的信任 ${delta}`}
+    </Badge>
+  );
+}
+
+export function UltimatumNotice({
+  characterName,
+  demand,
+  penalty,
+}: {
+  characterName: string;
+  demand: string;
+  penalty: string;
+}) {
+  return (
+    <div className="border-destructive/40 bg-destructive/5 mt-1 max-w-2xl rounded-md border p-3">
+      <p className="text-destructive flex items-center gap-1.5 text-xs font-medium">
+        <TriangleAlert className="size-3.5" />
+        {characterName} 当众发出最后通牒
+      </p>
+      <p className="mt-1.5 text-xs leading-5">要求:{demand}</p>
+      <p className="text-muted-foreground mt-1 text-xs leading-5">不照做的后果:{penalty}</p>
+    </div>
+  );
+}
+
 export function PlayerDecisionMessage({
   playerName,
   decision,
@@ -131,25 +173,39 @@ export function ReactionMessage({
   characterName,
   reaction,
   animate = true,
+  againstName,
 }: {
   characterName: string;
   reaction: AgentReaction;
   animate?: boolean;
+  /** 传了就是第二轮交锋:显示成「当场回击某人」 */
+  againstName?: string;
 }) {
   const { typed, isTyping } = useTypewriter(reaction.speech, animate);
   const stanceStyle = stanceStyles[reaction.stance];
+  const isRetort = Boolean(againstName);
+
   return (
     <Message>
       <SpeakingAvatar isTyping={isTyping} characterName={characterName} />
       <MessageContent>
-        <MessageHeader className="gap-2">
+        <MessageHeader className="flex-wrap gap-2">
           <span>{characterName}</span>
+          {isRetort ? (
+            <span className="text-destructive/90 flex items-center gap-1">
+              <Swords className="size-3" />
+              当场回击 {againstName}
+            </span>
+          ) : null}
           <Badge variant="outline" className={stanceStyle.badge}>
             {stanceLabels[reaction.stance]}
           </Badge>
+          <TrustDeltaBadge delta={reaction.trustDelta} />
         </MessageHeader>
         <div
-          className={`border-border max-w-2xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${stanceStyle.bubble} ${isTyping ? "ring-primary/40 ring-1" : ""}`}
+          className={`border-border max-w-2xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${stanceStyle.bubble} ${
+            isRetort ? "border-r-4 border-r-red-400/70" : ""
+          } ${isTyping ? "ring-primary/40 ring-1" : ""}`}
         >
           {typed}
           <TypingCaret visible={isTyping} />
@@ -164,6 +220,13 @@ export function ReactionMessage({
             <p className="text-foreground mt-1">{reaction.target}</p>
           </div>
         </div>
+        {reaction.ultimatum ? (
+          <UltimatumNotice
+            characterName={characterName}
+            demand={reaction.ultimatum.demand}
+            penalty={reaction.ultimatum.penalty}
+          />
+        ) : null}
         <MessageFooter className="max-w-2xl items-start leading-5">
           公开影响：{reaction.impact}
         </MessageFooter>
@@ -200,21 +263,36 @@ export function OpeningLineMessage({
   );
 }
 
+function deltaSummary(deltas: AppliedDeltas | MetricDeltas | null): string {
+  if (!deltas) return "";
+  const parts = metricKeys
+    .filter((key) => deltas[key] !== 0)
+    .map((key) => `${metricLabels[key]}${deltas[key] > 0 ? `+${deltas[key]}` : deltas[key]}`);
+  return parts.join(" · ");
+}
+
 export function DirectorNarrationMessage({
   title,
   narration,
   deltas,
+  entropy,
+  crisisPenalty,
   events,
   metricReasons,
   nextSituation,
 }: {
   title: string;
   narration: string;
-  deltas: MetricDeltas | null;
+  deltas: AppliedDeltas | null;
+  entropy?: AppliedDeltas | null;
+  crisisPenalty?: AppliedDeltas | null;
   events: WorldGameSession["turns"][number]["events"];
   metricReasons: WorldGameSession["turns"][number]["metricReasons"] | null;
   nextSituation: string | null;
 }) {
+  const entropyText = deltaSummary(entropy ?? null);
+  const penaltyText = deltaSummary(crisisPenalty ?? null);
+
   return (
     <Message>
       <MessageAvatar className="bg-primary text-primary-foreground size-8">
@@ -232,15 +310,15 @@ export function DirectorNarrationMessage({
         ) : null}
         {deltas ? (
           <MessageFooter className="max-w-2xl items-start leading-5">
-            {metricKeys
-              .map((key) => {
-                const delta = deltas[key];
-                if (delta === 0) return null;
-                return `${metricLabels[key]}${delta > 0 ? `+${delta}` : delta}`;
-              })
-              .filter(Boolean)
-              .join(" · ") || "四维指标持平"}
+            四维净变化：{deltaSummary(deltas) || "四维指标持平"}
           </MessageFooter>
+        ) : null}
+        {entropyText || penaltyText ? (
+          <p className="text-muted-foreground max-w-2xl text-xs leading-5">
+            {entropyText ? `大势流失：${entropyText}` : null}
+            {entropyText && penaltyText ? " · " : null}
+            {penaltyText ? `突发事件逾期：${penaltyText}` : null}
+          </p>
         ) : null}
         {metricReasons ? (
           <div className="text-muted-foreground mt-2 grid max-w-2xl gap-1 text-xs leading-5 sm:grid-cols-2">
@@ -259,5 +337,51 @@ export function DirectorNarrationMessage({
         ) : null}
       </MessageContent>
     </Message>
+  );
+}
+
+/** 正在倒计时的突发事件,压在时间轴顶端。 */
+export function CrisisBanner({ crisis }: { crisis: WorldCrisis }) {
+  const expired = crisis.roundsLeft <= 0;
+  const penaltyText = metricKeys
+    .filter((key) => crisis.penalty[key] > 0)
+    .map((key) => `${metricLabels[key]} -${crisis.penalty[key]}`)
+    .join(" · ");
+
+  return (
+    <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <TriangleAlert className="text-destructive size-4" />
+        <p className="text-sm font-medium">{crisis.title}</p>
+        <Badge variant={expired ? "destructive" : "secondary"} className="ml-auto">
+          {expired ? "已逾期" : `还剩 ${crisis.roundsLeft} 回合`}
+        </Badge>
+        <Badge variant="outline">{crisisSeverityLabels[crisis.severity]}</Badge>
+      </div>
+      <p className="text-muted-foreground mt-1.5 text-xs leading-5">{crisis.summary}</p>
+      <p className="text-muted-foreground mt-1 text-xs leading-5">
+        来源：{crisis.source}
+        {penaltyText ? ` · 每回合代价：${penaltyText}` : ""}
+      </p>
+    </div>
+  );
+}
+
+/** 悬在头顶的最后通牒。 */
+export function UltimatumBanner({ ultimatum }: { ultimatum: WorldUltimatum }) {
+  return (
+    <div className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Swords className="text-destructive size-4" />
+        <p className="text-sm font-medium">最后通牒悬而未决</p>
+        <Badge variant="destructive" className="ml-auto">
+          第 {ultimatum.deadlineRound} 回合到期
+        </Badge>
+      </div>
+      <p className="mt-1.5 text-xs leading-5">要求:{ultimatum.demand}</p>
+      <p className="text-muted-foreground mt-1 text-xs leading-5">
+        若不照做:{ultimatum.penalty}(逾期他将自行其是)
+      </p>
+    </div>
   );
 }
