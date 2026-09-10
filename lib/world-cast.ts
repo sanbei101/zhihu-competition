@@ -34,11 +34,9 @@ const characterSchema = z.object({
   name: z.string().describe("符合时代背景的角色姓名"),
   identity: z.string().describe("角色的身份与职务"),
   faction: z.string().describe("角色所属阵营或利益群体"),
-  archetype: characterArchetypeSchema
-    .optional()
-    .describe(
-      "这个角色的立绘原型,只能从 official(文臣/幕僚/学者)、general(将帅/武人)、envoy(使者/说客/中间人)、magnate(商贾/资本/东家)、technician(技术/科研/工程)、commoner(平民/匠人/渔农) 里挑最贴近身份的一个,必须填写",
-    ),
+  archetype: characterArchetypeSchema.describe(
+    "这个角色的立绘原型,只能从 official(文臣/幕僚/学者)、general(将帅/武人)、envoy(使者/说客/中间人)、magnate(商贾/资本/东家)、technician(技术/科研/工程)、commoner(平民/匠人/渔农) 里挑最贴近身份的一个",
+  ),
   personality: z.string().describe("两到三个鲜明且会影响决策的性格特征"),
   publicGoal: z.string().describe("角色公开追求的目标"),
   secret: z.string().describe("只有角色自己知道的秘密或真实动机"),

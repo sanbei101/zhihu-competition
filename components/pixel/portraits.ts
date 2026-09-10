@@ -355,55 +355,6 @@ function pick<T>(list: T[], key: string): T {
   return list[hashOf(key) % list.length];
 }
 
-const ARCHETYPE_KEYWORDS: { archetype: CharacterArchetype; words: string[] }[] = [
-  {
-    archetype: "general",
-    words: ["将", "帅", "军", "兵", "武", "校", "尉", "统帅", "司令", "舰队", "安保", "护"],
-  },
-  {
-    archetype: "technician",
-    words: [
-      "技术",
-      "工程",
-      "科学",
-      "研究",
-      "数据",
-      "程序",
-      "算",
-      "医",
-      "实验",
-      "学者",
-      "博士",
-      "监测",
-      "机",
-    ],
-  },
-  {
-    archetype: "magnate",
-    words: ["商", "资", "财", "董事", "老板", "公司", "东家", "钱庄", "贸易", "集团", "掌门"],
-  },
-  {
-    archetype: "envoy",
-    words: ["使", "外交", "说客", "谈判", "中间人", "代表", "翻译", "特使", "联络"],
-  },
-  {
-    archetype: "official",
-    words: ["相", "臣", "令", "尚书", "官", "幕僚", "参谋", "书记", "市长", "理事", "文书", "监"],
-  },
-  { archetype: "commoner", words: ["平民", "渔民", "农", "匠", "工", "厨", "船", "牧", "冷库"] },
-];
-
-/**
- * 老存档里没有 archetype 字段时的兜底:按身份与阵营的关键词猜一个原型。
- * 猜不到就当文臣 —— 议事厅里这个概率最高。
- */
-export function guessArchetype(text: string): CharacterArchetype {
-  for (const entry of ARCHETYPE_KEYWORDS) {
-    if (entry.words.some((word) => text.includes(word))) return entry.archetype;
-  }
-  return "official";
-}
-
 // ==================== 导演徽记 ====================
 
 /** Bresenham 直线:徽记里的分岔是算出来的,手写 28 行斜线太容易错 */
@@ -510,15 +461,13 @@ export interface PortraitSubject {
   name: string;
   identity?: string;
   faction?: string;
-  archetype?: CharacterArchetype;
+  /** 角色阵容一定会给这个字段,所以立绘造型是确定的,不留兜底 */
+  archetype: CharacterArchetype;
 }
 
 /** 一个角色一张立绘。同一个 id 与名字永远得到同一张,且与皮肤无关地保持特征一致。 */
 export function portraitFor(subject: PortraitSubject, skin: ScenarioSkin): PortraitDef {
-  const archetype =
-    subject.archetype ??
-    guessArchetype(`${subject.identity ?? ""} ${subject.faction ?? ""} ${subject.name}`);
-  const kit = ARCHETYPE_KITS[archetype];
+  const kit = ARCHETYPE_KITS[subject.archetype];
   const key = `${subject.id}:${subject.name}`;
   const seed = hashOf(key);
 

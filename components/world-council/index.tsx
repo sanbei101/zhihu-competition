@@ -28,7 +28,6 @@ import {
   MIN_ROUND_TO_CLOSE,
   actForRound,
   buildVoluntaryEnding,
-  createInitialRelations,
   describeCrisis,
   describeRelations,
   describeUltimatum,
@@ -65,12 +64,6 @@ interface WorldCouncilProps {
   skin: ScenarioSkin;
 }
 
-/**
- * 世界线导演。他不是人,登场用一枚徽记而不是立绘。
- * 这里给个最小身份对象,好让舞台与席位的接口不必为他开特例。
- */
-const DIRECTOR_SUBJECT = { id: "director", name: "世界线导演" };
-
 function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const router = useRouter();
   const cast: WorldCast = initial.cast;
@@ -80,11 +73,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const [metrics, setMetrics] = useState<WorldMetrics>(initial.metrics);
   const [turns, setTurns] = useState<WorldGameSession["turns"]>(initial.turns);
   const [ending, setEnding] = useState<WorldEnding | null>(initial.ending);
-  const [relations, setRelations] = useState<AgentRelation[]>(
-    initial.relations.length
-      ? initial.relations
-      : createInitialRelations(cast.agentCharacters.map((character) => character.id)),
-  );
+  const [relations, setRelations] = useState<AgentRelation[]>(initial.relations);
   const [crisis, setCrisis] = useState<WorldCrisis | null>(initial.crisis);
   const [ultimatum, setUltimatum] = useState<WorldUltimatum | null>(initial.ultimatum);
 
@@ -152,11 +141,10 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     const list: StageBeat[] = [
       {
         key: "opening:director",
-        speaker: DIRECTOR_SUBJECT,
+        directorName: "世界线导演",
         speech: cast.setting.opening,
         variant: "opening",
         label: "事件公布",
-        emblem: true,
       },
     ];
 
@@ -691,8 +679,8 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const choiceDisabled =
     isResolving || isJudging || isTurnComplete || ended || performance === "opening";
   const canCloseVoluntarily = !ended && isTurnComplete && round >= MIN_ROUND_TO_CLOSE;
-  /** 台上正在发言的人(玩家的抉择也算):左栏据此点亮他那一席、压暗其余。导演没有席位,不参与 */
-  const stageSpeakerId = currentBeat && !currentBeat.emblem ? currentBeat.speaker.id : null;
+  /** 台上正在发言的人(玩家的抉择也算):左栏据此点亮他那一席、压暗其余。导演没有席位,自然不参与 */
+  const stageSpeakerId = currentBeat?.speaker?.id ?? null;
   /** 交锋时站在对面的那个人 */
   const stageOpponentId = currentBeat?.against?.id ?? null;
   /** 四条开场白只在「没在台上演」且片头已散场时才落进历史流,免得同一句话出现两次 */

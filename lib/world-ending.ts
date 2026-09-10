@@ -241,24 +241,24 @@ export const turnRecordSchema = z.object({
   /** 第一轮:四个 Agent 各自表态 */
   reactions: z.array(turnReactionRecordSchema),
   /** 第二轮:被点名者之间的当场回击 */
-  retorts: z.array(retortRecordSchema).default([]),
+  retorts: z.array(retortRecordSchema),
   events: z.array(worldEventSchema).min(1).max(3),
   narration: z.string(),
   /** 本回合实际生效的四维增量(含大势熵增与逾期惩罚) */
   deltas: appliedDeltasSchema,
   /** 其中由大势熵增造成的部分 */
-  entropy: appliedDeltasSchema.default(zeroAppliedDeltas()),
+  entropy: appliedDeltasSchema,
   /** 其中由突发事件逾期造成的部分 */
-  crisisPenalty: appliedDeltasSchema.default(zeroAppliedDeltas()),
+  crisisPenalty: appliedDeltasSchema,
   metricReasons: metricReasonsSchema,
   /** 本回合结算后的信任度快照 */
-  relations: z.array(agentRelationSchema).default([]),
+  relations: z.array(agentRelationSchema),
   /** 本回合结束时的未决突发事件 */
-  crisis: crisisSchema.nullable().default(null),
-  crisisResolved: z.boolean().default(false),
+  crisis: crisisSchema.nullable(),
+  crisisResolved: z.boolean(),
   /** 本回合结束时的未决通牒 */
-  ultimatum: ultimatumSchema.nullable().default(null),
-  ultimatumOutcome: ultimatumOutcomeSchema.default("none"),
+  ultimatum: ultimatumSchema.nullable(),
+  ultimatumOutcome: ultimatumOutcomeSchema,
   nextSituation: z.string().min(1).max(300),
 });
 export type TurnRecord = z.infer<typeof turnRecordSchema>;
@@ -394,7 +394,7 @@ export const finaleSchema = z.object({
     )
     .min(1),
   articleMarkdown: z.string().min(200),
-  charCount: z.number().int().min(0).default(0),
+  charCount: z.number().int().min(0),
   shareText: z.string().min(20).max(2000),
 });
 export type WorldFinale = z.infer<typeof finaleSchema>;
@@ -427,15 +427,15 @@ export function assembleFinaleArticle(input: {
 export const worldGameSessionSchema = z.object({
   scenarioId: z.string(),
   scenarioTitle: z.string(),
-  scenarioUrl: z.string().optional().default(""),
+  scenarioUrl: z.string(),
   playerId: z.string(),
   cast: worldCastSchema,
   metrics: metricsSchema,
   round: z.number().int().min(1),
   turns: z.array(turnRecordSchema),
-  relations: z.array(agentRelationSchema).default([]),
-  crisis: crisisSchema.nullable().default(null),
-  ultimatum: ultimatumSchema.nullable().default(null),
+  relations: z.array(agentRelationSchema),
+  crisis: crisisSchema.nullable(),
+  ultimatum: ultimatumSchema.nullable(),
   status: z.enum(["ongoing", "ended"]),
   ending: endingSchema.nullable(),
 });

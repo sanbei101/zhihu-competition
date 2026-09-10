@@ -24,13 +24,13 @@ export const worldTurnRequestSchema = z.object({
   metrics: metricsPayloadSchema,
   historySummary: z.string().max(8000),
   /** 各 Agent 对玩家的信任度摘要 */
-  relationsSummary: z.string().max(2000).optional().default(""),
+  relationsSummary: z.string().max(2000),
   /** 当前未决的突发事件摘要 */
-  crisisSummary: z.string().max(800).optional().default(""),
+  crisisSummary: z.string().max(800),
   /** 当前未决的通牒摘要 */
-  ultimatumSummary: z.string().max(800).optional().default(""),
+  ultimatumSummary: z.string().max(800),
   /** 本回合大势熵增的说明 */
-  entropyNote: z.string().max(400).optional().default(""),
+  entropyNote: z.string().max(400),
   decision: z.string().trim().min(1).max(600),
 });
 

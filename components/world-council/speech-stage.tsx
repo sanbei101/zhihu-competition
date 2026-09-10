@@ -24,14 +24,15 @@ export type StagePhase = "idle" | "performing" | "waiting" | "judging";
 export interface StageBeat {
   /** 每一拍唯一:换了这一拍,立绘与气泡都要重来 */
   key: string;
-  speaker: PortraitSubject;
+  /** 说话的角色。导演不是人,他那一拍没有 speaker —— 只有 directorName */
+  speaker?: PortraitSubject;
+  /** 导演登场:舞台上出徽记,标题用这个称呼 */
+  directorName?: string;
   /** 他当场说的话 */
   speech: string;
   variant: "opening" | "decision" | "reaction" | "retort";
   /** 开场那几条的由头,如「公开表态」 */
   label?: string;
-  /** 这一拍的主角是导演(没有立绘,用徽记出场) */
-  emblem?: boolean;
   stance?: AgentReaction["stance"];
   /** 第二轮交锋:站在他对面的人。有值就是两人同框 */
   against?: PortraitSubject;
@@ -60,21 +61,20 @@ export function actionNoteOf(beat: StageBeat): string {
 function StageFigure({
   skin,
   subject,
-  emblem,
   talking,
   dimmed,
   scale,
 }: {
   skin: ScenarioSkin;
-  subject: PortraitSubject;
-  emblem?: boolean;
+  /** null = 导演:他不是人,出徽记 */
+  subject: PortraitSubject | null;
   talking: boolean;
   dimmed?: boolean;
   scale: number;
 }) {
   const art = useMemo(
-    () => (emblem ? directorEmblem(skin) : portraitFor(subject, skin)),
-    [emblem, subject, skin],
+    () => (subject ? portraitFor(subject, skin) : directorEmblem(skin)),
+    [subject, skin],
   );
 
   return (
@@ -136,9 +136,12 @@ export function SpeechStage({
     };
   }, [beat, done]);
 
-  const onStage = beat ? beat.speaker : player;
+  const figureName = beat ? (beat.speaker?.name ?? beat.directorName ?? "") : player.name;
+  const figureIdentity = beat?.speaker?.identity;
   const stance = beat?.stance ? stanceStyles[beat.stance] : null;
   const note = beat ? actionNoteOf(beat) : "";
+  /** beat 有 speaker 就是角色,没有就是导演 */
+  const figureSubject = beat ? (beat.speaker ?? null) : player;
 
   const bubbleTone =
     beat?.variant === "decision"
@@ -150,9 +153,9 @@ export function SpeechStage({
   return (
     <section className="bg-card relative overflow-hidden rounded-lg border" aria-label="议事舞台">
       <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
-        <span className="text-sm font-medium">{onStage.name}</span>
-        {beat && onStage.identity ? (
-          <span className="text-muted-foreground text-xs">{onStage.identity}</span>
+        <span className="text-sm font-medium">{figureName}</span>
+        {beat && figureIdentity ? (
+          <span className="text-muted-foreground text-xs">{figureIdentity}</span>
         ) : null}
         {beat?.variant === "opening" && beat.label ? (
           <Badge variant="outline">{beat.label}</Badge>
@@ -208,7 +211,7 @@ export function SpeechStage({
           key={beat?.key ?? "idle"}
           className="animate-in fade-in slide-in-from-bottom-2 duration-300 motion-reduce:animate-none"
         >
-          {beat?.against ? (
+          {beat?.against && beat.speaker ? (
             <div className="flex items-end justify-center gap-3 sm:gap-10">
               <div className="flex flex-col items-center gap-2">
                 <StageFigure skin={skin} subject={beat.speaker} talking={isTyping} scale={5} />
@@ -224,13 +227,7 @@ export function SpeechStage({
               </div>
             </div>
           ) : (
-            <StageFigure
-              skin={skin}
-              subject={onStage}
-              emblem={beat?.emblem}
-              talking={isTyping}
-              scale={6}
-            />
+            <StageFigure skin={skin} subject={figureSubject} talking={isTyping} scale={6} />
           )}
         </div>
 

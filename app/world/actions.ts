@@ -323,10 +323,10 @@ const generateOptionsInputSchema = z.object({
   playerId: z.string().min(1),
   metrics: metricsSchema,
   round: z.number().int().min(1),
-  history: z.array(turnRecordSchema).optional().default([]),
-  relations: z.array(agentRelationSchema).optional().default([]),
-  crisis: crisisSchema.nullable().optional().default(null),
-  ultimatum: ultimatumSchema.nullable().optional().default(null),
+  history: z.array(turnRecordSchema),
+  relations: z.array(agentRelationSchema),
+  crisis: crisisSchema.nullable(),
+  ultimatum: ultimatumSchema.nullable(),
 });
 
 export async function generateOptionsAction(input: unknown): Promise<ActionResult<RoundOptions>> {
@@ -378,11 +378,11 @@ const judgeTurnInputSchema = z.object({
   situation: z.string().trim().min(1).max(600),
   decision: z.string().trim().min(1).max(600),
   reactions: z.array(turnReactionRecordSchema).max(8),
-  retorts: z.array(retortRecordSchema).max(4).optional().default([]),
-  history: z.array(turnRecordSchema).optional().default([]),
-  relations: z.array(agentRelationSchema).optional().default([]),
-  crisis: crisisSchema.nullable().optional().default(null),
-  ultimatum: ultimatumSchema.nullable().optional().default(null),
+  retorts: z.array(retortRecordSchema).max(4),
+  history: z.array(turnRecordSchema),
+  relations: z.array(agentRelationSchema),
+  crisis: crisisSchema.nullable(),
+  ultimatum: ultimatumSchema.nullable(),
 });
 
 const judgeDraftSchema = z.object({
@@ -557,13 +557,13 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
 const generateFinalePlanInputSchema = z.object({
   scenarioId: z.string().min(1).max(100),
   scenarioTitle: z.string().min(1).max(300),
-  scenarioUrl: z.string().max(500).optional().default(""),
+  scenarioUrl: z.string().max(500),
   cast: worldCastSchema,
   playerId: z.string().min(1),
   turns: z.array(turnRecordSchema).min(1),
   metrics: metricsSchema,
-  relations: z.array(agentRelationSchema).optional().default([]),
-  crisis: crisisSchema.nullable().optional().default(null),
+  relations: z.array(agentRelationSchema),
+  crisis: crisisSchema.nullable(),
   ending: z.object({
     type: z.string(),
     title: z.string(),
@@ -640,8 +640,8 @@ const generateFinaleChapterInputSchema = z.object({
     brief: z.string().min(1).max(300),
   }),
   outline: z.array(z.object({ index: z.number().int().min(1), title: z.string() })).min(1),
-  previousTitle: z.string().max(40).optional().default(""),
-  previousTail: z.string().max(4000).optional().default(""),
+  previousTitle: z.string().max(40),
+  previousTail: z.string().max(4000),
 });
 
 /** 第二步:一次续写一章。 */
