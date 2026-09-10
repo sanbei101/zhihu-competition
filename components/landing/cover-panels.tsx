@@ -43,7 +43,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
     <section
       id="top"
       style={skinStyleVars(skin)}
-      aria-label="世界线档案库入口"
+      aria-label="知乎脑洞游乐园入口"
       className="bg-background text-foreground relative h-dvh w-full snap-start snap-always overflow-hidden"
     >
       <div className="absolute inset-0">
@@ -59,9 +59,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
       />
 
       <div className="relative flex h-full flex-col items-center px-5 pt-20 text-center sm:pt-24">
-        <Badge variant="outline" className="font-mono text-[10px] tracking-widest">
-          WORLDLINE ARCHIVES
-        </Badge>
+        <Badge variant="outline" className="tracking-[0.2em]">知乎脑洞游乐园</Badge>
 
         <h1 className="mt-4 max-w-3xl text-3xl leading-tight font-semibold tracking-tight sm:text-5xl sm:leading-[1.15]">
           一个问题,
@@ -70,7 +68,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
         </h1>
 
         <p className="text-muted-foreground mt-4 max-w-xl text-sm leading-7 sm:text-base">
-          从知乎的历史假设与脑洞命题中精选母本,按主题分装成可推演的世界。挑一个分区,进入议事厅做决定。
+          {`把知乎的经典脑洞与历史假设做成可推演的副本,按主题分成 ${SCENARIO_THEMES.length} 片乐园。挑一间走进去,决定权在你手里。`}
         </p>
 
         <div className="scrollbar-none -mx-5 mt-6 flex w-[calc(100%+2.5rem)] snap-x gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:max-w-3xl sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
@@ -95,9 +93,9 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
         </div>
 
         <div className="text-muted-foreground mt-5 flex items-center gap-3 font-mono text-[11px]">
-          <span>{SCENARIO_THEMES.length} 个主题</span>
+          <span>{SCENARIO_THEMES.length} 片主题乐园</span>
           <Separator orientation="vertical" className="h-3 self-center" />
-          <span>{topicCount} 条世界线</span>
+          <span>{topicCount} 个副本</span>
         </div>
 
         <div className="text-muted-foreground mt-6 flex flex-col items-center gap-1">
@@ -122,7 +120,7 @@ export function OutroPanel({
     <section
       id="end"
       style={skinStyleVars(skin)}
-      aria-label="世界线档案库结语"
+      aria-label="游园结束"
       className="bg-background text-foreground relative h-dvh w-full snap-start snap-always overflow-hidden"
     >
       {mounted ? <ThemeStage skin={skin} /> : null}
@@ -135,16 +133,14 @@ export function OutroPanel({
       />
 
       <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
-        <Badge variant="outline" className="font-mono text-[10px] tracking-widest">
-          END OF ARCHIVE
-        </Badge>
+        <Badge variant="outline" className="tracking-[0.2em]">本次游园到此</Badge>
         <h2 className="mt-4 max-w-2xl text-2xl leading-snug font-semibold tracking-tight sm:text-4xl">
           每一条世界线,
           <br />
           都从一个「如果」开始。
         </h2>
         <p className="text-muted-foreground mt-4 max-w-xl text-sm leading-7">
-          挑一个母本,把决定权交给你,剩下的交给议事厅。
+          挑一间副本走进去,剩下的交给议事厅。
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-2">
           <Button onClick={() => onJump(0)}>
@@ -156,15 +152,15 @@ export function OutroPanel({
             nativeButton={false}
             render={<Link href={`#${SCENARIO_THEMES[0]?.id ?? "top"}`} />}
           >
-            从第一条世界线开始
+            从第一间副本开始
           </Button>
         </div>
       </div>
 
       <footer className="border-border bg-background/70 absolute inset-x-0 bottom-0 border-t backdrop-blur-md">
         <div className="text-muted-foreground mx-auto flex max-w-7xl flex-col gap-1 px-5 py-4 text-[11px] sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <span className="text-foreground font-semibold">知乎脑洞 / WORLDLINE LAB</span>
-          <span>母本来自知乎公开问题,推演内容由 AI 生成</span>
+          <span className="text-foreground font-semibold">知乎脑洞游乐园 / WORLDLINE ARCADE</span>
+          <span>题目来自知乎公开问题,推演内容由 AI 生成</span>
         </div>
       </footer>
     </section>

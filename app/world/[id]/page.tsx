@@ -30,13 +30,13 @@ export default async function WorldPage({ params }: WorldPageProps) {
       <main style={skinStyleVars(skin)} className="bg-background text-foreground min-h-screen">
         <header className="border-border bg-background border-b">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
-            <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
-              <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
-              <span className="font-semibold tracking-tight">知乎脑洞</span>
+            <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞游乐园首页">
+              <img src="/zhihu.svg" alt="知乎脑洞游乐园" className="size-9 rounded-lg" />
+              <span className="font-semibold tracking-tight">知乎脑洞游乐园</span>
             </Link>
             <Button nativeButton={false} variant="ghost" size="sm" render={<Link href="/" />}>
               <ArrowLeft data-icon="inline-start" />
-              返回主题库
+              返回主题乐园
             </Button>
           </div>
         </header>
@@ -44,16 +44,16 @@ export default async function WorldPage({ params }: WorldPageProps) {
         <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8">
           <Card className="mx-auto max-w-lg shadow-none">
             <CardHeader className="p-6 sm:p-8">
-              <CardTitle className="text-xl">这条世界线不在当前题库里</CardTitle>
+              <CardTitle className="text-xl">这间副本不在题库里</CardTitle>
               <p className="text-muted-foreground mt-2 text-sm leading-7">
-                题库中的世界线由主题索引,请从首页对应分区进入。
+                题库中的副本按主题乐园索引,请从首页对应分区进入。
               </p>
               <p className="text-muted-foreground mt-1 font-mono text-xs">ID: {id}</p>
             </CardHeader>
             <CardFooter className="bg-muted border-border flex gap-2 border-t px-6 py-4 sm:px-8">
               <Button nativeButton={false} render={<Link href="/" />}>
                 <ArrowLeft data-icon="inline-start" />
-                回主题库
+                回主题乐园
               </Button>
             </CardFooter>
           </Card>
@@ -69,9 +69,9 @@ export default async function WorldPage({ params }: WorldPageProps) {
     <main style={skinStyleVars(skin)} className="bg-background text-foreground min-h-screen">
       <header className="border-border bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-5 px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞首页">
-            <img src="/zhihu.svg" alt="知乎脑洞" className="size-9 rounded-lg" />
-            <span className="font-semibold tracking-tight">知乎脑洞</span>
+          <Link href="/" className="flex items-center gap-3" aria-label="返回知乎脑洞游乐园首页">
+            <img src="/zhihu.svg" alt="知乎脑洞游乐园" className="size-9 rounded-lg" />
+            <span className="font-semibold tracking-tight">知乎脑洞游乐园</span>
           </Link>
           <Button
             nativeButton={false}
@@ -135,7 +135,7 @@ export default async function WorldPage({ params }: WorldPageProps) {
                 <CardTitle className="pt-2 text-xl leading-8">{topic.title}</CardTitle>
               </CardHeader>
               <CardContent className="text-muted-foreground px-6 text-sm leading-7 sm:px-8">
-                该母本已收入固化题库,推演时以标题与所属主题的时代背景为准。原始讨论可在知乎查看。
+                该副本已收入题库,推演时以标题与所属主题的时代背景为准。原始讨论可在知乎查看。
               </CardContent>
               {topic.url ? (
                 <CardFooter className="bg-muted border-border border-t px-6 py-4 sm:px-8">

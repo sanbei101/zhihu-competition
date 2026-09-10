@@ -196,7 +196,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
             </Badge>
             <CardTitle className="pt-2 text-xl leading-8">召集第一幕角色</CardTitle>
             <CardDescription className="leading-6">
-              DeepSeek 将依据母本生成三名玩家候选与四名独立 Agent 角色。
+              DeepSeek 将依据副本生成三名玩家候选与四名独立 Agent 角色。
             </CardDescription>
           </CardHeader>
           <CardContent className="px-6">

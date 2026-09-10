@@ -9,6 +9,18 @@ export const GROUND_LINE = "bottom-7 sm:bottom-9 lg:bottom-11";
 /** 小屏整体收一档,避免精灵把整屏挤满 */
 const SPRITE_FIT = "origin-bottom scale-[0.6] sm:scale-[0.8] lg:scale-100";
 
+/**
+ * 每层精灵的高度上限(视口高度百分比)。
+ * 首页一整屏里,下半部分要留给「演出带」,精灵再大也不能越过这条线,
+ * 用 max-h + w-auto 让 SVG 等比缩,像素比不整也比压住文案好。
+ */
+const FIT = {
+  hero: "w-auto max-h-[21dvh] sm:max-h-[26dvh] lg:max-h-[32dvh]",
+  prop: "w-auto max-h-[13dvh] sm:max-h-[16dvh] lg:max-h-[19dvh]",
+  landmark: "w-auto max-h-[17dvh] sm:max-h-[21dvh] lg:max-h-[26dvh]",
+  floating: "w-auto max-h-[11dvh] sm:max-h-[13dvh] lg:max-h-[15dvh]",
+} as const;
+
 /** 远山起伏,写死数组保证服务端与客户端渲染一致 */
 const RIDGE_STEPS = [11, 17, 25, 19, 31, 23, 14, 8, 13, 21, 28, 16, 10, 18, 24, 12];
 
@@ -35,10 +47,13 @@ export function stagePixelSize(sprite: SpriteDef, targetHeight: number) {
 export function StageSprite({
   sprite,
   targetHeight,
+  fit,
   className,
 }: {
   sprite: SpriteDef;
   targetHeight: number;
+  /** 高度上限,防止精灵越过后面的浮动层 */
+  fit?: string;
   className?: string;
 }) {
   return (
@@ -49,6 +64,7 @@ export function StageSprite({
         palette={sprite.palette}
         duration={sprite.duration}
         scale={stagePixelSize(sprite, targetHeight)}
+        className={fit}
       />
     </div>
   );
@@ -99,7 +115,7 @@ export function StageBackdrop({ skin }: { skin: ScenarioSkin }) {
         viewBox={`0 0 ${ridgeWidth} 32`}
         preserveAspectRatio="none"
         shapeRendering="crispEdges"
-        className={`absolute inset-x-0 ${GROUND_LINE} h-20 w-full sm:h-28 lg:h-36`}
+        className={`absolute inset-x-0 ${GROUND_LINE} h-24 w-full sm:h-32 lg:h-40`}
         aria-hidden="true"
       >
         {RIDGE_STEPS.map((step, index) => (
@@ -162,7 +178,7 @@ export function ThemeStage({ skin, reversed = false, className }: ThemeStageProp
           className={`absolute ${GROUND_LINE} ${reversed ? "left-[6%]" : "right-[6%]"}`}
           aria-hidden="true"
         >
-          <StageSprite sprite={landmark} targetHeight={228} />
+          <StageSprite sprite={landmark} targetHeight={228} fit={FIT.landmark} />
         </div>
       ) : null}
 
@@ -170,18 +186,18 @@ export function ThemeStage({ skin, reversed = false, className }: ThemeStageProp
       {floating.slice(0, 2).map((sprite, index) => (
         <div
           key={sprite.id}
-          className={`absolute ${index === 0 ? "top-[42%]" : "top-[58%]"} ${
+          className={`absolute ${index === 0 ? "top-[17%]" : "top-[28%]"} ${
             reversed ? "right-[8%]" : "left-[8%]"
           }`}
           aria-hidden="true"
         >
-          <StageSprite sprite={sprite} targetHeight={126} />
+          <StageSprite sprite={sprite} targetHeight={126} fit={FIT.floating} />
         </div>
       ))}
 
-      {/* 地面精灵:首位站 C 位,其余作前景 */}
+      {/* 地面精灵:首位站 C 位,其余作前景;精灵少的时候 justify-around 才不会全挤到两头 */}
       <div
-        className={`absolute inset-x-0 ${GROUND_LINE} flex items-end justify-between gap-4 px-[6%] sm:px-[9%] ${rowPadding}`}
+        className={`absolute inset-x-0 ${GROUND_LINE} flex items-end justify-around gap-4 px-[6%] sm:px-[9%] ${rowPadding}`}
         aria-hidden="true"
       >
         {ground.map((sprite, index) => (
@@ -189,6 +205,7 @@ export function ThemeStage({ skin, reversed = false, className }: ThemeStageProp
             key={sprite.id}
             sprite={sprite}
             targetHeight={index === 0 ? 288 : 168}
+            fit={index === 0 ? FIT.hero : FIT.prop}
           />
         ))}
       </div>

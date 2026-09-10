@@ -304,7 +304,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               size="sm"
               onClick={() =>
                 void copyText(
-                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n--知乎脑洞世界线推演`,
+                  `${finale.verdictTitle}\n\n${finale.articleMarkdown}\n\n--知乎脑洞游乐园 · 世界线推演`,
                 ).then((ok) => {
                   if (ok) setCopied("article");
                   else

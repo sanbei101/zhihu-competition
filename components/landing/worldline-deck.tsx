@@ -51,18 +51,23 @@ function TopBar({
             event.preventDefault();
             onJump(0);
           }}
-          className="flex items-center gap-2.5"
-          aria-label="回到世界线档案库入口"
+          className="flex shrink-0 items-center gap-2.5"
+          aria-label="回到知乎脑洞游乐园入口"
         >
-          <img src="/zhihu.svg" alt="知乎脑洞" className="size-8 rounded-md" />
-          <span className="text-sm font-semibold tracking-tight">知乎脑洞</span>
-          <Separator orientation="vertical" className="mx-1 hidden h-4 self-center sm:block" />
-          <span className="text-muted-foreground hidden text-[11px] tracking-wider uppercase sm:block">
-            Worldline Archives
+          <img src="/zhihu.svg" alt="知乎脑洞游乐园" className="size-8 rounded-md" />
+          <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
+            知乎脑洞游乐园
+          </span>
+          <Separator
+            orientation="vertical"
+            className="mx-1 hidden h-4 self-center 2xl:block"
+          />
+          <span className="text-muted-foreground hidden text-[11px] tracking-wider uppercase 2xl:block">
+            Worldline Arcade
           </span>
         </a>
 
-        <nav className="hidden items-center gap-0.5 xl:flex" aria-label="世界线分区">
+        <nav className="hidden items-center gap-0.5 xl:flex" aria-label="主题乐园">
           {SCENARIO_THEMES.map((theme, index) => {
             const current = activeIndex === index + 1;
             return (
@@ -87,7 +92,7 @@ function TopBar({
 
         <div className="text-muted-foreground flex shrink-0 items-center gap-1.5 font-mono text-[11px]">
           <Layers className="size-3.5" />
-          {THEME_COUNT} 主题 / {TOPIC_COUNT} 世界线
+          {THEME_COUNT} 片乐园 / {TOPIC_COUNT} 个副本
         </div>
       </div>
 
