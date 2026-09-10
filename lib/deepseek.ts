@@ -54,8 +54,88 @@ export function llmModel() {
   return createDeepSeek({
     ...(apiKey ? { apiKey } : {}),
     ...(baseURL ? { baseURL } : {}),
+    ...(baseURL ? { fetch: relayTolerantFetch } : {}),
   })(model);
 }
+
+// ==================== 中转站兼容层 ====================
+
+/**
+ * 中转站(实测 d1api.xin,OneAPI 面板)返回的响应里 `role` 是空串 `""`,
+ * 而 AI SDK 的非流式响应 schema 是 `role: z.literal("assistant").nullish()`、
+ * 流式 chunk schema 是 `role: z.enum(["assistant"]).nullish()` —— 空串两个都过不了校验,
+ * 于是整个响应被判定为 `AI_APICallError: Invalid JSON response`。
+ *
+ * 这里在 fetch 层把空 role 修回 assistant。只改这一个模式,别的字节一律不动。
+ */
+const EMPTY_ROLE_PATTERN = /"role"\s*:\s*""/g;
+
+function repairRole(text: string): string {
+  return text.replace(EMPTY_ROLE_PATTERN, '"role":"assistant"');
+}
+
+/**
+ * 响应体已经被解压/改写过了,这几个头必须摘掉,
+ * 否则消费端会拿着「gzip」的声明去解一段明文,或者按旧的长度截断。
+ */
+function repairedHeaders(source: Headers): Headers {
+  const headers = new Headers(source);
+  headers.delete("content-encoding");
+  headers.delete("content-length");
+  headers.delete("transfer-encoding");
+  return headers;
+}
+
+let roleRepairLogged = false;
+function noteRoleRepair() {
+  if (roleRepairLogged) return;
+  roleRepairLogged = true;
+  console.warn("中转站兼容层:已把响应里的空 role 修正为 assistant");
+}
+
+export const relayTolerantFetch: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  if ((response.headers.get("content-type") ?? "").includes("text/event-stream")) {
+    if (!response.body) return response;
+
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+    let buffer = "";
+
+    const transform = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        buffer += decoder.decode(chunk, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const repaired = repairRole(line);
+          if (repaired !== line) noteRoleRepair();
+          controller.enqueue(encoder.encode(`${repaired}\n`));
+        }
+      },
+      flush(controller) {
+        buffer += decoder.decode();
+        if (!buffer) return;
+        controller.enqueue(encoder.encode(repairRole(buffer)));
+      },
+    });
+
+    return new Response(response.body.pipeThrough(transform), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: repairedHeaders(response.headers),
+    });
+  }
+
+  const text = await response.text();
+  const repaired = repairRole(text);
+  if (repaired !== text) noteRoleRepair();
+  return new Response(repaired, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: repairedHeaders(response.headers),
+  });
+};
 
 /** 中转站不一定实现 DeepSeek 的 thinking 字段,给个开关兜底。 */
 export function llmProviderOptions() {

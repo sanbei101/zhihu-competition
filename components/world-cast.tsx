@@ -286,15 +286,24 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                 return (
                   <Card
                     key={character.id}
-                    className={isSelected ? "border-primary shadow-none" : "shadow-none"}
+                    className={
+                      isSelected
+                        ? "min-w-0 border-primary shadow-none"
+                        : "min-w-0 shadow-none"
+                    }
                   >
                     <CardHeader>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+                        <div className="min-w-0">
                           <CardTitle>{character.name}</CardTitle>
                           <CardDescription className="mt-1">{character.identity}</CardDescription>
                         </div>
-                        <Badge variant="outline">{character.faction}</Badge>
+                        <Badge
+                          variant="outline"
+                          className="h-auto max-w-full text-left whitespace-normal"
+                        >
+                          {character.faction}
+                        </Badge>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4 text-sm leading-6">
@@ -317,7 +326,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                         <p className="mt-1">{character.relationship}</p>
                       </div>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="mt-auto">
                       <Button
                         variant={isSelected ? "secondary" : "outline"}
                         className="w-full"
