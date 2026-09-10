@@ -140,7 +140,8 @@ export function ThemePanel({ theme, index, total, active, mounted }: ThemePanelP
             <div className="mb-3 flex items-end justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium">
-                  {theme.scenarios.length} 个副本 <span className="opacity-60">· 挑一个进入</span>
+                  {theme.scenarios.length} 间副本
+                  <span className="opacity-60"> · 选一间开始推演</span>
                 </p>
                 <p className="text-muted-foreground mt-1 line-clamp-1 text-xs">{theme.hint}</p>
               </div>

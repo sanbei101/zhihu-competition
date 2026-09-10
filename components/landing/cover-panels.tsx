@@ -3,12 +3,15 @@ import Link from "next/link";
 
 import { StageBackdrop, GROUND_LINE, StageSprite, ThemeStage } from "@/components/pixel/theme-stage";
 import { spritesForSkin } from "@/components/pixel/sprites";
+import TextType from "@/components/ui/TextType";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SCENARIO_THEMES } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 import { cn } from "@/lib/utils";
+
+const BRAND = "知乎脑洞游乐园";
 
 /** 封面巡游:每个主题派一位招牌精灵,带着自己的皮肤配色站成一排 */
 const PARADE: Array<{ id: string; height: number }> = [
@@ -18,6 +21,13 @@ const PARADE: Array<{ id: string; height: number }> = [
   { id: "apocalypse", height: 164 },
   { id: "alien", height: 182 },
 ];
+
+/**
+ * 巡游精灵的高度上限。
+ * 首屏大字是垂直居中的,下面那簇小字会一直压到约 440px 处,
+ * 所以精灵最多只能用「(视口高 - 440) / 2 - 56」这点空间,矮屏才不会被小字压住。
+ */
+const PARADE_FIT = "w-auto max-h-[calc((100dvh_-_440px)/2_-_56px)]";
 
 function WorldParade() {
   return (
@@ -29,7 +39,9 @@ function WorldParade() {
         const skin = getSkin(entry.id);
         const sprite = spritesForSkin(skin)[0];
         if (!sprite) return null;
-        return <StageSprite key={entry.id} sprite={sprite} targetHeight={entry.height} />;
+        return (
+          <StageSprite key={entry.id} sprite={sprite} targetHeight={entry.height} fit={PARADE_FIT} />
+        );
       })}
     </div>
   );
@@ -58,49 +70,76 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
         }}
       />
 
-      <div className="relative flex h-full flex-col items-center px-5 pt-20 text-center sm:pt-24">
-        <Badge variant="outline" className="tracking-[0.2em]">知乎脑洞游乐园</Badge>
+      <div className="relative flex h-full flex-col items-center px-5 pt-14 pb-14 text-center">
+        {/* 上簇:贴着大字的上沿,把大字顶到页心 */}
+        <div className="flex flex-1 flex-col items-center justify-end gap-3">
+          <Badge variant="outline" className="font-mono text-[10px] tracking-[0.25em]">
+            WORLDLINE ARCADE
+          </Badge>
+          <p className="max-w-2xl text-balance text-base leading-8 font-medium tracking-tight sm:text-xl">
+            一句「如果」,值得用<span className="text-primary">一整个世界</span>来回答。
+          </p>
+          <p className="text-muted-foreground max-w-xl text-xs leading-6 sm:text-sm">
+            知乎那些最出格的假设,在这里长成了可以走进去的副本。你下决定,世界接着写。
+          </p>
+        </div>
 
-        <h1 className="mt-4 max-w-3xl text-3xl leading-tight font-semibold tracking-tight sm:text-5xl sm:leading-[1.15]">
-          一个问题,
-          <br />
-          一条尚未发生的世界线。
+        {/* 页心大字:整页最大的字,打字机逐字敲出来。用 flex 居中,逐字出现时由中间向外长,
+            行高由内容决定,不会顶到顶栏也不会挤压上下两簇小字。 */}
+        <h1
+          aria-label={BRAND}
+          className="my-5 flex w-full justify-center text-[clamp(2.4rem,11vw,11rem)] leading-[1.15] font-semibold tracking-tight sm:my-3"
+        >
+          {/* 光标绝对定位挂在字的右边:不占宽度,居中以七个字为准,不会整体偏左 */}
+          <span className="relative">
+            <TextType
+              text={BRAND}
+              as="span"
+              loop={false}
+              typingSpeed={190}
+              initialDelay={420}
+              cursorCharacter="▎"
+              cursorClassName="absolute top-0 left-full text-primary"
+            />
+          </span>
         </h1>
 
-        <p className="text-muted-foreground mt-4 max-w-xl text-sm leading-7 sm:text-base">
-          {`把知乎的经典脑洞与历史假设做成可推演的副本,按主题分成 ${SCENARIO_THEMES.length} 片乐园。挑一间走进去,决定权在你手里。`}
-        </p>
+        {/* 下簇:贴着大字的下沿 */}
+        <div className="flex flex-1 flex-col items-center justify-start gap-3">
+          <div className="scrollbar-none -mx-5 flex w-[calc(100%+2.5rem)] snap-x gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:max-w-5xl sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
+            {SCENARIO_THEMES.map((theme, index) => {
+              const themeSkin = getSkin(theme.id);
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  onClick={() => onJump(index + 1)}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "xs" }),
+                    "shrink-0 snap-center",
+                  )}
+                >
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: themeSkin.accent }}
+                    aria-hidden="true"
+                  />
+                  {themeSkin.name}
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="scrollbar-none -mx-5 mt-6 flex w-[calc(100%+2.5rem)] snap-x gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:max-w-3xl sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
-          {SCENARIO_THEMES.map((theme, index) => {
-            const themeSkin = getSkin(theme.id);
-            return (
-              <button
-                key={theme.id}
-                type="button"
-                onClick={() => onJump(index + 1)}
-                className={cn(buttonVariants({ variant: "outline", size: "xs" }), "shrink-0 snap-center")}
-              >
-                <span
-                  className="size-2 rounded-full"
-                  style={{ backgroundColor: themeSkin.accent }}
-                  aria-hidden="true"
-                />
-                {themeSkin.name}
-              </button>
-            );
-          })}
-        </div>
+          <div className="text-muted-foreground flex items-center gap-3 font-mono text-[11px]">
+            <span>{SCENARIO_THEMES.length} 片主题乐园</span>
+            <Separator orientation="vertical" className="h-3 self-center" />
+            <span>{topicCount} 个副本</span>
+          </div>
 
-        <div className="text-muted-foreground mt-5 flex items-center gap-3 font-mono text-[11px]">
-          <span>{SCENARIO_THEMES.length} 片主题乐园</span>
-          <Separator orientation="vertical" className="h-3 self-center" />
-          <span>{topicCount} 个副本</span>
-        </div>
-
-        <div className="text-muted-foreground mt-6 flex flex-col items-center gap-1">
-          <span className="font-mono text-[10px] tracking-widest">SCROLL / 向下滑</span>
-          <ChevronDown className="size-4 animate-bounce motion-reduce:animate-none" />
+          <div className="text-muted-foreground flex flex-col items-center gap-1">
+            <span className="font-mono text-[10px] tracking-widest">SCROLL / 向下滑</span>
+            <ChevronDown className="size-4 animate-bounce motion-reduce:animate-none" />
+          </div>
         </div>
       </div>
     </section>
