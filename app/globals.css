@@ -4,6 +4,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "Pixel Subset";
+  src: url("/pixel.woff2") format("woff2");
+  font-display: swap;
+}
+
+@theme {
+  --font-pixel:
+    "Pixel Subset", ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
 /* 整屏演出的横向题库架与滚动容器都不显示滚动条,靠导航轨指示位置 */
 @utility scrollbar-none {
   scrollbar-width: none;

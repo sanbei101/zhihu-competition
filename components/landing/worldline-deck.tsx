@@ -273,7 +273,7 @@ export function WorldlineDeck() {
   return (
     <div
       style={skinStyleVars(activeSkin)}
-      className="bg-background text-foreground relative h-dvh w-full overflow-hidden"
+      className="bg-background text-foreground font-pixel relative h-dvh w-full overflow-hidden"
     >
       <div
         ref={scrollerRef}
