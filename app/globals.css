@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 整屏演出的横向题库架与滚动容器都不显示滚动条,靠导航轨指示位置 */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);

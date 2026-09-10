@@ -73,7 +73,7 @@ export function peakFrames(width: number, height: number, count: number): string
     for (let i = 0; i < 3; i += 1) {
       const step = (f + i) % count;
       const y = peakTop - 1 - step;
-      const x = mid + Math.round(Math.sin(step * 1.2 + f) * 2);
+      const x = mid + Math.round(Math.sin(step * 1.2 + f) * 1);
       put(grid, x, y, i === 0 ? "e" : "y");
     }
 
@@ -154,14 +154,14 @@ export function helixFrames(width: number, height: number, count: number): strin
   return frames;
 }
 
-/** 塔/灯柱 + 向外扩散的脉冲环 */
+/** 塔/灯柱 + 塔尖向上起伏的光柱 */
 export function beaconFrames(width: number, height: number, count: number): string[][] {
   const frames: string[][] = [];
   const mid = Math.floor(width / 2);
+  const top = Math.max(3, Math.round(height * 0.28));
 
   for (let f = 0; f < count; f += 1) {
     const grid = makeGrid(width, height);
-    const top = 2;
 
     for (let y = top; y < height; y += 1) {
       const half = y > height - 4 ? 3 : y > height - 8 ? 2 : 1;
@@ -169,17 +169,14 @@ export function beaconFrames(width: number, height: number, count: number): stri
         put(grid, x, y, x === mid - half || x === mid + half ? "o" : "x");
       }
     }
-    put(grid, mid, top - 1, "e");
 
-    const ring = f + 1;
-    for (let i = 0; i < 36; i += 1) {
-      const angle = (i / 36) * Math.PI * 2;
-      put(
-        grid,
-        Math.round(mid + Math.cos(angle) * ring * 1.6),
-        Math.round(top - 1 + Math.sin(angle) * ring),
-        "y",
-      );
+    // 塔尖光柱:高度逐帧起伏,顶端最亮,像素放大后依然干净
+    put(grid, mid, top - 1, "e");
+    const beam = (f % 3) + 1;
+    for (let i = 1; i <= beam; i += 1) {
+      const y = top - 1 - i;
+      if (y < 0) break;
+      put(grid, mid, y, i === beam ? "e" : "y");
     }
 
     frames.push(seal(grid));
