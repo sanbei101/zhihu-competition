@@ -108,7 +108,7 @@ const buildFinalePrompt = (input: {
   fallbackRating: FinaleRating;
   turns: TurnRecord[];
 }) =>
-  `知乎母本问题:${input.scenarioTitle}
+  `知乎脑洞副本:${input.scenarioTitle}
 玩家扮演:${input.player.name}(${input.player.identity}),阵营 ${input.player.faction},公开目标:${input.player.publicGoal}
 最终结局:${input.ending.title} -- ${input.ending.reason}
 终局四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}(参考评级 ${input.fallbackRating})
