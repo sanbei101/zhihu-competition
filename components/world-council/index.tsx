@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { generateOptionsAction, judgeTurnAction } from "@/app/world/actions";
+import { ThemeScene } from "@/components/pixel/theme-scene";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-p
 import { Timeline } from "@/components/world-council/timeline";
 import { WorldTabs } from "@/components/world-council/world-tabs";
 import { WorldIntro } from "@/components/world-intro";
+import type { ScenarioSkin } from "@/lib/scenario-skin";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   MAX_ROUNDS,
@@ -38,9 +40,10 @@ interface WorldCouncilProps {
   initial: WorldGameSession;
   worldId: string;
   onBack: () => void;
+  skin: ScenarioSkin;
 }
 
-function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
+function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const router = useRouter();
   const cast: WorldCast = initial.cast;
   const player = cast.playerCharacters.find((character) => character.id === initial.playerId);
@@ -381,6 +384,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   return (
     <div className="space-y-4">
+      <ThemeScene skin={skin} variant="strip" className="border-border rounded-md border" />
       {showIntro ? (
         <WorldIntro
           crisis={cast.setting.crisis}
@@ -400,6 +404,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                 <CircleDot data-icon="inline-start" />
                 {actForRound(round)}
               </Badge>
+              <Badge variant="secondary">{skin.name}</Badge>
               {ended && ending ? (
                 <Badge variant="secondary">{endingLabels[ending.type]}</Badge>
               ) : null}
@@ -477,7 +482,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   );
 }
 
-export function WorldCouncilSession({ worldId }: { worldId: string }) {
+export function WorldCouncilSession({ worldId, skin }: { worldId: string; skin: ScenarioSkin }) {
   const router = useRouter();
   const [session, setSession] = useState<WorldGameSession | null>();
   const key = worldCouncilStorageKey(worldId);
@@ -537,5 +542,7 @@ export function WorldCouncilSession({ worldId }: { worldId: string }) {
     );
   }
 
-  return <WorldCouncil initial={session} worldId={worldId} onBack={() => router.back()} />;
+  return (
+    <WorldCouncil initial={session} worldId={worldId} onBack={() => router.back()} skin={skin} />
+  );
 }
