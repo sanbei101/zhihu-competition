@@ -280,6 +280,18 @@ function fail(error: string, detail?: string): ActionErr {
   return { ok: false, error, detail };
 }
 
+/**
+ * 入参校验失败的统一出口。
+ * Server Action 的入参是 unknown,类型系统完全帮不上忙 —— 少传一个字段,只有运行时才知道,
+ * 所以必须把「到底缺了哪个字段」直接说出来,别只丢一句「输入不完整」。
+ */
+function failParse(what: string, error: z.ZodError): ActionErr {
+  const issues = error.issues
+    .map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`)
+    .join(" / ");
+  return fail(`${what}输入不完整`, issues);
+}
+
 function requireDeepSeekKey(): string | ActionErr {
   if (!hasLlmKey()) return fail(missingLlmKeyMessage());
   return "ok";
@@ -331,7 +343,7 @@ const generateOptionsInputSchema = z.object({
 
 export async function generateOptionsAction(input: unknown): Promise<ActionResult<RoundOptions>> {
   const parsed = generateOptionsInputSchema.safeParse(input);
-  if (!parsed.success) return fail("选项输入不完整");
+  if (!parsed.success) return failParse("选项", parsed.error);
 
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;
@@ -422,7 +434,7 @@ const judgeDraftSchema = z.object({
 
 export async function judgeTurnAction(input: unknown): Promise<ActionResult<JudgeResult>> {
   const parsed = judgeTurnInputSchema.safeParse(input);
-  if (!parsed.success) return fail("裁决输入不完整");
+  if (!parsed.success) return failParse("裁决", parsed.error);
 
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;
@@ -574,7 +586,7 @@ const generateFinalePlanInputSchema = z.object({
 /** 第一步:定卷目、判词与开场白。 */
 export async function generateFinalePlanAction(input: unknown): Promise<ActionResult<FinalePlan>> {
   const parsed = generateFinalePlanInputSchema.safeParse(input);
-  if (!parsed.success) return fail("结算输入不完整");
+  if (!parsed.success) return failParse("结算", parsed.error);
 
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;
@@ -649,7 +661,7 @@ export async function generateFinaleChapterAction(
   input: unknown,
 ): Promise<ActionResult<FinaleChapter>> {
   const parsed = generateFinaleChapterInputSchema.safeParse(input);
-  if (!parsed.success) return fail("章节输入不完整");
+  if (!parsed.success) return failParse("章节", parsed.error);
 
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;

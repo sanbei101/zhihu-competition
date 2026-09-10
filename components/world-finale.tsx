@@ -182,14 +182,18 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     }
   }
 
+  /** 终章两次调用共用的结算上下文。字段必须与 Server Action 的入参 schema 对齐 —— 那边入参是 unknown,少传一个只会在运行时炸 */
   function gameRef(game: WorldGameSession) {
     return {
       scenarioId: game.scenarioId,
       scenarioTitle: game.scenarioTitle,
+      scenarioUrl: game.scenarioUrl,
       cast: game.cast,
       playerId: game.playerId,
       turns: game.turns,
       metrics: game.metrics,
+      relations: game.relations,
+      crisis: game.crisis,
       ending: game.ending ?? { type: "open", title: "", reason: "" },
     };
   }
