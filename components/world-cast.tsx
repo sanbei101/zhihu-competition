@@ -4,7 +4,6 @@ import { Bot, LoaderCircle, Play, RefreshCw, Sparkles, UserRound } from "lucide-
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { generateCastAction } from "@/app/world/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +17,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/toast";
 import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
-import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
+import {
+  type WorldCast,
+  worldCastStreamEventSchema,
+  worldCouncilStorageKey,
+} from "@/lib/world-cast";
 import { createInitialGameSession } from "@/lib/world-ending";
 
 interface WorldCastProps {
@@ -33,6 +36,9 @@ interface WorldCastProps {
 export function WorldCastPanel({ scenario }: WorldCastProps) {
   const router = useRouter();
   const [cast, setCast] = useState<WorldCast | null>(null);
+  const [streamingSetting, setStreamingSetting] = useState<WorldCast["setting"] | null>(null);
+  const [streamingPlayers, setStreamingPlayers] = useState<WorldCast["playerCharacters"]>([]);
+  const [streamingAgents, setStreamingAgents] = useState<WorldCast["agentCharacters"]>([]);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +50,9 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     const cached = loadCachedCast(scenario.id);
     if (cached) {
       setCast(cached.cast);
+      setStreamingSetting(cached.cast.setting);
+      setStreamingPlayers(cached.cast.playerCharacters);
+      setStreamingAgents(cached.cast.agentCharacters);
       setCacheNote(
         `已从本地缓存恢复(${new Date(cached.savedAt).toLocaleString("zh-CN", { hour12: false })})`,
       );
@@ -53,24 +62,77 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   async function generateCast() {
     setError("");
     setIsLoading(true);
+    setCast(null);
+    setStreamingSetting(null);
+    setStreamingPlayers([]);
+    setStreamingAgents([]);
+    setSelectedCharacterId(null);
     setCacheNote("");
     setElapsed("");
     const startedAt = Date.now();
 
     try {
-      const result = await generateCastAction({
-        scenarioId: scenario.id,
-        title: scenario.title,
-        content: scenario.content,
+      const response = await fetch("/api/world-cast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scenarioId: scenario.id,
+          title: scenario.title,
+          content: scenario.content,
+        }),
       });
 
-      if (!result.ok) {
-        throw new Error(result.detail ? `${result.error}\n${result.detail}` : result.error);
+      if (!response.ok) throw new Error(`角色生成请求失败(${response.status})`);
+      if (!response.body) throw new Error("浏览器未收到角色生成响应流");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const completedCast: { value: WorldCast | null } = { value: null };
+
+      function applyLine(line: string) {
+        if (!line.trim()) return;
+        const parsed = worldCastStreamEventSchema.safeParse(JSON.parse(line));
+        if (!parsed.success) throw new Error("角色生成事件结构不匹配");
+        const event = parsed.data;
+        if (event.type === "setting") setStreamingSetting(event.setting);
+        if (event.type === "player-character") {
+          setStreamingPlayers((current) =>
+            current.some((character) => character.id === event.character.id)
+              ? current
+              : [...current, event.character],
+          );
+        }
+        if (event.type === "agent-character") {
+          setStreamingAgents((current) =>
+            current.some((character) => character.id === event.character.id)
+              ? current
+              : [...current, event.character],
+          );
+        }
+        if (event.type === "error") throw new Error(event.error);
+        if (event.type === "complete") completedCast.value = event.cast;
       }
 
-      setCast(result.data);
-      setSelectedCharacterId(null);
-      saveCachedCast(scenario.id, result.data);
+      for (;;) {
+        // eslint-disable-next-line no-await-in-loop -- 流式读取必须串行等待每个 chunk
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) applyLine(line);
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) applyLine(buffer);
+      const finalCast = completedCast.value;
+      if (!finalCast) throw new Error("角色阵容没有完整生成");
+
+      setCast(finalCast);
+      setStreamingSetting(finalCast.setting);
+      setStreamingPlayers(finalCast.playerCharacters);
+      setStreamingAgents(finalCast.agentCharacters);
+      saveCachedCast(scenario.id, finalCast);
       setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s,已存入本地缓存`);
       toast.add({
         title: "角色阵容已生成",
@@ -90,13 +152,19 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   function clearCache() {
     clearCachedCast(scenario.id);
     setCast(null);
+    setStreamingSetting(null);
+    setStreamingPlayers([]);
+    setStreamingAgents([]);
     setSelectedCharacterId(null);
     setCacheNote("");
     setElapsed("");
     toast.add({ title: "已清除本地缓存", type: "info" });
   }
 
-  const selectedCharacter = cast?.playerCharacters.find(
+  const visibleSetting = cast?.setting ?? streamingSetting;
+  const visiblePlayers = cast?.playerCharacters ?? streamingPlayers;
+  const visibleAgents = cast?.agentCharacters ?? streamingAgents;
+  const selectedCharacter = visiblePlayers.find(
     (character) => character.id === selectedCharacterId,
   );
 
@@ -168,7 +236,11 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               ) : (
                 <Sparkles data-icon="inline-start" />
               )}
-              {isLoading ? "正在召集角色" : cast ? "重新生成阵容" : "生成角色阵容"}
+              {isLoading
+                ? `正在召集角色 (${visiblePlayers.length + visibleAgents.length}/7)`
+                : cast
+                  ? "重新生成阵容"
+                  : "生成角色阵容"}
             </Button>
             {cast && !isLoading ? (
               <Button variant="ghost" size="sm" className="w-full" onClick={clearCache}>
@@ -179,15 +251,22 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
         </Card>
       </aside>
 
-      {cast ? (
+      {visibleSetting ? (
         <section className="space-y-10 lg:col-span-2" aria-live="polite">
           <div className="border-primary border-l-4 pl-6">
             <p className="text-primary text-sm font-medium">ACT I / OPENING</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight">{cast.setting.crisis}</h2>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight">{visibleSetting.crisis}</h2>
             <p className="text-muted-foreground mt-3 text-sm">
-              {cast.setting.time} · {cast.setting.location}
+              {visibleSetting.time} · {visibleSetting.location}
             </p>
-            <p className="mt-5 max-w-4xl text-base leading-8">{cast.setting.opening}</p>
+            <p className="mt-5 max-w-4xl text-base leading-8">{visibleSetting.opening}</p>
+            <div className="mt-5 grid gap-2 text-sm sm:grid-cols-3">
+              {visibleSetting.rules.map((rule) => (
+                <div key={rule} className="bg-muted/60 rounded-md px-3 py-2 leading-6">
+                  {rule}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -201,7 +280,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              {cast.playerCharacters.map((character) => {
+              {visiblePlayers.map((character) => {
                 const isSelected = character.id === selectedCharacterId;
 
                 return (
@@ -247,7 +326,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                 );
               })}
             </div>
-            {selectedCharacter ? (
+            {selectedCharacter && cast ? (
               <div className="bg-muted mt-4 flex flex-col justify-between gap-4 rounded-lg p-5 text-sm leading-6 sm:flex-row sm:items-center">
                 <div>
                   <p className="font-medium">{selectedCharacter.name}的秘密</p>
@@ -272,7 +351,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {cast.agentCharacters.map((character) => (
+              {visibleAgents.map((character) => (
                 <Card key={character.id} className="shadow-none">
                   <CardHeader>
                     <Badge variant="secondary" className="w-fit">

@@ -15,35 +15,54 @@ const characterSchema = z.object({
   publicGoal: z.string().describe("角色公开追求的目标"),
   secret: z.string().describe("只有角色自己知道的秘密或真实动机"),
   relationship: z.string().describe("与其他核心人物最重要的关系或矛盾"),
+  voice: z.string().describe("角色说话时的语言习惯、语气和关注点"),
+  redLine: z.string().describe("角色绝不会接受的结果或底线"),
+});
+
+export const playerCharacterSchema = characterSchema.extend({
+  decisionPower: z.string().describe("玩家扮演此角色时能直接调动的关键资源或权力"),
+});
+
+export const agentCharacterSchema = characterSchema.extend({
+  pressureMethod: z.string().describe("该角色向玩家施压或推进局势的主要手段"),
+  openingLine: z.string().describe("该角色在第一幕对玩家说的第一句话"),
+});
+
+export const worldSettingSchema = z.object({
+  time: z.string().describe("故事发生的具体时间"),
+  location: z.string().describe("故事开始的地点"),
+  crisis: z.string().describe("此刻所有角色必须面对的核心危机"),
+  opening: z.string().describe("不超过一百五十字的第一幕开场旁白"),
+  rules: z
+    .array(z.string().min(1).max(120))
+    .min(3)
+    .max(6)
+    .describe("三到六条不能被角色违背的时代、制度、地理或技术硬约束"),
 });
 
 export const worldCastSchema = z.object({
-  setting: z.object({
-    time: z.string().describe("故事发生的具体时间"),
-    location: z.string().describe("故事开始的地点"),
-    crisis: z.string().describe("此刻所有角色必须面对的核心危机"),
-    opening: z.string().describe("不超过一百五十字的第一幕开场旁白"),
-  }),
+  setting: worldSettingSchema,
   playerCharacters: z
-    .array(
-      characterSchema.extend({
-        decisionPower: z.string().describe("玩家扮演此角色时能直接调动的关键资源或权力"),
-      }),
-    )
+    .array(playerCharacterSchema)
     .length(3)
     .describe("三个立场和玩法明显不同的玩家候选角色"),
   agentCharacters: z
-    .array(
-      characterSchema.extend({
-        pressureMethod: z.string().describe("该角色向玩家施压或推进局势的主要手段"),
-        openingLine: z.string().describe("该角色在第一幕对玩家说的第一句话"),
-      }),
-    )
+    .array(agentCharacterSchema)
     .length(4)
     .describe("四个将在后续回合中分别由独立 AI Agent 扮演的角色"),
 });
 
 export type WorldCast = z.infer<typeof worldCastSchema>;
+
+export const worldCastStreamEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("setting"), setting: worldSettingSchema }),
+  z.object({ type: z.literal("player-character"), character: playerCharacterSchema }),
+  z.object({ type: z.literal("agent-character"), character: agentCharacterSchema }),
+  z.object({ type: z.literal("complete"), cast: worldCastSchema }),
+  z.object({ type: z.literal("error"), error: z.string() }),
+]);
+
+export type WorldCastStreamEvent = z.infer<typeof worldCastStreamEventSchema>;
 
 export function worldCouncilStorageKey(scenarioId: string) {
   return `world-council:${scenarioId}`;

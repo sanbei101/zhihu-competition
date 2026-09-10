@@ -11,6 +11,7 @@ import {
   finaleSchema,
   judgeResultSchema,
   metricDeltasSchema,
+  metricReasonsSchema,
   metricsSchema,
   ratingForMetrics,
   summarizeReactionsForPrompt,
@@ -21,6 +22,7 @@ import {
   type WorldFinale,
 } from "@/lib/world-ending";
 import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
+import { worldEventSchema } from "@/lib/world-turn";
 
 // ==================== 返回包络 ====================
 
@@ -56,11 +58,13 @@ export async function generateCastAction(
 
 角色必须扎根于题目给出的时代、制度和技术条件,不能使用穿越者或全知视角来偷懒。三个玩家候选角色要拥有不同的权力来源、道德困境和玩法;四个 AI 角色要代表不同利益集团,彼此目标不能完全一致。人物关系中必须包含合作、冲突或债务,使他们在第一回合就有采取行动的理由。
 
+必须完整填写 schema 中的每个字段:setting.rules 输出三到六条硬约束;全部七个角色都要填写 voice 和 redLine;三个玩家角色填写 decisionPower;四个 Agent 角色填写 pressureMethod 和 openingLine。不要遗漏字段,不要增加角色数量。
+
 不要续写完整历史,不要提前给出结局,只建立危机爆发时的舞台和可博弈角色。使用简体中文,内容具体、克制。角色 id 使用唯一的简短英文小写标识。`,
       prompt: `为下面这条世界线生成开场角色阵容。\n\n知乎问题编号:${scenarioId}\n问题:${title}\n补充描述:${content || "无"}`,
       schema: worldCastSchema,
-      temperature: 0.9,
-      maxOutputTokens: 10000,
+      temperature: 0.6,
+      maxOutputTokens: 14000,
     });
 
     return { ok: true, data: worldCastSchema.parse(object) };
@@ -97,9 +101,11 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
   try {
     const object = await generateStructured({
       instructions: `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
-四个选项必须立场/代价明显不同,覆盖稳、险、赌三种风险;只写本回合能做的具体行动,不提前揭示结局。使用简体中文。`,
+四个选项必须立场/代价明显不同,覆盖稳、险、赌三种风险;只写本回合能做的具体行动,不提前揭示结局。选项必须遵守世界硬约束,并优先推动此前回合留下的未解决后果。不要写抽象口号。使用简体中文。`,
       prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
 时间:${cast.setting.time};地点:${cast.setting.location};危机:${cast.setting.crisis}
+世界硬约束:
+${cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
 玩家:${player.name}(${player.identity}),可调动:${player.decisionPower}
 当前四维:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}
 
@@ -129,6 +135,7 @@ const judgeTurnInputSchema = z.object({
   playerId: z.string().min(1),
   metrics: metricsSchema,
   round: z.number().int().min(1).max(MAX_ROUNDS),
+  situation: z.string().trim().min(1).max(500),
   decision: z.string().trim().min(1).max(600),
   reactions: z.array(turnReactionRecordSchema).max(8),
   history: z.array(turnRecordSchema).max(MAX_ROUNDS).optional().default([]),
@@ -136,7 +143,16 @@ const judgeTurnInputSchema = z.object({
 
 const judgeDraftSchema = z.object({
   deltas: metricDeltasSchema.describe("四维指标的单回合增量,每项 -20 到 20 之间"),
+  metricReasons: metricReasonsSchema.describe(
+    "逐项说明本回合指标为什么变化,必须引用具体行动或事件",
+  ),
+  events: z
+    .array(worldEventSchema)
+    .min(1)
+    .max(3)
+    .describe("一到三个本回合真正发生的公开世界事件,不能只是情绪描述"),
   narration: z.string().min(1).max(300).describe("不超过三百字的世界旁白,承上启下"),
+  nextSituation: z.string().min(1).max(300).describe("下一回合最先逼近玩家的具体危机或待处理后果"),
   endingTitle: z
     .string()
     .max(40)
@@ -158,17 +174,20 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
   const keyCheck = requireDeepSeekKey();
   if (typeof keyCheck !== "string") return keyCheck;
 
-  const { cast, playerId, metrics, round, decision, reactions, history } = parsed.data;
+  const { cast, playerId, metrics, round, situation, decision, reactions, history } = parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
   if (!player) return fail("玩家角色不存在");
 
   try {
     const draft = await generateStructured({
-      instructions: `你是冷酷公正的世界线裁决者。你只根据玩家决策与各方行动推演世界四维指标(政权稳定/军心士气/民众支持/战略资源)的单回合增量,并写一段承上启下的旁白。
+      instructions: `你是冷酷公正的世界线裁决者。你只根据玩家决策与各方行动推演世界四维指标(政权稳定/军心士气/民众支持/战略资源)的单回合增量,并写一段承上启下的旁白,同时记录真实发生的公开事件。
 
-规则:增量每项 -20 到 20;奖惩对称、克制,顺风不乱加,逆风不乱踩;旁白不超过三百字,简体中文,具体而不煽情。你只负责本回合的增量与旁白,最终是否结束由系统按规则计算。`,
+规则:增量每项 -20 到 20;奖惩对称、克制,顺风不乱加,逆风不乱踩;每个指标都必须给出具体原因;事件必须有来源、参与者和可观察后果;nextSituation 必须从本回合行动自然推导。旁白不超过三百字,简体中文,具体而不煽情。你只负责本回合的增量、事件和旁白,最终是否结束由系统按规则计算。`,
       prompt: `当前是第 ${round} / ${MAX_ROUNDS} 回合。
 时间:${cast.setting.time};地点:${cast.setting.location};危机:${cast.setting.crisis}
+世界硬约束:
+${cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
+本回合突发处境:${situation}
 当前四维指标:政权稳定 ${metrics.stability},军心士气 ${metrics.morale},民众支持 ${metrics.support},战略资源 ${metrics.resources}
 
 此前已结算回合:
@@ -179,10 +198,10 @@ ${summarizeTurnsForPrompt(history)}
 本回合各方行动:
 ${summarizeReactionsForPrompt(reactions)}
 
-请给出四维增量与世界旁白。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`,
+请给出事件、四维增量、逐项变化原因、世界旁白和下一回合危机。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`,
       schema: judgeDraftSchema,
       temperature: 0.4,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 2400,
     });
 
     // 数值与结束判定由服务端确定性计算,不完全信任模型。
@@ -203,7 +222,10 @@ ${summarizeReactionsForPrompt(reactions)}
         round,
         metrics: nextMetrics,
         deltas: draft.deltas,
+        metricReasons: draft.metricReasons,
+        events: draft.events,
         narration: draft.narration,
+        nextSituation: draft.nextSituation,
         isEnded,
         ending,
       }),
@@ -251,7 +273,7 @@ export async function generateFinaleAction(input: unknown): Promise<ActionResult
     const object = await generateStructured({
       instructions: `你是知乎硬核历史区/科幻区的高赞答主兼世界线史官。根据玩家的真实推演记录,整理一篇格式严密的'知乎体深度长文回答'。
 
-要求:只写推演记录里真实发生过的事,不编造新史实;引用至少两处玩家原话;结构为:开篇钩子 / 分幕推演 / 关键抉择复盘 / 反事实对照 / 结论与开放讨论;简体中文,克制、有信息量;timeline 每回合一句话;shareText 是 200 字内的社区分享卡文案,含结局与评级。`,
+       要求:只写推演记录里真实发生过的事,不编造新史实;引用至少两处玩家原话;结构为:开篇钩子 / 分幕推演 / 关键抉择复盘 / 未选择方案的合理推测(明确标注为推测) / 结论与开放讨论;简体中文,克制、有信息量;timeline 必须引用每回合真实发生的事件;shareText 是 200 字内的社区分享卡文案,含结局与评级。`,
       prompt: `知乎母本问题:${scenarioTitle}
 玩家扮演:${player.name}(${player.identity}),阵营 ${player.faction},公开目标:${player.publicGoal}
 最终结局:${ending.title} -- ${ending.reason}

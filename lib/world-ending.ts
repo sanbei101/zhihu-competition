@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { worldCastSchema } from "@/lib/world-cast";
-import { agentReactionSchema } from "@/lib/world-turn";
+import { agentReactionSchema, worldEventSchema } from "@/lib/world-turn";
 
 // ==================== 局制常量 ====================
 
@@ -43,6 +43,14 @@ export const metricDeltasSchema = z.object({
 });
 export type MetricDeltas = z.infer<typeof metricDeltasSchema>;
 
+export const metricReasonsSchema = z.object({
+  stability: z.string().min(1).max(120),
+  morale: z.string().min(1).max(120),
+  support: z.string().min(1).max(120),
+  resources: z.string().min(1).max(120),
+});
+export type MetricReasons = z.infer<typeof metricReasonsSchema>;
+
 // ==================== 回合记录 ====================
 
 export const turnReactionRecordSchema = z.object({
@@ -55,8 +63,11 @@ export const turnRecordSchema = z.object({
   round: z.number().int().min(1).max(MAX_ROUNDS),
   decision: z.string(),
   reactions: z.array(turnReactionRecordSchema),
+  events: z.array(worldEventSchema).min(1).max(3),
   narration: z.string(),
   deltas: metricDeltasSchema,
+  metricReasons: metricReasonsSchema,
+  nextSituation: z.string().min(1).max(300),
 });
 export type TurnRecord = z.infer<typeof turnRecordSchema>;
 
@@ -84,7 +95,10 @@ export const judgeResultSchema = z.object({
   round: z.number().int().min(1).max(MAX_ROUNDS),
   metrics: metricsSchema,
   deltas: metricDeltasSchema,
+  metricReasons: metricReasonsSchema,
+  events: z.array(worldEventSchema).min(1).max(3),
   narration: z.string(),
+  nextSituation: z.string().min(1).max(300),
   isEnded: z.boolean(),
   ending: endingSchema.nullable(),
 });
@@ -273,7 +287,8 @@ export function summarizeTurnsForPrompt(turns: TurnRecord[], maxChars = 1800): s
       const stances = turn.reactions
         .map((entry) => `${entry.agentId}:${entry.reaction.stance}`)
         .join(",");
-      return `第${turn.round}回合:玩家${turn.decision.slice(0, 80)};各方(${stances || "无回应"});旁白:${turn.narration.slice(0, 120)}`;
+      const events = turn.events.map((event) => `${event.kind}:${event.title}`).join(",");
+      return `第${turn.round}回合:玩家${turn.decision.slice(0, 80)};各方(${stances || "无回应"});事件:${events};旁白:${turn.narration.slice(0, 120)};下引:${turn.nextSituation.slice(0, 80)}`;
     })
     .join("\n");
   return text.length > maxChars ? `…${text.slice(-maxChars)}` : text;

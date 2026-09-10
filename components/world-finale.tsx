@@ -21,6 +21,7 @@ import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { WorldEventPanel } from "@/components/world-event";
 import { worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   endingLabels,
@@ -229,6 +230,17 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
                     <p className="text-sm font-medium">{entry.title}</p>
                     <p className="text-muted-foreground mt-1 text-xs leading-5">{entry.summary}</p>
                   </div>
+                </li>
+              ))}
+              <Separator />
+              {session.turns.map((turn) => (
+                <li key={`events-${turn.round}`} className="space-y-3">
+                  <p className="text-muted-foreground text-xs font-medium">
+                    第 {turn.round} 回合真实发生的事件
+                  </p>
+                  {turn.events.map((event) => (
+                    <WorldEventPanel key={event.id} event={event} />
+                  ))}
                 </li>
               ))}
             </ol>

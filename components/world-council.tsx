@@ -50,6 +50,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { WorldEventPanel } from "@/components/world-event";
 import { WorldIntro } from "@/components/world-intro";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
@@ -60,6 +61,7 @@ import {
   endingLabels,
   metricKeys,
   metricLabels,
+  summarizeTurnsForPrompt,
   worldGameSessionSchema,
   type MetricDeltas,
   type TurnReactionRecord,
@@ -173,8 +175,18 @@ function ReactionMessage({
         <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
           {typed}
         </div>
+        <div className="mt-2 grid max-w-2xl gap-2 text-xs leading-5 sm:grid-cols-2">
+          <div className="bg-muted/60 rounded-md p-3">
+            <p className="text-muted-foreground">立即行动</p>
+            <p className="text-foreground mt-1">{reaction.action}</p>
+          </div>
+          <div className="bg-muted/60 rounded-md p-3">
+            <p className="text-muted-foreground">行动目标</p>
+            <p className="text-foreground mt-1">{reaction.target}</p>
+          </div>
+        </div>
         <MessageFooter className="max-w-2xl items-start leading-5">
-          行动:{reaction.action} · 影响:{reaction.impact}
+          公开影响：{reaction.impact}
         </MessageFooter>
       </MessageContent>
     </Message>
@@ -210,10 +222,16 @@ function DirectorNarrationMessage({
   title,
   narration,
   deltas,
+  events,
+  metricReasons,
+  nextSituation,
 }: {
   title: string;
   narration: string;
   deltas: MetricDeltas | null;
+  events: WorldGameSession["turns"][number]["events"];
+  metricReasons: WorldGameSession["turns"][number]["metricReasons"] | null;
+  nextSituation: string | null;
 }) {
   return (
     <Message>
@@ -223,6 +241,13 @@ function DirectorNarrationMessage({
       <MessageContent>
         <MessageHeader>{title}</MessageHeader>
         <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">{narration}</div>
+        {events.length ? (
+          <div className="mt-3 max-w-2xl space-y-3">
+            {events.map((event) => (
+              <WorldEventPanel key={event.id} event={event} />
+            ))}
+          </div>
+        ) : null}
         {deltas ? (
           <MessageFooter className="max-w-2xl items-start leading-5">
             {metricKeys
@@ -233,6 +258,21 @@ function DirectorNarrationMessage({
               })
               .filter(Boolean)
               .join(" · ") || "四维指标持平"}
+          </MessageFooter>
+        ) : null}
+        {metricReasons ? (
+          <div className="text-muted-foreground mt-2 grid max-w-2xl gap-1 text-xs leading-5 sm:grid-cols-2">
+            {metricKeys.map((key) => (
+              <p key={key}>
+                <span className="text-foreground">{metricLabels[key]}：</span>
+                {metricReasons[key]}
+              </p>
+            ))}
+          </div>
+        ) : null}
+        {nextSituation ? (
+          <MessageFooter className="max-w-2xl items-start leading-5">
+            下一回合逼近：{nextSituation}
           </MessageFooter>
         ) : null}
       </MessageContent>
@@ -273,6 +313,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
   const pendingJudgeRef = useRef<{
     decision: string;
     collected: TurnReactionRecord[];
+    situation: string;
   } | null>(null);
 
   if (!player) {
@@ -381,8 +422,12 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
     setOptionsAttempt((attempt) => attempt + 1);
   }
 
-  async function runJudge(judgeDecision: string, collected: TurnReactionRecord[]) {
-    pendingJudgeRef.current = { decision: judgeDecision, collected };
+  async function runJudge(
+    judgeDecision: string,
+    collected: TurnReactionRecord[],
+    judgeSituation: string,
+  ) {
+    pendingJudgeRef.current = { decision: judgeDecision, collected, situation: judgeSituation };
     setIsJudging(true);
     setJudgeError("");
 
@@ -391,6 +436,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
       playerId: activePlayer.id,
       metrics,
       round,
+      situation: judgeSituation,
       decision: judgeDecision,
       reactions: collected,
       history: turns,
@@ -414,8 +460,11 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
         round,
         decision: judgeDecision,
         reactions: collected,
+        events: judged.events,
         narration: judged.narration,
         deltas: judged.deltas,
+        metricReasons: judged.metricReasons,
+        nextSituation: judged.nextSituation,
       },
     ]);
     if (judged.isEnded && judged.ending) {
@@ -427,7 +476,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   function retryJudge() {
     const pending = pendingJudgeRef.current;
-    if (pending) void runJudge(pending.decision, pending.collected);
+    if (pending) void runJudge(pending.decision, pending.collected, pending.situation);
   }
 
   function startNextRound() {
@@ -456,6 +505,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
   async function chooseOption(option: DecisionOption) {
     const content = decisionTextOf(option);
+    const situation = options?.situation ?? cast.setting.crisis;
     if (!content || isResolving || isJudging || isTurnComplete || ended) return;
 
     setSubmittedDecision(content);
@@ -515,6 +565,10 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
         body: JSON.stringify({
           cast,
           playerId: activePlayer.id,
+          round,
+          situation,
+          metrics,
+          historySummary: summarizeTurnsForPrompt(turns, 3600),
           decision: content,
         }),
       });
@@ -562,7 +616,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
 
     setIsResolving(false);
     // 流式回应收齐后自动进入冲突裁决
-    await runJudge(content, collected);
+    await runJudge(content, collected, situation);
   }
 
   const choiceDisabled = isResolving || isJudging || isTurnComplete || ended;
@@ -778,6 +832,9 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                             title={`世界线导演 · 第 ${turn.round} 回合裁决`}
                             narration={turn.narration}
                             deltas={turn.deltas}
+                            events={turn.events}
+                            metricReasons={turn.metricReasons}
+                            nextSituation={turn.nextSituation}
                           />
                         </MessageScrollerItem>
                       </Fragment>
@@ -1004,6 +1061,18 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                     {activePlayer.decisionPower}
                   </p>
                 </div>
+                <Separator />
+                <div>
+                  <p className="text-muted-foreground text-xs">世界硬约束</p>
+                  <ul className="mt-2 space-y-2 text-xs leading-5">
+                    {cast.setting.rules.map((rule) => (
+                      <li key={rule} className="flex gap-2">
+                        <span className="text-primary">·</span>
+                        <span>{rule}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </TabsContent>
               <TabsContent value="round">
                 <ol className="space-y-5 text-sm">
@@ -1033,6 +1102,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
                   </li>
                   {[
                     { label: "Agent 行动", done: reactions.length > 0 || currentTurnSettled },
+                    { label: "公开事件", done: isTurnComplete },
                     { label: "冲突裁决", done: isTurnComplete },
                     { label: "世界更新", done: isTurnComplete },
                   ].map((step, index) => (
