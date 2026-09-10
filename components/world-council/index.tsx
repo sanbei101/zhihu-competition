@@ -316,12 +316,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   function retryJudge() {
     const pending = pendingJudgeRef.current;
     if (pending) {
-      void runJudge(
-        pending.decision,
-        pending.collected,
-        pending.retortRecords,
-        pending.situation,
-      );
+      void runJudge(pending.decision, pending.collected, pending.retortRecords, pending.situation);
     }
   }
 

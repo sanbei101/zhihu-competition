@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { generateStructured, hasLlmKey, missingLlmKeyMessage } from "@/lib/deepseek";
 import { worldCastRequestSchema, worldCastSchema, type WorldCast } from "@/lib/world-cast";
-import { CAST_INSTRUCTIONS, buildCastPrompt } from "@/lib/world-prompts";
 import {
   addDeltas,
   advanceCrisis,
@@ -23,8 +22,10 @@ import {
   FINALE_CHAPTER_MAX,
   FINALE_CHAPTER_MIN,
   FINALE_CHAPTER_MIN_CHARS,
-  FINALE_CHAPTER_TARGET,
+  FINALE_PREFACE_CHARS,
+  FINALE_TARGET_CHARS,
   finaleChapterCountFor,
+  finaleChapterTargetFor,
   finaleChapterSchema,
   finalePlanSchema,
   judgeResultSchema,
@@ -53,6 +54,7 @@ import {
   type WorldMetrics,
 } from "@/lib/world-ending";
 import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
+import { CAST_INSTRUCTIONS, buildCastPrompt } from "@/lib/world-prompts";
 import { worldEventSchema } from "@/lib/world-turn";
 
 // ==================== 提示词 ====================
@@ -173,23 +175,29 @@ const FINALE_VOICE_RULES = `写作纪律(每一条都必须遵守):
 - 语言克制、具体、有体温,允许犹豫、自嘲与后悔。不许用「综上所述」「首先其次」「不难看出」这类腔调,也不许分点罗列。
 - 简体中文。`;
 
-const FINALE_PLAN_INSTRUCTIONS = (chapterCount: number) => `你在替一位亲历者代笔。最终要交付的不是评论文章,而是这位亲历者本人的自述——他的日记,他的回忆。你先把卷目和判词定下来,正文会由你分章续写。
+const FINALE_PLAN_INSTRUCTIONS = (
+  chapterCount: number,
+) => `你在替一位亲历者代笔。最终要交付的不是评论文章,而是这位亲历者本人的自述——他的日记,他的回忆。你先把卷目和判词定下来,正文会由你分章续写。
+
+篇幅预算:开场白加正文合计 ${FINALE_TARGET_CHARS} 字左右。宁可写得准,不要写得多。
 
 三件事:
 1. 判决信息:verdictTitle(一句话标题)、verdictLine(一句话点评)、rating(S/A/B/C)、privateGoalVerdict(达成/部分达成/未达成)、privateGoalNote(一到两句依据)。私密目标的判定要严格,只根据记录里真实发生的事。
-2. preface(全文开场白):第一人称,交代你此刻身在何处、隔了多久、为什么决定把这件事写下来。五百到八百字,要有具体的时间地点和一个真实到可疑的细节。
-3. chapters(全部卷目):从序到跋,恰好 ${chapterCount} 章。每章给出 title 与 brief——brief 必须点明这一章写哪个场景、哪次交锋、谁说了哪句关键的话、你的心里怎么翻覆,要具体到能被直接扩写成两千字。不许出现「叙述战况」「描写局势」这种空话。
+2. preface(全文开场白):第一人称,交代你此刻身在何处、隔了多久、为什么决定把这件事写下来。约 ${FINALE_PREFACE_CHARS} 字,要有具体的时间地点和一个真实到可疑的细节。
+3. chapters(全部卷目):从序到跋,恰好 ${chapterCount} 章。每章给出 title 与 brief——brief 必须点明这一章写哪个场景、哪次交锋、谁说了哪句关键的话、你的心里怎么翻覆,要具体到能被直接扩写成 ${finaleChapterTargetFor(chapterCount)} 字上下。不许出现「叙述战况」「描写局势」这种空话。
 
 ${FINALE_VOICE_RULES}`;
 
-const FINALE_CHAPTER_INSTRUCTIONS = `你在替一位亲历者写他的自述。现在只写其中一章,不是全篇。
+const FINALE_CHAPTER_INSTRUCTIONS = (
+  chapterCount: number,
+) => `你在替一位亲历者写他的自述。现在只写其中一章,不是全篇。
 
 ${FINALE_VOICE_RULES}
 
 本章额外要求:
 - 严格按这一章的 brief 来写:场景、对话、动作、心理活动,一样都不能省。
 - 必须承接上一章的结尾(会附上上一章的末尾原文),让读者感觉是同一个人一口气写下来的。不要重复上一章已经交代过的事。
-- 正文长度必须达到 ${FINALE_CHAPTER_MIN_CHARS} 字以上(目标 ${FINALE_CHAPTER_TARGET} 字)。写不够就继续展开场景、对话与内心活动,绝对不许提前收尾、不许用一句总结草草带过。
+- 全篇分 ${chapterCount} 章,合计 ${FINALE_TARGET_CHARS} 字左右,所以本章写到 ${finaleChapterTargetFor(chapterCount)} 字上下即可(不少于 ${FINALE_CHAPTER_MIN_CHARS} 字)。写不够就继续展开场景、对话与内心活动,绝对不许提前收尾、不许用一句总结草草带过;写够了就收,不必硬凑。
 - 不要写小标题,不要分点,就是连续的自述散文,允许自然分段。`;
 
 const buildFinalePlanPrompt = (input: {
@@ -585,7 +593,7 @@ export async function generateFinalePlanAction(input: unknown): Promise<ActionRe
       }),
       schema: finalePlanSchema,
       temperature: 0.75,
-      maxOutputTokens: 4000,
+      maxOutputTokens: 3000,
     });
 
     const plan = finalePlanSchema.parse(object);
@@ -644,7 +652,7 @@ export async function generateFinaleChapterAction(
 
   try {
     const object = await generateStructured({
-      instructions: FINALE_CHAPTER_INSTRUCTIONS,
+      instructions: FINALE_CHAPTER_INSTRUCTIONS(chapterCount),
       prompt: buildFinaleChapterPrompt({
         scenarioTitle,
         player,
@@ -659,7 +667,7 @@ export async function generateFinaleChapterAction(
       }),
       schema: finaleChapterSchema,
       temperature: 0.85,
-      maxOutputTokens: 4600,
+      maxOutputTokens: 3000,
     });
 
     return { ok: true, data: finaleChapterSchema.parse(object) };

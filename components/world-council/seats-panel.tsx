@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/item";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import type { ScenarioSkin } from "@/lib/scenario-skin";
 import { type WorldCast } from "@/lib/world-cast";
 import {
   attitudeHints,
@@ -26,7 +27,6 @@ import {
   type AgentRelation,
   type WorldUltimatum,
 } from "@/lib/world-ending";
-import type { ScenarioSkin } from "@/lib/scenario-skin";
 
 export type AgentStatus = "thinking" | "done" | "error";
 
@@ -47,7 +47,8 @@ const attitudeTone: Record<AgentRelation["attitude"], string> = {
 };
 
 function statusDot(status: AgentStatus | undefined) {
-  if (status === "done") return { className: "size-2 rounded-full bg-emerald-500", label: "已回应" };
+  if (status === "done")
+    return { className: "size-2 rounded-full bg-emerald-500", label: "已回应" };
   if (status === "thinking")
     return { className: "size-2 animate-pulse rounded-full bg-amber-500", label: "思考中" };
   if (status === "error")

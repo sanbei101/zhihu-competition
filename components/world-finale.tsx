@@ -28,7 +28,6 @@ import { toast } from "@/components/ui/toast";
 import { WorldEventPanel } from "@/components/world-event";
 import { worldCouncilStorageKey } from "@/lib/world-cast";
 import {
-  FINALE_MIN_TOTAL_CHARS,
   assembleFinaleArticle,
   attitudeLabels,
   countArticleChars,
@@ -242,7 +241,11 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
 
         if (!drafted.ok) {
           setError(`${drafted.error}${drafted.detail ? `:${drafted.detail}` : ""}`);
-          toast.add({ title: `第 ${index + 1} 章生成失败`, description: drafted.error, type: "error" });
+          toast.add({
+            title: `第 ${index + 1} 章生成失败`,
+            description: drafted.error,
+            type: "error",
+          });
           return;
         }
 
@@ -457,7 +460,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         </Card>
       ) : null}
 
-      {finale && finale.timeline.length ? (
+      {plan && plan.timeline.length ? (
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -467,7 +470,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
           </CardHeader>
           <CardContent>
             <ol className="space-y-5">
-              {finale.timeline.map((entry) => (
+              {plan.timeline.map((entry) => (
                 <li key={entry.round} className="flex gap-3">
                   <span className="bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded-full font-mono text-xs">
                     {entry.round}
@@ -500,10 +503,6 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             <BookOpenText className="size-4" />
             亲历者自述
           </CardTitle>
-          <p className="text-muted-foreground text-xs leading-5">
-            {player ? `以 ${player.name} 的第一人称写成` : "以亲历者第一人称写成"}
-            ,由史官分卷续写。全文目标 {FINALE_MIN_TOTAL_CHARS.toLocaleString("zh-CN")} 字以上。
-          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {totalChapters ? (
@@ -516,12 +515,13 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
                   {() => `${chapters.length} / ${totalChapters} 章`}
                 </ProgressValue>
               </Progress>
-              <p className="text-muted-foreground flex items-center gap-2 text-xs" aria-live="polite">
+              <p
+                className="text-muted-foreground flex items-center gap-2 text-xs"
+                aria-live="polite"
+              >
                 {isWriting ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
                 {writingLabel}
-                {writtenChars > 0
-                  ? ` · 已写正文 ${writtenChars.toLocaleString("zh-CN")} 字`
-                  : null}
+                {writtenChars > 0 ? ` · 已写正文 ${writtenChars.toLocaleString("zh-CN")} 字` : null}
               </p>
             </div>
           ) : isWriting ? (
@@ -563,16 +563,10 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               ) : null}
             </div>
           ) : null}
-
-          {finale ? (
-            <p className="text-muted-foreground text-xs">
-              全文 {finale.charCount.toLocaleString("zh-CN")} 字(不含空格)。
-            </p>
-          ) : null}
         </CardContent>
       </Card>
 
-      {finale ? (
+      {plan ? (
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -581,34 +575,36 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={() =>
-                void copyText(`${finale.articleMarkdown}\n\n--知乎脑洞游乐园 · 世界线推演`).then(
-                  (ok) => {
-                    if (ok) setCopied("article");
-                    else
-                      toast.add({
-                        title: "复制失败",
-                        description: "浏览器未授权剪贴板",
-                        type: "error",
-                      });
-                  },
-                )
-              }
-            >
-              {copied === "article" ? (
-                <Check data-icon="inline-start" />
-              ) : (
-                <Copy data-icon="inline-start" />
-              )}
-              {copied === "article" ? "已复制全文" : "复制全文"}
-            </Button>
+            {finale ? (
+              <Button
+                size="sm"
+                onClick={() =>
+                  void copyText(`${finale.articleMarkdown}\n\n--知乎脑洞游乐园 · 世界线推演`).then(
+                    (ok) => {
+                      if (ok) setCopied("article");
+                      else
+                        toast.add({
+                          title: "复制失败",
+                          description: "浏览器未授权剪贴板",
+                          type: "error",
+                        });
+                    },
+                  )
+                }
+              >
+                {copied === "article" ? (
+                  <Check data-icon="inline-start" />
+                ) : (
+                  <Copy data-icon="inline-start" />
+                )}
+                {copied === "article" ? "已复制全文" : "复制全文"}
+              </Button>
+            ) : null}
             <Button
               size="sm"
               variant="outline"
               onClick={() =>
-                void copyText(finale.shareText).then((ok) => {
+                void copyText(plan.shareText).then((ok) => {
                   if (ok) setCopied("share");
                   else
                     toast.add({

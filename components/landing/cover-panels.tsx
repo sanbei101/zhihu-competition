@@ -1,11 +1,16 @@
 import { ArrowUp, ChevronDown } from "lucide-react";
 import Link from "next/link";
 
-import { StageBackdrop, GROUND_LINE, StageSprite, ThemeStage } from "@/components/pixel/theme-stage";
 import { spritesForSkin } from "@/components/pixel/sprites";
-import TextType from "@/components/ui/TextType";
+import {
+  StageBackdrop,
+  GROUND_LINE,
+  StageSprite,
+  ThemeStage,
+} from "@/components/pixel/theme-stage";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import TextType from "@/components/ui/TextType";
 import { SCENARIO_THEMES } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 import { cn } from "@/lib/utils";
@@ -39,7 +44,12 @@ function WorldParade() {
         const sprite = spritesForSkin(skin)[0];
         if (!sprite) return null;
         return (
-          <StageSprite key={entry.id} sprite={sprite} targetHeight={entry.height} fit={PARADE_FIT} />
+          <StageSprite
+            key={entry.id}
+            sprite={sprite}
+            targetHeight={entry.height}
+            fit={PARADE_FIT}
+          />
         );
       })}
     </div>
@@ -74,7 +84,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
           <Badge variant="outline" className="font-mono text-[10px] tracking-[0.25em]">
             WORLDLINE ARCADE
           </Badge>
-          <p className="max-w-2xl text-balance text-base leading-8 font-medium tracking-tight sm:text-xl">
+          <p className="max-w-2xl text-base leading-8 font-medium tracking-tight text-balance sm:text-xl">
             一句「如果」,值得用<span className="text-primary">一整个世界</span>来回答。
           </p>
           <p className="text-muted-foreground max-w-xl text-xs leading-6 sm:text-sm">
@@ -104,7 +114,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
 
         {/* 下簇:贴着大字的下沿 */}
         <div className="flex flex-1 flex-col items-center justify-start gap-3">
-          <div className="scrollbar-none -mx-5 flex w-[calc(100%+2.5rem)] snap-x gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:max-w-5xl sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
+          <div className="-mx-5 flex w-[calc(100%+2.5rem)] snap-x scrollbar-none gap-2 overflow-x-auto px-5 sm:mx-0 sm:w-auto sm:max-w-5xl sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0">
             {SCENARIO_THEMES.map((theme, index) => {
               const themeSkin = getSkin(theme.id);
               return (
@@ -164,7 +174,9 @@ export function OutroPanel({
       />
 
       <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
-        <Badge variant="outline" className="tracking-[0.2em]">本次游园到此</Badge>
+        <Badge variant="outline" className="tracking-[0.2em]">
+          本次游园到此
+        </Badge>
         <h2 className="mt-4 max-w-2xl text-2xl leading-snug font-semibold tracking-tight sm:text-4xl">
           每一条世界线,
           <br />

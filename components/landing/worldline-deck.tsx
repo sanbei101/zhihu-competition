@@ -31,13 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "end", label: "结语", skin: null },
 ];
 
-function TopBar({
-  activeIndex,
-  onJump,
-}: {
-  activeIndex: number;
-  onJump: (index: number) => void;
-}) {
+function TopBar({ activeIndex, onJump }: { activeIndex: number; onJump: (index: number) => void }) {
   return (
     <header className="border-border bg-background/75 absolute inset-x-0 top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
@@ -54,10 +48,7 @@ function TopBar({
           <span className="text-sm font-semibold tracking-tight whitespace-nowrap">
             知乎脑洞游乐园
           </span>
-          <Separator
-            orientation="vertical"
-            className="mx-1 hidden h-4 self-center 2xl:block"
-          />
+          <Separator orientation="vertical" className="mx-1 hidden h-4 self-center 2xl:block" />
           <span className="text-muted-foreground hidden text-[11px] tracking-wider uppercase 2xl:block">
             Worldline Arcade
           </span>
@@ -222,9 +213,7 @@ export function WorldlineDeck() {
       const target = event.target as HTMLElement | null;
       if (
         target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
       ) {
         return;
       }
@@ -268,7 +257,7 @@ export function WorldlineDeck() {
     >
       <div
         ref={scrollerRef}
-        className="scrollbar-none h-dvh snap-y snap-mandatory overflow-y-auto overscroll-y-contain"
+        className="h-dvh snap-y snap-mandatory scrollbar-none overflow-y-auto overscroll-y-contain"
       >
         <CoverPanel onJump={jumpTo} />
 

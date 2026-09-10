@@ -1,3 +1,5 @@
+import { Output, streamText } from "ai";
+
 import {
   JSON_ONLY_INSTRUCTION,
   hasLlmKey,
@@ -6,8 +8,6 @@ import {
   missingLlmKeyMessage,
   salvageStructuredOutput,
 } from "@/lib/deepseek";
-import { Output, streamText } from "ai";
-
 import {
   agentCharacterSchema,
   playerCharacterSchema,

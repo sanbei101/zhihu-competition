@@ -146,7 +146,8 @@ function pickConflictPair(
   const defender =
     sorted.find(
       (entry) =>
-        entry.agentId !== challenger.agentId && entry.reaction.stance !== challenger.reaction.stance,
+        entry.agentId !== challenger.agentId &&
+        entry.reaction.stance !== challenger.reaction.stance,
     ) ?? sorted.find((entry) => entry.agentId !== challenger.agentId);
 
   return defender ? { challenger, defender } : null;

@@ -56,9 +56,7 @@ export function decisionTextOf(option: DecisionOption): string {
 }
 
 /** 内置的「按兵不动」选项:不是白给的安全牌,熵增会照常收账。 */
-export function idleOptionFor(cast: {
-  agentCharacters: { id: string }[];
-}): DecisionOption {
+export function idleOptionFor(cast: { agentCharacters: { id: string }[] }): DecisionOption {
   return {
     id: "idle",
     title: "按兵不动",

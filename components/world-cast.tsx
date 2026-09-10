@@ -287,9 +287,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                   <Card
                     key={character.id}
                     className={
-                      isSelected
-                        ? "min-w-0 border-primary shadow-none"
-                        : "min-w-0 shadow-none"
+                      isSelected ? "border-primary min-w-0 shadow-none" : "min-w-0 shadow-none"
                     }
                   >
                     <CardHeader>

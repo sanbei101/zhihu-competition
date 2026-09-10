@@ -167,10 +167,7 @@ export function defectRelation(relations: AgentRelation[], agentId: string): Age
   );
 }
 
-export function relationOf(
-  relations: AgentRelation[],
-  agentId: string,
-): AgentRelation | undefined {
+export function relationOf(relations: AgentRelation[], agentId: string): AgentRelation | undefined {
   return relations.find((relation) => relation.agentId === agentId);
 }
 
@@ -311,12 +308,22 @@ export type JudgeResult = z.infer<typeof judgeResultSchema>;
 export const finaleRatingSchema = z.enum(["S", "A", "B", "C"]);
 export type FinaleRating = z.infer<typeof finaleRatingSchema>;
 
-/** 万字长文的目标字数与单章区间。 */
-export const FINALE_MIN_TOTAL_CHARS = 10000;
-export const FINALE_CHAPTER_MIN_CHARS = 1800;
-export const FINALE_CHAPTER_TARGET = 2200;
-export const FINALE_CHAPTER_MIN = 6;
-export const FINALE_CHAPTER_MAX = 9;
+/**
+ * 终章自述的篇幅预算
+ * 单章目标不写死,而是由总预算与章数反算,保证不同章数下总长都落在三千字上下。
+ */
+export const FINALE_TARGET_CHARS = 3000;
+export const FINALE_PREFACE_CHARS = 350;
+export const FINALE_CHAPTER_MIN_CHARS = 400;
+export const FINALE_CHAPTER_MAX_CHARS = 1500;
+export const FINALE_CHAPTER_MIN = 3;
+export const FINALE_CHAPTER_MAX = 5;
+
+/** 按章数反算单章目标字数:总预算扣掉开场白,再平分。 */
+export function finaleChapterTargetFor(chapterCount: number): number {
+  const body = Math.max(FINALE_TARGET_CHARS - FINALE_PREFACE_CHARS, 0);
+  return Math.round(body / Math.max(chapterCount, 1));
+}
 
 /** 第一章:先定卷目与判词,再由客户端逐章续写。 */
 export const finalePlanSchema = z.object({
@@ -338,7 +345,9 @@ export const finalePlanSchema = z.object({
     )
     .min(FINALE_CHAPTER_MIN)
     .max(FINALE_CHAPTER_MAX)
-    .describe("全部卷目,按时间顺序,至少 5 章,总数由题目给定"),
+    .describe(
+      `全部卷目,按时间顺序,共 ${FINALE_CHAPTER_MIN} 到 ${FINALE_CHAPTER_MAX} 章,总数由题目给定`,
+    ),
   timeline: z
     .array(
       z.object({
@@ -358,8 +367,10 @@ export const finaleChapterSchema = z.object({
   markdown: z
     .string()
     .min(FINALE_CHAPTER_MIN_CHARS)
-    .max(6000)
-    .describe(`本卷正文,第一人称,${FINALE_CHAPTER_MIN_CHARS} 到 3000 字之间`),
+    .max(FINALE_CHAPTER_MAX_CHARS)
+    .describe(
+      `本卷正文,第一人称,${FINALE_CHAPTER_MIN_CHARS} 到 ${FINALE_CHAPTER_MAX_CHARS} 字之间`,
+    ),
 });
 export type FinaleChapter = z.infer<typeof finaleChapterSchema>;
 
@@ -385,9 +396,9 @@ export const finaleSchema = z.object({
 });
 export type WorldFinale = z.infer<typeof finaleSchema>;
 
-/** 章节数按回合数推算,保证总字数能稳定过万。 */
+/** 章节数按回合数推算:3 到 5 章,推演越长分卷越细。 */
 export function finaleChapterCountFor(turns: number): number {
-  return Math.min(FINALE_CHAPTER_MAX, Math.max(FINALE_CHAPTER_MIN, 6 + Math.floor(turns / 3)));
+  return Math.min(FINALE_CHAPTER_MAX, Math.max(FINALE_CHAPTER_MIN, 3 + Math.floor(turns / 3)));
 }
 
 export function countArticleChars(markdown: string): number {
@@ -780,7 +791,10 @@ export function summarizeReactionsForPrompt(reactions: TurnReactionRecord[]): st
 export function summarizeRetortsForPrompt(retorts: RetortRecord[]): string {
   if (!retorts.length) return "(本回合没有发生面对面交锋)";
   return retorts
-    .map((entry) => `- ${entry.agentId} 回击 ${entry.againstId}:${entry.reaction.speech.slice(0, 100)}`)
+    .map(
+      (entry) =>
+        `- ${entry.agentId} 回击 ${entry.againstId}:${entry.reaction.speech.slice(0, 100)}`,
+    )
     .join("\n");
 }
 

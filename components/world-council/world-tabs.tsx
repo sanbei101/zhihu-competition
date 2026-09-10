@@ -204,10 +204,7 @@ export function WorldTabs({
                 <div key={character.id} className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">{character.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={`ml-auto px-1.5 ${attitudeTone[attitude]}`}
-                    >
+                    <Badge variant="outline" className={`ml-auto px-1.5 ${attitudeTone[attitude]}`}>
                       {attitudeLabels[attitude]}
                     </Badge>
                   </div>
@@ -250,9 +247,7 @@ export function WorldTabs({
                 </span>
                 <div>
                   <p className="font-medium">玩家决策</p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    从选项里做出抉择,或按兵不动
-                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">从选项里做出抉择,或按兵不动</p>
                 </div>
               </li>
               {[

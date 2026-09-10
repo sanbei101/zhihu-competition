@@ -35,7 +35,7 @@ function TopicCard({ topic, order }: { topic: ScenarioTopic; order: number }) {
   return (
     <Link
       href={topicHref(topic)}
-      className="block h-full rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="focus-visible:ring-ring block h-full rounded-xl focus-visible:ring-2 focus-visible:outline-none"
     >
       <Card className="bg-card/85 hover:ring-primary/50 h-full gap-0 py-0 shadow-lg backdrop-blur-md transition-all">
         <CardHeader className="gap-2 p-4 sm:p-5">
@@ -167,13 +167,10 @@ export function ThemePanel({ theme, index, total, active, mounted }: ThemePanelP
 
             <ul
               ref={railRef}
-              className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 sm:gap-4"
+              className="flex snap-x snap-mandatory scrollbar-none gap-3 overflow-x-auto pb-1 sm:gap-4"
             >
               {theme.scenarios.map((topic, order) => (
-                <li
-                  key={topic.id}
-                  className="w-[84%] shrink-0 snap-center sm:w-[56%] lg:w-[29rem]"
-                >
+                <li key={topic.id} className="w-[84%] shrink-0 snap-center sm:w-[56%] lg:w-[29rem]">
                   <TopicCard topic={topic} order={order} />
                 </li>
               ))}

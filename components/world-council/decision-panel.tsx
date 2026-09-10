@@ -219,19 +219,13 @@ export function DecisionPanel({
       ) : null}
 
       {isResolving ? (
-        <div
-          className="text-muted-foreground flex items-center gap-2 text-xs"
-          aria-live="polite"
-        >
+        <div className="text-muted-foreground flex items-center gap-2 text-xs" aria-live="polite">
           <LoaderCircle className="size-3.5 animate-spin" />
           已收到 {reactions.length} / {agentCount} 条回应
         </div>
       ) : null}
       {isJudging ? (
-        <div
-          className="text-muted-foreground flex items-center gap-2 text-xs"
-          aria-live="polite"
-        >
+        <div className="text-muted-foreground flex items-center gap-2 text-xs" aria-live="polite">
           <LoaderCircle className="size-3.5 animate-spin" />
           各方表态收齐,正在裁决世界走向……
         </div>
