@@ -32,6 +32,7 @@ import {
   attitudeLabels,
   countArticleChars,
   endingLabels,
+  finalePlanSchema,
   finaleSchema,
   metricKeys,
   metricLabels,
@@ -151,10 +152,13 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         return;
       }
 
+      // 卷目结构改过之后,旧断点里的 plan 可能已经过不了校验:整份丢掉,
+      // 免得拿半截旧结构去渲染(那几章本来就是按旧卷目写的,留着也没意义)。
       const cachedProgress = readJson<FinaleProgress>(progressCacheKey(worldId));
-      if (cachedProgress?.plan) {
-        setPlan(cachedProgress.plan);
-        setChapters(cachedProgress.chapters ?? []);
+      const parsedPlan = cachedProgress ? finalePlanSchema.safeParse(cachedProgress.plan) : null;
+      if (parsedPlan?.success) {
+        setPlan(parsedPlan.data);
+        setChapters(cachedProgress?.chapters ?? []);
       }
     } catch (err) {
       console.error("终章存档恢复失败", err);
@@ -256,7 +260,8 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
 
       const articleMarkdown = assembleFinaleArticle({
         verdictTitle: activePlan.verdictTitle,
-        preface: activePlan.preface,
+        prologue: activePlan.prologue,
+        selfIntro: activePlan.selfIntro,
         chapters: written,
       });
       const assembled = finaleSchema.parse({
@@ -328,7 +333,8 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     (plan
       ? assembleFinaleArticle({
           verdictTitle: plan.verdictTitle,
-          preface: plan.preface,
+          prologue: plan.prologue,
+          selfIntro: plan.selfIntro,
           chapters,
         })
       : "");

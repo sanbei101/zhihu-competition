@@ -309,19 +309,20 @@ export const finaleRatingSchema = z.enum(["S", "A", "B", "C"]);
 export type FinaleRating = z.infer<typeof finaleRatingSchema>;
 
 /**
- * 终章自述的篇幅预算
+ * 终章故事的篇幅预算
  * 单章目标不写死,而是由总预算与章数反算,保证不同章数下总长都落在三千字上下。
  */
 export const FINALE_TARGET_CHARS = 3000;
-export const FINALE_PREFACE_CHARS = 350;
+/** 楔子(旁白 + 「我是谁」自我介绍)算在这一份预算里。 */
+export const FINALE_PROLOGUE_CHARS = 450;
 export const FINALE_CHAPTER_MIN_CHARS = 400;
 export const FINALE_CHAPTER_MAX_CHARS = 1500;
 export const FINALE_CHAPTER_MIN = 3;
 export const FINALE_CHAPTER_MAX = 5;
 
-/** 按章数反算单章目标字数:总预算扣掉开场白,再平分。 */
+/** 按章数反算单章目标字数:总预算扣掉楔子,再平分。 */
 export function finaleChapterTargetFor(chapterCount: number): number {
-  const body = Math.max(FINALE_TARGET_CHARS - FINALE_PREFACE_CHARS, 0);
+  const body = Math.max(FINALE_TARGET_CHARS - FINALE_PROLOGUE_CHARS, 0);
   return Math.round(body / Math.max(chapterCount, 1));
 }
 
@@ -333,8 +334,10 @@ export const finalePlanSchema = z.object({
   /** 玩家私密目标的达成情况 */
   privateGoalVerdict: z.enum(["达成", "部分达成", "未达成"]),
   privateGoalNote: z.string().min(1).max(400),
-  /** 全文开场白:第一人称,交代你是谁、此刻身在何处、为什么要把这件事写下来 */
-  preface: z.string().min(120).max(1200),
+  /** 楔子·旁白:像故事开场那样交代时间、地点与正在发生的危机,旁白腔,不出现「我」 */
+  prologue: z.string().min(60).max(600),
+  /** 楔子·自述:紧接旁白转第一人称,以「我是」开头做自我介绍 */
+  selfIntro: z.string().min(100).max(900),
   chapters: z
     .array(
       z.object({
@@ -405,16 +408,18 @@ export function countArticleChars(markdown: string): number {
   return markdown.replace(/\s/g, "").length;
 }
 
-/** 把卷目、开场白和逐章正文拼成最终长文。 */
+/** 把楔子(旁白 + 自述)和逐章正文拼成最终的知乎故事长文。 */
 export function assembleFinaleArticle(input: {
   verdictTitle: string;
-  preface: string;
+  prologue: string;
+  selfIntro: string;
   chapters: { title: string; markdown: string }[];
 }): string {
   const body = input.chapters
     .map((chapter) => `## ${chapter.title}\n\n${chapter.markdown.trim()}`)
     .join("\n\n");
-  return `# ${input.verdictTitle}\n\n${input.preface.trim()}\n\n${body}\n\n---\n\n*以上为亲历者自述,由世界线史官整理归档。*`;
+  const opening = [input.prologue.trim(), input.selfIntro.trim()].filter(Boolean).join("\n\n");
+  return `# ${input.verdictTitle}\n\n## 楔子\n\n${opening}\n\n---\n\n${body}\n\n---\n\n*以上为亲历者自述,由世界线史官整理归档。*`;
 }
 
 // ==================== 对局存档 ====================
