@@ -45,9 +45,8 @@ export const roundOptionsSchema = z.object({
   situation: z.string().min(1).max(300).describe("本回合突发处境,不超过三百字"),
   options: z
     .array(decisionOptionSchema)
-    .min(3)
-    .max(5)
-    .describe("三到五个立场与代价明显不同的抉择,数量按处境需要而定,不要凑数"),
+    .length(4)
+    .describe("恰好四个立场与代价明显不同的抉择,按 A/B/C/D 顺序排列"),
 });
 export type RoundOptions = z.infer<typeof roundOptionsSchema>;
 

@@ -19,7 +19,13 @@ import {
   describeUltimatum,
   entropyDeltasForRound,
   entropyNoteForRound,
-  finaleSchema,
+  FINALE_CHAPTER_MAX,
+  FINALE_CHAPTER_MIN,
+  FINALE_CHAPTER_MIN_CHARS,
+  FINALE_CHAPTER_TARGET,
+  finaleChapterCountFor,
+  finaleChapterSchema,
+  finalePlanSchema,
   judgeResultSchema,
   metricDeltasSchema,
   metricReasonsSchema,
@@ -35,13 +41,14 @@ import {
   turnRecordSchema,
   ultimatumOutcomeSchema,
   ultimatumSchema,
+  type FinaleChapter,
+  type FinalePlan,
   type FinaleRating,
   type JudgeResult,
   type RetortRecord,
   type TurnReactionRecord,
   type TurnRecord,
   type UltimatumDraft,
-  type WorldFinale,
   type WorldMetrics,
 } from "@/lib/world-ending";
 import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
@@ -62,12 +69,12 @@ privateGoal 是玩家的私密目标:必须具体到可以被判定是否达成,
 const buildCastPrompt = (input: { scenarioId: string; title: string; content?: string }) =>
   `为下面这条世界线生成开场角色阵容。\n\n知乎问题编号:${input.scenarioId}\n问题:${input.title}\n补充描述:${input.content || "无"}`;
 
-const OPTIONS_INSTRUCTIONS = `你是世界线导演。每回合给出一个突发处境和三到五个互斥抉择,供玩家点选。
+const OPTIONS_INSTRUCTIONS = `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
 
 硬性要求:
 1. 每个选项都要填 impact(四维代价方向,只用 ↑↑ ↑ — ↓ ↓↓)和 forecast(在场每一方会站到哪一边)。玩家必须在点下去之前就看得出这笔交易划不划算,以及朝堂上会炸成什么样。
 2. forecast 必须覆盖题目给出的全部在场角色,并且至少有一方是 doubt 或 oppose,不许所有人一致赞成。
-3. 选项立场与代价差异要足够大,覆盖稳、险、赌三种风险;数量按处境需要给 3 到 5 个,凑数反而扣分。
+3. 四个选项的立场与代价差异要足够大,覆盖稳、险、赌三种风险,按 A/B/C/D 顺序排列。
 4. 至少有一个选项直面本回合处境,至少有一个是拆东墙补西墙。
 5. 必须承接此前回合留下的未解决问题。若存在正在倒计时的突发事件或未决的最后通牒,优先围绕它们出题。
 6. 遵守世界硬约束,只写本回合能做的具体行动,不提前揭示结局。不要写抽象口号。使用简体中文。`;
@@ -171,13 +178,33 @@ ${summarizeRetortsForPrompt(input.retorts)}
 
 请给出事件、四维增量、逐项变化原因、世界旁白、下一回合危机,并结算突发事件与最后通牒。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`;
 
-const FINALE_INSTRUCTIONS = `你是知乎硬核历史区/科幻区的高赞答主兼世界线史官。根据玩家的真实推演记录,整理一篇格式严密的'知乎体深度长文回答'。
+const FINALE_VOICE_RULES = `写作纪律(每一条都必须遵守):
+- 通篇第一人称,用「我」指代自己;提到别人一律用他们的姓名与身份,绝对不许出现「玩家」「AI」「Agent」「系统」「选项」这类词。
+- 只写推演记录里真实发生过的事。不许编造新的史实、新的人物、新的结局,人物只能用记录里出现过的名字。
+- 每一章都要落在具体场景里:谁站在哪里、说了哪句话、你有什么身体反应与心里翻覆。不许写成战报罗列。
+- 语言克制、具体、有体温,允许犹豫、自嘲与后悔。不许用「综上所述」「首先其次」「不难看出」这类腔调,也不许分点罗列。
+- 简体中文。`;
 
-要求:只写推演记录里真实发生过的事,不编造新史实;引用至少两处玩家原话;结构为:开篇钩子 / 分幕推演 / 关键抉择复盘 / 未选择方案的合理推测(明确标注为推测) / 结论与开放讨论;简体中文,克制、有信息量;timeline 必须引用每回合真实发生的事件;shareText 是 200 字内的社区分享卡文案,含结局与评级。
+const FINALE_PLAN_INSTRUCTIONS = (chapterCount: number) => `你在替一位亲历者代笔。最终要交付的不是评论文章,而是这位亲历者本人的自述——他的日记,他的回忆。你先把卷目和判词定下来,正文会由你分章续写。
 
-另外必须单独判定玩家的私密目标(privateGoalVerdict 填「达成 / 部分达成 / 未达成」,privateGoalNote 用一到两句说明依据)。判定要严格:只根据推演记录里真实发生的事,不要因为玩家愿望强烈就放水。`;
+三件事:
+1. 判决信息:verdictTitle(一句话标题)、verdictLine(一句话点评)、rating(S/A/B/C)、privateGoalVerdict(达成/部分达成/未达成)、privateGoalNote(一到两句依据)。私密目标的判定要严格,只根据记录里真实发生的事。
+2. preface(全文开场白):第一人称,交代你此刻身在何处、隔了多久、为什么决定把这件事写下来。五百到八百字,要有具体的时间地点和一个真实到可疑的细节。
+3. chapters(全部卷目):从序到跋,恰好 ${chapterCount} 章。每章给出 title 与 brief——brief 必须点明这一章写哪个场景、哪次交锋、谁说了哪句关键的话、你的心里怎么翻覆,要具体到能被直接扩写成两千字。不许出现「叙述战况」「描写局势」这种空话。
 
-const buildFinalePrompt = (input: {
+${FINALE_VOICE_RULES}`;
+
+const FINALE_CHAPTER_INSTRUCTIONS = `你在替一位亲历者写他的自述。现在只写其中一章,不是全篇。
+
+${FINALE_VOICE_RULES}
+
+本章额外要求:
+- 严格按这一章的 brief 来写:场景、对话、动作、心理活动,一样都不能省。
+- 必须承接上一章的结尾(会附上上一章的末尾原文),让读者感觉是同一个人一口气写下来的。不要重复上一章已经交代过的事。
+- 正文长度必须达到 ${FINALE_CHAPTER_MIN_CHARS} 字以上(目标 ${FINALE_CHAPTER_TARGET} 字)。写不够就继续展开场景、对话与内心活动,绝对不许提前收尾、不许用一句总结草草带过。
+- 不要写小标题,不要分点,就是连续的自述散文,允许自然分段。`;
+
+const buildFinalePlanPrompt = (input: {
   scenarioTitle: string;
   player: PlayerCharacter;
   ending: { type: string; title: string; reason: string };
@@ -186,24 +213,58 @@ const buildFinalePrompt = (input: {
   turns: TurnRecord[];
   relations: z.infer<typeof agentRelationSchema>[];
   crisis: z.infer<typeof crisisSchema> | null;
+  chapterCount: number;
 }) =>
   `知乎脑洞副本:${input.scenarioTitle}
-玩家扮演:${input.player.name}(${input.player.identity}),阵营 ${input.player.faction},公开目标:${input.player.publicGoal}
-玩家的私密目标:${input.player.privateGoal}
+你要代笔的人:${input.player.name}(${input.player.identity}),阵营 ${input.player.faction}
+他的公开目标:${input.player.publicGoal}
+他的私密目标:${input.player.privateGoal}
+跟他共事过的人:${input.player.relationship}
+
 最终结局:${input.ending.title} -- ${input.ending.reason}
 终局四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}(参考评级 ${input.fallbackRating})
-共推演 ${input.turns.length} 回合
+共推演 ${input.turns.length} 回合,请排 ${input.chapterCount} 章。
 
-终局各方对玩家的信任度:
+终局各方对他的信任度:
 ${describeRelations(input.relations)}
 
 未解决的突发事件:
 ${describeCrisis(input.crisis)}
 
-完整推演记录:
-${summarizeTurnsForPrompt(input.turns, 5000)}
+完整推演记录(这是唯一的事实来源):
+${summarizeTurnsForPrompt(input.turns, 20000)}
 
-请输出 verdictTitle、verdictLine、rating(S/A/B/C)、privateGoalVerdict、privateGoalNote、timeline、articleMarkdown(2000 字左右的知乎体长文)、shareText。`;
+请输出判决信息、开场白 preface、卷目 chapters、timeline 与 shareText。`;
+
+const buildFinaleChapterPrompt = (input: {
+  scenarioTitle: string;
+  player: PlayerCharacter;
+  ending: { type: string; title: string; reason: string };
+  metrics: WorldMetrics;
+  turns: TurnRecord[];
+  chapterCount: number;
+  chapter: { index: number; title: string; brief: string };
+  outline: { index: number; title: string }[];
+  previousTail: string;
+  previousTitle: string;
+}) =>
+  `知乎脑洞副本:${input.scenarioTitle}
+自述者:${input.player.name}(${input.player.identity})
+最终结局:${input.ending.title} -- ${input.ending.reason}
+终局四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+
+全篇共 ${input.chapterCount} 章的卷目(你只写其中第 ${input.chapter.index} 章,不要越界去写别的章):
+${input.outline.map((entry) => `${entry.index}. ${entry.title}`).join("\n")}
+
+${input.previousTail ? `上一章《${input.previousTitle}》的末尾原文(接着它往下写):\n"""\n${input.previousTail}\n"""\n` : "这是全篇的第一章正文,没有上一章。"}
+
+本章标题:${input.chapter.title}
+本章要写的内容:${input.chapter.brief}
+
+推演记录(事实来源,供你核对细节):
+${summarizeTurnsForPrompt(input.turns, 6000)}
+
+请直接输出本章 title 与 markdown 正文。`;
 
 // ==================== 返回包络 ====================
 
@@ -490,7 +551,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
 
 // ==================== 终章结算 ====================
 
-const generateFinaleInputSchema = z.object({
+const generateFinalePlanInputSchema = z.object({
   scenarioId: z.string().min(1).max(100),
   scenarioTitle: z.string().min(1).max(300),
   scenarioUrl: z.string().max(500).optional().default(""),
@@ -507,8 +568,9 @@ const generateFinaleInputSchema = z.object({
   }),
 });
 
-export async function generateFinaleAction(input: unknown): Promise<ActionResult<WorldFinale>> {
-  const parsed = generateFinaleInputSchema.safeParse(input);
+/** 第一步:定卷目、判词与开场白。 */
+export async function generateFinalePlanAction(input: unknown): Promise<ActionResult<FinalePlan>> {
+  const parsed = generateFinalePlanInputSchema.safeParse(input);
   if (!parsed.success) return fail("结算输入不完整");
 
   const keyCheck = requireDeepSeekKey();
@@ -518,31 +580,106 @@ export async function generateFinaleAction(input: unknown): Promise<ActionResult
   const player = cast.playerCharacters.find((character) => character.id === playerId);
   if (!player) return fail("玩家角色不存在");
 
-  const fallbackRating = ratingForMetrics(metrics);
+  const chapterCount = finaleChapterCountFor(turns.length);
 
   try {
     const object = await generateStructured({
-      instructions: FINALE_INSTRUCTIONS,
-      prompt: buildFinalePrompt({
+      instructions: FINALE_PLAN_INSTRUCTIONS(chapterCount),
+      prompt: buildFinalePlanPrompt({
         scenarioTitle,
         player,
         ending,
         metrics,
-        fallbackRating,
+        fallbackRating: ratingForMetrics(metrics),
         turns,
         relations,
         crisis,
+        chapterCount,
       }),
-      schema: finaleSchema,
-      temperature: 0.7,
-      maxOutputTokens: 9000,
+      schema: finalePlanSchema,
+      temperature: 0.75,
+      maxOutputTokens: 4000,
     });
 
-    return { ok: true, data: finaleSchema.parse(object) };
+    const plan = finalePlanSchema.parse(object);
+    // 卷目数量以实际推演回合为准,模型多给就截断,章节序号强制重排。
+    const chapters = plan.chapters
+      .slice(0, Math.max(chapterCount, FINALE_CHAPTER_MIN))
+      .map((chapter, index) => ({
+        index: index + 1,
+        title: chapter.title,
+        brief: chapter.brief,
+      }));
+
+    return { ok: true, data: { ...plan, chapters } };
   } catch (error) {
-    console.error("终章结算失败", error);
+    console.error("终章卷目生成失败", error);
     return fail(
-      "终章生成失败",
+      "终章卷目生成失败",
+      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    );
+  }
+}
+
+const generateFinaleChapterInputSchema = z.object({
+  scenarioId: z.string().min(1).max(100),
+  scenarioTitle: z.string().min(1).max(300),
+  cast: worldCastSchema,
+  playerId: z.string().min(1),
+  turns: z.array(turnRecordSchema).min(1),
+  metrics: metricsSchema,
+  ending: z.object({ type: z.string(), title: z.string(), reason: z.string() }),
+  chapterCount: z.number().int().min(1).max(FINALE_CHAPTER_MAX),
+  chapter: z.object({
+    index: z.number().int().min(1),
+    title: z.string().min(1).max(40),
+    brief: z.string().min(1).max(300),
+  }),
+  outline: z.array(z.object({ index: z.number().int().min(1), title: z.string() })).min(1),
+  previousTitle: z.string().max(40).optional().default(""),
+  previousTail: z.string().max(4000).optional().default(""),
+});
+
+/** 第二步:一次续写一章。 */
+export async function generateFinaleChapterAction(
+  input: unknown,
+): Promise<ActionResult<FinaleChapter>> {
+  const parsed = generateFinaleChapterInputSchema.safeParse(input);
+  if (!parsed.success) return fail("章节输入不完整");
+
+  const keyCheck = requireDeepSeekKey();
+  if (typeof keyCheck !== "string") return keyCheck;
+
+  const { scenarioTitle, cast, playerId, turns, metrics, ending, chapterCount, chapter } =
+    parsed.data;
+  const player = cast.playerCharacters.find((character) => character.id === playerId);
+  if (!player) return fail("玩家角色不存在");
+
+  try {
+    const object = await generateStructured({
+      instructions: FINALE_CHAPTER_INSTRUCTIONS,
+      prompt: buildFinaleChapterPrompt({
+        scenarioTitle,
+        player,
+        ending,
+        metrics,
+        turns,
+        chapterCount,
+        chapter,
+        outline: parsed.data.outline,
+        previousTail: parsed.data.previousTail,
+        previousTitle: parsed.data.previousTitle,
+      }),
+      schema: finaleChapterSchema,
+      temperature: 0.85,
+      maxOutputTokens: 4600,
+    });
+
+    return { ok: true, data: finaleChapterSchema.parse(object) };
+  } catch (error) {
+    console.error(`终章第 ${chapter.index} 章生成失败`, error);
+    return fail(
+      `第 ${chapter.index} 章生成失败`,
       error instanceof Error ? `${error.name}: ${error.message}` : String(error),
     );
   }

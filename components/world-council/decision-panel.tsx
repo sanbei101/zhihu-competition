@@ -92,7 +92,7 @@ function ForecastRow({
   if (!forecast.length) return null;
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <span className="text-muted-foreground text-[11px]">朝堂预判</span>
+      <span className="text-muted-foreground text-[11px]">预测</span>
       {forecast.map((entry) => (
         <span
           key={entry.agentId}
@@ -134,11 +134,6 @@ export function DecisionPanel({
   idleOption,
 }: DecisionPanelProps) {
   const nameById = new Map(cast.agentCharacters.map((character) => [character.id, character.name]));
-  const allOptions = options
-    ? idleOption
-      ? [...options.options, idleOption]
-      : options.options
-    : [];
   const agentCount = cast.agentCharacters.length;
 
   return (
@@ -169,7 +164,7 @@ export function DecisionPanel({
             <div className="space-y-3">
               <p className="text-sm leading-7">{options.situation}</p>
               <div className="grid gap-2 sm:grid-cols-2">
-                {allOptions.map((option, index) => (
+                {options.options.map((option, index) => (
                   <Button
                     key={option.id}
                     type="button"
@@ -180,11 +175,7 @@ export function DecisionPanel({
                   >
                     <span className="flex w-full items-center gap-2">
                       <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded font-mono text-[11px]">
-                        {option.id === "idle" ? (
-                          <PauseCircle className="size-3.5" />
-                        ) : (
-                          (["A", "B", "C", "D", "E"][index] ?? index + 1)
-                        )}
+                        {["A", "B", "C", "D"][index] ?? index + 1}
                       </span>
                       <span className="font-medium">{option.title}</span>
                       <Badge variant="secondary" className="ml-auto shrink-0">
@@ -199,8 +190,28 @@ export function DecisionPanel({
                   </Button>
                 ))}
               </div>
+              {idleOption ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={choiceDisabled}
+                  onClick={() => onChooseOption(idleOption)}
+                  className="border-border h-auto w-full flex-col items-start gap-1.5 rounded-lg border border-dashed p-3 text-left"
+                >
+                  <span className="flex w-full items-center gap-2">
+                    <PauseCircle className="text-muted-foreground size-4 shrink-0" />
+                    <span className="font-medium">{idleOption.title}</span>
+                    <Badge variant="outline" className="ml-auto shrink-0">
+                      {idleOption.risk}
+                    </Badge>
+                  </span>
+                  <span className="text-muted-foreground text-xs leading-5 font-normal whitespace-normal">
+                    {idleOption.desc}
+                  </span>
+                </Button>
+              ) : null}
               <p className="text-muted-foreground text-xs">
-                点选其一即提交,不可更改。四维代价与朝堂预判都只是推演,不保证成真。
+                点选其一即提交,不可更改。四维代价与预测都只是推演,不保证成真。
               </p>
             </div>
           ) : null}

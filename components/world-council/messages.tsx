@@ -1,6 +1,6 @@
 "use client";
 
-import { GitBranch, Swords, TriangleAlert } from "lucide-react";
+import { Crosshair, GitBranch, Swords, TriangleAlert, Waves, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -169,6 +169,27 @@ export function PlayerDecisionMessage({
   );
 }
 
+/** 一条行动记录:做了什么 / 冲着谁 / 后果。 */
+function ActionLine({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Zap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3 px-3.5 py-2.5">
+      <dt className="text-muted-foreground flex w-20 shrink-0 items-center gap-1.5">
+        <Icon className="size-3.5" />
+        {label}
+      </dt>
+      <dd className="text-foreground min-w-0 leading-6">{value}</dd>
+    </div>
+  );
+}
+
 export function ReactionMessage({
   characterName,
   reaction,
@@ -210,16 +231,11 @@ export function ReactionMessage({
           {typed}
           <TypingCaret visible={isTyping} />
         </div>
-        <div className="mt-2 grid max-w-2xl gap-2 text-xs leading-5 sm:grid-cols-2">
-          <div className="bg-muted/60 rounded-md p-3">
-            <p className="text-muted-foreground">立即行动</p>
-            <p className="text-foreground mt-1">{reaction.action}</p>
-          </div>
-          <div className="bg-muted/60 rounded-md p-3">
-            <p className="text-muted-foreground">行动目标</p>
-            <p className="text-foreground mt-1">{reaction.target}</p>
-          </div>
-        </div>
+        <dl className="border-border bg-muted/40 max-w-2xl divide-y rounded-lg border text-xs">
+          <ActionLine icon={Zap} label="做了什么" value={reaction.action} />
+          <ActionLine icon={Crosshair} label="冲着谁" value={reaction.target} />
+          <ActionLine icon={Waves} label="后果" value={reaction.impact} />
+        </dl>
         {reaction.ultimatum ? (
           <UltimatumNotice
             characterName={characterName}
@@ -227,9 +243,6 @@ export function ReactionMessage({
             penalty={reaction.ultimatum.penalty}
           />
         ) : null}
-        <MessageFooter className="max-w-2xl items-start leading-5">
-          公开影响：{reaction.impact}
-        </MessageFooter>
       </MessageContent>
     </Message>
   );

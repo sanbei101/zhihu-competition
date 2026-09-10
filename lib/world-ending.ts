@@ -311,13 +311,34 @@ export type JudgeResult = z.infer<typeof judgeResultSchema>;
 export const finaleRatingSchema = z.enum(["S", "A", "B", "C"]);
 export type FinaleRating = z.infer<typeof finaleRatingSchema>;
 
-export const finaleSchema = z.object({
-  verdictTitle: z.string(),
-  verdictLine: z.string(),
+/** 万字长文的目标字数与单章区间。 */
+export const FINALE_MIN_TOTAL_CHARS = 10000;
+export const FINALE_CHAPTER_MIN_CHARS = 1800;
+export const FINALE_CHAPTER_TARGET = 2200;
+export const FINALE_CHAPTER_MIN = 6;
+export const FINALE_CHAPTER_MAX = 9;
+
+/** 第一章:先定卷目与判词,再由客户端逐章续写。 */
+export const finalePlanSchema = z.object({
+  verdictTitle: z.string().min(1).max(60),
+  verdictLine: z.string().min(1).max(200),
   rating: finaleRatingSchema,
   /** 玩家私密目标的达成情况 */
   privateGoalVerdict: z.enum(["达成", "部分达成", "未达成"]),
-  privateGoalNote: z.string().min(1).max(300),
+  privateGoalNote: z.string().min(1).max(400),
+  /** 全文开场白:第一人称,交代你是谁、此刻身在何处、为什么要把这件事写下来 */
+  preface: z.string().min(120).max(1200),
+  chapters: z
+    .array(
+      z.object({
+        index: z.number().int().min(1),
+        title: z.string().min(1).max(40),
+        brief: z.string().min(10).max(300),
+      }),
+    )
+    .min(FINALE_CHAPTER_MIN)
+    .max(FINALE_CHAPTER_MAX)
+    .describe("全部卷目,按时间顺序,至少 5 章,总数由题目给定"),
   timeline: z
     .array(
       z.object({
@@ -327,10 +348,63 @@ export const finaleSchema = z.object({
       }),
     )
     .min(1),
-  articleMarkdown: z.string().min(200).max(20000),
+  shareText: z.string().min(20).max(2000),
+});
+export type FinalePlan = z.infer<typeof finalePlanSchema>;
+
+/** 后续每一次调用只续写一章。 */
+export const finaleChapterSchema = z.object({
+  title: z.string().min(1).max(40),
+  markdown: z
+    .string()
+    .min(FINALE_CHAPTER_MIN_CHARS)
+    .max(6000)
+    .describe(`本卷正文,第一人称,${FINALE_CHAPTER_MIN_CHARS} 到 3000 字之间`),
+});
+export type FinaleChapter = z.infer<typeof finaleChapterSchema>;
+
+/** 组装完成、可缓存可复制的终章。 */
+export const finaleSchema = z.object({
+  verdictTitle: z.string(),
+  verdictLine: z.string(),
+  rating: finaleRatingSchema,
+  privateGoalVerdict: z.enum(["达成", "部分达成", "未达成"]),
+  privateGoalNote: z.string().min(1).max(400),
+  timeline: z
+    .array(
+      z.object({
+        round: z.number().int().min(1),
+        title: z.string(),
+        summary: z.string(),
+      }),
+    )
+    .min(1),
+  articleMarkdown: z.string().min(200),
+  charCount: z.number().int().min(0).default(0),
   shareText: z.string().min(20).max(2000),
 });
 export type WorldFinale = z.infer<typeof finaleSchema>;
+
+/** 章节数按回合数推算,保证总字数能稳定过万。 */
+export function finaleChapterCountFor(turns: number): number {
+  return Math.min(FINALE_CHAPTER_MAX, Math.max(FINALE_CHAPTER_MIN, 6 + Math.floor(turns / 3)));
+}
+
+export function countArticleChars(markdown: string): number {
+  return markdown.replace(/\s/g, "").length;
+}
+
+/** 把卷目、开场白和逐章正文拼成最终长文。 */
+export function assembleFinaleArticle(input: {
+  verdictTitle: string;
+  preface: string;
+  chapters: { title: string; markdown: string }[];
+}): string {
+  const body = input.chapters
+    .map((chapter) => `## ${chapter.title}\n\n${chapter.markdown.trim()}`)
+    .join("\n\n");
+  return `# ${input.verdictTitle}\n\n${input.preface.trim()}\n\n${body}\n\n---\n\n*以上为亲历者自述,由世界线史官整理归档。*`;
+}
 
 // ==================== 对局存档 ====================
 
