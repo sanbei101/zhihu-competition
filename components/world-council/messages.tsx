@@ -28,34 +28,61 @@ const stanceLabels: Record<AgentReaction["stance"], string> = {
   exploit: "借势",
 };
 
+const stanceStyles: Record<AgentReaction["stance"], { bubble: string; badge: string }> = {
+  support: {
+    bubble: "border-l-emerald-500 bg-emerald-50/70",
+    badge: "border-emerald-500/60 bg-emerald-100 text-emerald-700",
+  },
+  oppose: {
+    bubble: "border-l-red-500 bg-red-50/70",
+    badge: "border-red-500/60 bg-red-100 text-red-700",
+  },
+  negotiate: {
+    bubble: "border-l-sky-500 bg-sky-50/70",
+    badge: "border-sky-500/60 bg-sky-100 text-sky-700",
+  },
+  exploit: {
+    bubble: "border-l-amber-500 bg-amber-50/70",
+    badge: "border-amber-500/60 bg-amber-100 text-amber-700",
+  },
+};
+
+const TYPE_INTERVAL_MS = 55;
+const TYPE_PAUSE_MS = 165;
+const TYPING_CARET = "▍";
+
 export function useTypewriter(
   text: string,
-  durationMs = 6000,
-): { typed: string; isTyping: boolean } {
-  const [count, setCount] = useState(0);
+  animate = true,
+): { typed: string; isTyping: boolean; done: boolean } {
+  const [count, setCount] = useState(animate ? 0 : text.length);
 
   useEffect(() => {
+    if (!animate) {
+      setCount(text.length);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setCount(text.length);
+      return;
+    }
     setCount(0);
-    if (!text.length) return;
-    const frame = Math.max(1, Math.ceil(text.length / (durationMs / 50)));
-    const id = setInterval(() => {
-      setCount((current) => {
-        if (current >= text.length) {
-          clearInterval(id);
-          return current;
-        }
-        const next = current + frame;
-        if (next >= text.length) {
-          clearInterval(id);
-          return text.length;
-        }
-        return next;
-      });
-    }, 50);
-    return () => clearInterval(id);
-  }, [durationMs, text]);
+    let index = 0;
+    let timer = window.setTimeout(function tick() {
+      index += 1;
+      setCount(index);
+      if (index >= text.length) return;
+      const pausedAtPunctuation = "。！？…；：,!、?\n".includes(text[index - 1]);
+      timer = window.setTimeout(tick, pausedAtPunctuation ? TYPE_PAUSE_MS : TYPE_INTERVAL_MS);
+    }, TYPE_INTERVAL_MS);
+    return () => window.clearTimeout(timer);
+  }, [animate, text]);
 
-  return { typed: text.slice(0, count), isTyping: count < text.length };
+  return { typed: text.slice(0, count), isTyping: count < text.length, done: count >= text.length };
+}
+
+function TypingCaret({ visible }: { visible: boolean }) {
+  return visible ? <span className="animate-pulse">{TYPING_CARET}</span> : null;
 }
 
 export function SpeakingAvatar({
@@ -103,21 +130,29 @@ export function PlayerDecisionMessage({
 export function ReactionMessage({
   characterName,
   reaction,
+  animate = true,
 }: {
   characterName: string;
   reaction: AgentReaction;
+  animate?: boolean;
 }) {
-  const { typed, isTyping } = useTypewriter(reaction.speech);
+  const { typed, isTyping } = useTypewriter(reaction.speech, animate);
+  const stanceStyle = stanceStyles[reaction.stance];
   return (
     <Message>
       <SpeakingAvatar isTyping={isTyping} characterName={characterName} />
       <MessageContent>
         <MessageHeader className="gap-2">
           <span>{characterName}</span>
-          <Badge variant="outline">{stanceLabels[reaction.stance]}</Badge>
+          <Badge variant="outline" className={stanceStyle.badge}>
+            {stanceLabels[reaction.stance]}
+          </Badge>
         </MessageHeader>
-        <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
+        <div
+          className={`border-border max-w-2xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${stanceStyle.bubble} ${isTyping ? "ring-primary/40 ring-1" : ""}`}
+        >
           {typed}
+          <TypingCaret visible={isTyping} />
         </div>
         <div className="mt-2 grid max-w-2xl gap-2 text-xs leading-5 sm:grid-cols-2">
           <div className="bg-muted/60 rounded-md p-3">
@@ -140,11 +175,13 @@ export function ReactionMessage({
 export function OpeningLineMessage({
   character,
   footer,
+  animate = true,
 }: {
   character: WorldCast["agentCharacters"][number];
   footer: string;
+  animate?: boolean;
 }) {
-  const { typed, isTyping } = useTypewriter(character.openingLine);
+  const { typed, isTyping } = useTypewriter(character.openingLine, animate);
   return (
     <Message>
       <SpeakingAvatar isTyping={isTyping} characterName={character.name} />
@@ -155,6 +192,7 @@ export function OpeningLineMessage({
         </MessageHeader>
         <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
           {typed}
+          <TypingCaret visible={isTyping} />
         </div>
         <MessageFooter>{footer}</MessageFooter>
       </MessageContent>

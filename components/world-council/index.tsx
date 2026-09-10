@@ -430,6 +430,7 @@ function WorldCouncil({ initial, worldId, onBack }: WorldCouncilProps) {
               currentTurnSettled={currentTurnSettled}
               ended={ended}
               ending={ending}
+              openingAnimate={!showIntro && initial.turns.length === 0}
               onGoFinale={goFinale}
             />
             <DecisionPanel

@@ -42,6 +42,7 @@ interface TimelineProps {
   currentTurnSettled: boolean;
   ended: boolean;
   ending: WorldEnding | null;
+  openingAnimate: boolean;
   onGoFinale: () => void;
 }
 
@@ -54,6 +55,7 @@ export function Timeline({
   currentTurnSettled,
   ended,
   ending,
+  openingAnimate,
   onGoFinale,
 }: TimelineProps) {
   return (
@@ -81,6 +83,7 @@ export function Timeline({
                 <OpeningLineMessage
                   character={character}
                   footer={index < 2 ? "公开表态" : "旁听发言"}
+                  animate={openingAnimate}
                 />
               </MessageScrollerItem>
             ))}
@@ -101,7 +104,11 @@ export function Timeline({
                   if (!character) return null;
                   return (
                     <MessageScrollerItem key={`turn-${turn.round}-reaction-${agentId}`}>
-                      <ReactionMessage characterName={character.name} reaction={reaction} />
+                      <ReactionMessage
+                        characterName={character.name}
+                        reaction={reaction}
+                        animate={false}
+                      />
                     </MessageScrollerItem>
                   );
                 })}
