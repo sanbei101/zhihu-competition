@@ -1,4 +1,4 @@
-import { generateStructured } from "@/lib/deepseek";
+import { generateStructured, hasLlmKey, missingLlmKeyMessage } from "@/lib/deepseek";
 import { type WorldCast } from "@/lib/world-cast";
 import { type WorldMetrics } from "@/lib/world-ending";
 import {
@@ -165,8 +165,8 @@ export async function POST(request: Request) {
   if (!parsedInput.success) {
     return Response.json({ error: "回合决策信息不完整" }, { status: 400 });
   }
-  if (!process.env.DEEPSEEK_API_KEY) {
-    return Response.json({ error: "服务端缺少 DEEPSEEK_API_KEY" }, { status: 500 });
+  if (!hasLlmKey()) {
+    return Response.json({ error: missingLlmKeyMessage() }, { status: 500 });
   }
 
   const {
