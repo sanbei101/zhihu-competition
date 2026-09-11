@@ -21,6 +21,7 @@ import { readNdjsonStream } from "@/lib/ndjson-stream";
 import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
 import {
   type WorldCast,
+  type WorldCastStage,
   worldCastStreamEventSchema,
   worldCouncilStorageKey,
 } from "@/lib/world-cast";
@@ -41,6 +42,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   const [streamingSetting, setStreamingSetting] = useState<WorldCast["setting"] | null>(null);
   const [streamingPlayers, setStreamingPlayers] = useState<WorldCast["playerCharacters"]>([]);
   const [streamingAgents, setStreamingAgents] = useState<WorldCast["agentCharacters"]>([]);
+  const [streamingStage, setStreamingStage] = useState<WorldCastStage | null>(null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +70,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     setStreamingSetting(null);
     setStreamingPlayers([]);
     setStreamingAgents([]);
+    setStreamingStage("setting");
     setSelectedCharacterId(null);
     setCacheNote("");
     setElapsed("");
@@ -98,6 +101,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       const completedCast: { value: WorldCast | null } = { value: null };
 
       await readNdjsonStream(response, worldCastStreamEventSchema, (event) => {
+        if (event.type === "stage") setStreamingStage(event.stage);
         if (event.type === "setting") setStreamingSetting(event.setting);
         if (event.type === "player-character") {
           setStreamingPlayers((current) =>
@@ -123,6 +127,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       setStreamingSetting(finalCast.setting);
       setStreamingPlayers(finalCast.playerCharacters);
       setStreamingAgents(finalCast.agentCharacters);
+      setStreamingStage(null);
       saveCachedCast(scenario.id, finalCast);
       setElapsed(`本次生成耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)}s,已存入本地缓存`);
       toast.add({
@@ -146,6 +151,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     setStreamingSetting(null);
     setStreamingPlayers([]);
     setStreamingAgents([]);
+    setStreamingStage(null);
     setSelectedCharacterId(null);
     setCacheNote("");
     setElapsed("");
@@ -158,6 +164,11 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   const selectedCharacter = visiblePlayers.find(
     (character) => character.id === selectedCharacterId,
   );
+  const stageLabels: Record<WorldCastStage, string> = {
+    setting: "正在建立世界背景",
+    players: "正在完善玩家角色",
+    agents: "正在配置 Agent 角色",
+  };
 
   function enterCouncil() {
     if (!cast || !selectedCharacter) return;
@@ -205,6 +216,11 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                 <span>配置由独立 Agent 扮演的利益相关者</span>
               </li>
             </ol>
+            {isLoading && streamingStage ? (
+              <p className="text-primary mt-5 text-sm font-medium" aria-live="polite">
+                {stageLabels[streamingStage]}...
+              </p>
+            ) : null}
             <p
               className="text-destructive mt-5 text-sm break-words whitespace-pre-wrap"
               role="alert"

@@ -87,7 +87,11 @@ export const worldCastSchema = z.object({
 
 export type WorldCast = z.infer<typeof worldCastSchema>;
 
+export const worldCastStageSchema = z.enum(["setting", "players", "agents"]);
+export type WorldCastStage = z.infer<typeof worldCastStageSchema>;
+
 export const worldCastStreamEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("stage"), stage: worldCastStageSchema }),
   z.object({ type: z.literal("setting"), setting: worldSettingSchema }),
   z.object({ type: z.literal("player-character"), character: playerCharacterSchema }),
   z.object({ type: z.literal("agent-character"), character: agentCharacterSchema }),
