@@ -39,6 +39,7 @@ export async function collectWorldTurn(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...input,
+      relations: input.relations,
       historySummary: summarizeTurnsForPrompt(input.turns, 4000),
       relationsSummary: describeRelations(input.relations),
       crisisSummary: describeCrisis(input.crisis),

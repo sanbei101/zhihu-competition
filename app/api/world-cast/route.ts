@@ -3,6 +3,12 @@ import { z } from "zod";
 import { errorResponse, publicError } from "@/lib/app-error";
 import { hasLlmKey, generateStructured, missingLlmKeyMessage } from "@/lib/deepseek";
 import {
+  buildAgentStagePrompt,
+  buildPlayerPrompt,
+  buildStage1Prompt,
+  CAST_INSTRUCTIONS,
+} from "@/lib/prompts";
+import {
   agentCharacterSchema,
   characterArchetypeSchema,
   playerCharacterSchema,
@@ -12,7 +18,6 @@ import {
   type WorldCast,
   type WorldCastStreamEvent,
 } from "@/lib/world-cast";
-import { CAST_INSTRUCTIONS } from "@/lib/world-prompts";
 
 const encoder = new TextEncoder();
 
@@ -59,12 +64,7 @@ export async function POST(request: Request) {
           send({ type: "stage", stage: "setting" });
           const stage1 = await generateStructured({
             instructions: CAST_INSTRUCTIONS,
-            prompt: `为剧本《${title}》(ID:${scenarioId})生成第一幕的世界观背景,以及3名玩家候选和4名Agent角色的基本档案骨架。
-
-剧本背景概要:
-${content || "无"}
-
-只输出必要信息。setting 要完整,角色骨架只填写身份、阵营和立绘原型。角色 id 必须唯一且保持简短英文小写。`,
+            prompt: buildStage1Prompt({ scenarioId, title, content }),
             schema: stage1Schema,
             temperature: 0.6,
             maxOutputTokens: 3000,
@@ -80,15 +80,11 @@ ${content || "无"}
             // eslint-disable-next-line no-await-in-loop
             const character = await generateStructured({
               instructions: CAST_INSTRUCTIONS,
-              prompt: `根据以下世界背景,完善这1名玩家角色的深层设定。
-
-世界背景:
-${JSON.stringify(stage1.setting)}
-
-角色骨架:
-${JSON.stringify(roster)}
-
-必须保留骨架中的 id、name、identity、faction、archetype。补齐 schema 的全部字段;每个字段控制在一到两句话,重点写出秘密、底线、可调动资源和可判定的私密目标。`,
+              prompt: buildPlayerPrompt({
+                setting: stage1.setting,
+                roster,
+                existing: playerCharacters,
+              }),
               schema: playerCharacterSchema,
               temperature: 0.7,
               maxOutputTokens: 1800,
@@ -105,18 +101,11 @@ ${JSON.stringify(roster)}
             // eslint-disable-next-line no-await-in-loop
             const character = await generateStructured({
               instructions: CAST_INSTRUCTIONS,
-              prompt: `根据以下世界背景和玩家角色,完善这1名Agent角色的深层设定与交互逻辑。
-
-世界背景:
-${JSON.stringify(stage1.setting)}
-
-玩家角色:
-${JSON.stringify(playerCharacters)}
-
-Agent角色骨架:
-${JSON.stringify(roster)}
-
-必须保留骨架中的 id、name、identity、faction、archetype。补齐 schema 的全部字段;每个字段控制在一到两句话,重点写出施压手段、开场白、秘密和与玩家的关系。`,
+              prompt: buildAgentStagePrompt({
+                setting: stage1.setting,
+                players: playerCharacters,
+                roster,
+              }),
               schema: agentCharacterSchema,
               temperature: 0.7,
               maxOutputTokens: 1800,

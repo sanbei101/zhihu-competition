@@ -16,6 +16,11 @@ const metricsPayloadSchema = z.object({
   resources: z.number().min(0).max(100),
 });
 
+const relationPayloadSchema = z.object({
+  agentId: z.string(),
+  trust: z.number().min(0).max(100),
+});
+
 /** 回合数不再设上限,由'大势熵增'保证收敛。 */
 export const worldTurnRequestSchema = z.object({
   cast: worldCastSchema,
@@ -23,6 +28,8 @@ export const worldTurnRequestSchema = z.object({
   round: z.number().int().min(1),
   situation: z.string().trim().min(1).max(600),
   metrics: metricsPayloadSchema,
+  /** 各 Agent 对玩家的信任度(结构化,用于挑本回合最可能合作方) */
+  relations: z.array(relationPayloadSchema).max(8),
   historySummary: z.string().max(8000),
   /** 各 Agent 对玩家的信任度摘要 */
   relationsSummary: z.string().max(2000),

@@ -10,5 +10,46 @@ privateGoal 是玩家的私密目标:必须具体到可以被判定是否达成,
 
 不要续写完整历史,不要提前给出结局,只建立危机爆发时的舞台和可博弈角色。使用简体中文,内容具体、克制。角色 id 使用唯一的简短英文小写标识。`;
 
-export const buildCastPrompt = (input: { scenarioId: string; title: string; content?: string }) =>
-  `为下面这条世界线生成开场角色阵容。\n\n知乎问题编号:${input.scenarioId}\n问题:${input.title}\n补充描述:${input.content || "无"}`;
+export const buildStage1Prompt = (input: { scenarioId: string; title: string; content?: string }) =>
+  `为剧本《${input.title}》(ID:${input.scenarioId})生成第一幕的世界观背景,以及3名玩家候选和4名Agent角色的基本档案骨架。
+
+剧本背景概要:
+${input.content || "无"}
+
+只输出必要信息。setting 要完整,角色骨架只填写身份、阵营和立绘原型。角色 id 必须唯一且保持简短英文小写。`;
+
+export const buildPlayerPrompt = (input: {
+  setting: unknown;
+  roster: unknown;
+  existing: unknown[];
+}) =>
+  `根据以下世界背景,完善这1名玩家角色的深层设定。
+
+世界背景:
+${JSON.stringify(input.setting)}
+
+角色骨架:
+${JSON.stringify(input.roster)}
+
+已确定的玩家角色(请与他们保持身份、阵营与目标不重复,避免互相撞车):
+${input.existing.length ? JSON.stringify(input.existing) : "(暂无,你是第一个)"}
+
+必须保留骨架中的 id、name、identity、faction、archetype。补齐 schema 的全部字段;每个字段控制在一到两句话,重点写出秘密、底线、可调动资源和可判定的私密目标。`;
+
+export const buildAgentStagePrompt = (input: {
+  setting: unknown;
+  players: unknown;
+  roster: unknown;
+}) =>
+  `根据以下世界背景和玩家角色,完善这1名Agent角色的深层设定与交互逻辑。
+
+世界背景:
+${JSON.stringify(input.setting)}
+
+玩家角色:
+${JSON.stringify(input.players)}
+
+Agent角色骨架:
+${JSON.stringify(input.roster)}
+
+必须保留骨架中的 id、name、identity、faction、archetype。补齐 schema 的全部字段;每个字段控制在一到两句话,重点写出施压手段、开场白、秘密和与玩家的关系。`;
