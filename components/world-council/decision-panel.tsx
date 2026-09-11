@@ -171,17 +171,17 @@ export function DecisionPanel({
                     variant="outline"
                     disabled={choiceDisabled}
                     onClick={() => onChooseOption(option)}
-                    className="h-auto flex-col items-start gap-2 p-4 text-left"
+                    className="h-auto min-w-0 flex-col items-start gap-2 p-4 text-left"
                   >
-                    <span className="flex w-full items-center gap-2">
+                    <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                       <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded font-mono text-[11px]">
                         {["A", "B", "C", "D"][index] ?? index + 1}
                       </span>
-                      <span className="font-medium">{option.title}</span>
+                      <span className="min-w-0 flex-1 font-medium break-words">{option.title}</span>
+                    </span>
+                    <span className="flex w-full flex-wrap items-center gap-1.5 pl-7">
                       {option.crisisAction ? <Badge variant="destructive">处理危机</Badge> : null}
-                      <Badge variant="secondary" className="ml-auto shrink-0">
-                        {option.risk}
-                      </Badge>
+                      <Badge variant="secondary">{option.risk}</Badge>
                     </span>
                     <span className="text-muted-foreground text-xs leading-5 font-normal whitespace-normal">
                       {option.desc}
@@ -197,12 +197,14 @@ export function DecisionPanel({
                   variant="ghost"
                   disabled={choiceDisabled}
                   onClick={() => onChooseOption(idleOption)}
-                  className="border-border h-auto w-full flex-col items-start gap-1.5 rounded-lg border border-dashed p-3 text-left"
+                  className="border-border h-auto w-full min-w-0 flex-col items-start gap-1.5 rounded-lg border border-dashed p-3 text-left"
                 >
-                  <span className="flex w-full items-center gap-2">
+                  <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
                     <PauseCircle className="text-muted-foreground size-4 shrink-0" />
-                    <span className="font-medium">{idleOption.title}</span>
-                    <Badge variant="outline" className="ml-auto shrink-0">
+                    <span className="min-w-0 flex-1 font-medium break-words">
+                      {idleOption.title}
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
                       {idleOption.risk}
                     </Badge>
                   </span>
