@@ -132,7 +132,7 @@ export function UltimatumNotice({
   penalty: string;
 }) {
   return (
-    <div className="border-destructive/40 bg-destructive/5 mt-1 max-w-2xl rounded-md border p-3">
+    <div className="border-destructive/40 bg-destructive/5 mt-1 max-w-4xl rounded-md border p-3">
       <p className="text-destructive flex items-center gap-1.5 text-xs font-medium">
         <TriangleAlert className="size-3.5" />
         {characterName} 当众发出最后通牒
@@ -161,7 +161,7 @@ export function PlayerDecisionMessage({
         <MessageHeader>
           {playerName} · 你的抉择{roundLabel ? ` · ${roundLabel}` : null}
         </MessageHeader>
-        <div className="bg-primary text-primary-foreground max-w-2xl rounded-lg px-4 py-3 leading-7">
+        <div className="bg-primary text-primary-foreground max-w-4xl rounded-lg px-4 py-3 leading-7">
           {decision}
         </div>
       </MessageContent>
@@ -212,14 +212,14 @@ export function ReactionMessage({
           <TrustDeltaBadge delta={reaction.trustDelta} />
         </MessageHeader>
         <div
-          className={`border-border max-w-2xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${stanceStyle.bubble} ${
+          className={`border-border max-w-4xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${stanceStyle.bubble} ${
             isRetort ? "border-r-4 border-r-red-400/70" : ""
           } ${isTyping ? "ring-primary/40 ring-1" : ""}`}
         >
           {typed}
           <TypingCaret visible={isTyping} />
         </div>
-        <dl className="text-muted-foreground max-w-2xl space-y-1 text-xs leading-5">
+        <dl className="text-muted-foreground max-w-4xl space-y-1 text-xs leading-5">
           <ActionNote label="做了什么" value={reaction.action} />
           <ActionNote label="冲着谁" value={reaction.target} />
           <ActionNote label="后果" value={reaction.impact} />
@@ -254,7 +254,7 @@ export function OpeningLineMessage({
           <span>{character.name}</span>
           <span className="font-normal">{character.identity}</span>
         </MessageHeader>
-        <div className="border-border bg-background max-w-2xl rounded-lg border px-4 py-3 leading-7">
+        <div className="border-border bg-background max-w-4xl rounded-lg border px-4 py-3 leading-7">
           {typed}
           <TypingCaret visible={isTyping} />
         </div>
@@ -301,28 +301,28 @@ export function DirectorNarrationMessage({
       </MessageAvatar>
       <MessageContent>
         <MessageHeader>{title}</MessageHeader>
-        <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">{narration}</div>
+        <div className="bg-muted max-w-4xl rounded-lg px-4 py-3 leading-7">{narration}</div>
         {events.length ? (
-          <div className="mt-3 max-w-2xl space-y-3">
+          <div className="mt-3 max-w-4xl space-y-3">
             {events.map((event) => (
               <WorldEventPanel key={event.id} event={event} />
             ))}
           </div>
         ) : null}
         {deltas ? (
-          <MessageFooter className="max-w-2xl items-start leading-5">
+          <MessageFooter className="max-w-4xl items-start leading-5">
             四维净变化:{deltaSummary(deltas) || "四维指标持平"}
           </MessageFooter>
         ) : null}
         {entropyText || penaltyText ? (
-          <p className="text-muted-foreground max-w-2xl text-xs leading-5">
+          <p className="text-muted-foreground max-w-4xl text-xs leading-5">
             {entropyText ? `大势流失:${entropyText}` : null}
             {entropyText && penaltyText ? " · " : null}
             {penaltyText ? `突发事件逾期:${penaltyText}` : null}
           </p>
         ) : null}
         {metricReasons ? (
-          <div className="text-muted-foreground mt-2 grid max-w-2xl gap-1 text-xs leading-5 sm:grid-cols-2">
+          <div className="text-muted-foreground mt-2 grid max-w-4xl gap-1 text-xs leading-5 sm:grid-cols-2">
             {metricKeys.map((key) => (
               <p key={key}>
                 <span className="text-foreground">{metricLabels[key]}:</span>
@@ -332,7 +332,7 @@ export function DirectorNarrationMessage({
           </div>
         ) : null}
         {nextSituation ? (
-          <MessageFooter className="max-w-2xl items-start leading-5">
+          <MessageFooter className="max-w-4xl items-start leading-5">
             下一回合逼近:{nextSituation}
           </MessageFooter>
         ) : null}

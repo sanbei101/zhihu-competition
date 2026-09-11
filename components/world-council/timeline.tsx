@@ -60,7 +60,7 @@ export function Timeline({
     <MessageScrollerProvider>
       <MessageScroller className="h-128">
         <MessageScrollerViewport>
-          <MessageScrollerContent className="p-5 sm:p-6">
+          <MessageScrollerContent className="mx-auto w-full max-w-5xl p-5 sm:p-6 lg:p-8">
             {showOpening ? (
               <MessageScrollerItem>
                 <Message>
@@ -69,7 +69,7 @@ export function Timeline({
                   </MessageAvatar>
                   <MessageContent>
                     <MessageHeader>世界线导演</MessageHeader>
-                    <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
+                    <div className="bg-muted max-w-4xl rounded-lg px-4 py-3 leading-7">
                       {cast.setting.opening}
                     </div>
                     <MessageFooter>事件公布</MessageFooter>
@@ -162,7 +162,7 @@ export function Timeline({
                   </MessageAvatar>
                   <MessageContent>
                     <MessageHeader>世界线终局 · {endingLabels[ending.type]}</MessageHeader>
-                    <div className="bg-muted max-w-2xl rounded-lg px-4 py-3 leading-7">
+                    <div className="bg-muted max-w-4xl rounded-lg px-4 py-3 leading-7">
                       <p className="font-medium">{ending.title}</p>
                       <p className="text-muted-foreground mt-1 text-sm leading-6">
                         {ending.reason}

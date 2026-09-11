@@ -151,8 +151,8 @@ export function SpeechStage({
 
   return (
     <section className="bg-card relative overflow-hidden rounded-lg border" aria-label="议事舞台">
-      <div className="flex flex-wrap items-center gap-2 border-b px-5 py-3">
-        <span className="text-sm font-medium">{figureName}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 border-b px-5 py-3">
+        <span className="min-w-0 text-sm font-medium">{figureName}</span>
         {beat && figureIdentity ? (
           <span className="text-muted-foreground text-xs">{figureIdentity}</span>
         ) : null}
@@ -171,7 +171,7 @@ export function SpeechStage({
             当场回击 {beat.against.name}
           </span>
         ) : null}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {phase === "judging" ? (
             <span className="text-muted-foreground flex items-center gap-1 text-xs">
               <Gavel className="size-3.5" />
@@ -190,9 +190,9 @@ export function SpeechStage({
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-4 px-5 py-5">
+      <div className="flex flex-col items-center gap-5 px-5 py-6 lg:px-8">
         <div
-          className={`min-h-18 w-full max-w-2xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${bubbleTone}`}
+          className={`min-h-18 w-full max-w-4xl rounded-lg border border-l-4 px-4 py-3 leading-7 ${bubbleTone}`}
           aria-hidden="true"
         >
           {beat ? (
