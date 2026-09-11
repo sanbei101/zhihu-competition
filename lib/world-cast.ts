@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { publicErrorSchema } from "@/lib/app-error";
+
 export const worldCastRequestSchema = z.object({
   scenarioId: z.string().trim().min(1).max(100),
   title: z.string().trim().min(1).max(300),
@@ -90,7 +92,7 @@ export const worldCastStreamEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("player-character"), character: playerCharacterSchema }),
   z.object({ type: z.literal("agent-character"), character: agentCharacterSchema }),
   z.object({ type: z.literal("complete"), cast: worldCastSchema }),
-  z.object({ type: z.literal("error"), error: z.string() }),
+  z.object({ type: z.literal("error"), error: publicErrorSchema }),
 ]);
 
 export type WorldCastStreamEvent = z.infer<typeof worldCastStreamEventSchema>;

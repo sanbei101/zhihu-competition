@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/toast";
+import { errorEnvelopeSchema, userErrorMessage } from "@/lib/app-error";
+import { readNdjsonStream } from "@/lib/ndjson-stream";
 import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
 import {
   type WorldCast,
@@ -82,19 +84,20 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
         }),
       });
 
-      if (!response.ok) throw new Error(`角色生成请求失败(${response.status})`);
-      if (!response.body) throw new Error("浏览器未收到角色生成响应流");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      if (!response.ok) {
+        let message = `角色生成请求失败(${response.status})`;
+        try {
+          const body: unknown = await response.json();
+          const parsedError = errorEnvelopeSchema.safeParse(body);
+          if (parsedError.success) message = userErrorMessage(parsedError.data.error);
+        } catch {
+          // 保留状态码兜底提示
+        }
+        throw new Error(message);
+      }
       const completedCast: { value: WorldCast | null } = { value: null };
 
-      function applyLine(line: string) {
-        if (!line.trim()) return;
-        const parsed = worldCastStreamEventSchema.safeParse(JSON.parse(line));
-        if (!parsed.success) throw new Error("角色生成事件结构不匹配");
-        const event = parsed.data;
+      await readNdjsonStream(response, worldCastStreamEventSchema, (event) => {
         if (event.type === "setting") setStreamingSetting(event.setting);
         if (event.type === "player-character") {
           setStreamingPlayers((current) =>
@@ -110,21 +113,9 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               : [...current, event.character],
           );
         }
-        if (event.type === "error") throw new Error(event.error);
+        if (event.type === "error") throw new Error(userErrorMessage(event.error));
         if (event.type === "complete") completedCast.value = event.cast;
-      }
-
-      for (;;) {
-        // eslint-disable-next-line no-await-in-loop -- 流式读取必须串行等待每个 chunk
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) applyLine(line);
-      }
-      buffer += decoder.decode();
-      if (buffer.trim()) applyLine(buffer);
+      });
       const finalCast = completedCast.value;
       if (!finalCast) throw new Error("角色阵容没有完整生成");
 

@@ -1,5 +1,6 @@
 import { Output, streamText } from "ai";
 
+import { errorResponse, publicError } from "@/lib/app-error";
 import {
   JSON_ONLY_INSTRUCTION,
   hasLlmKey,
@@ -26,15 +27,15 @@ export async function POST(request: Request) {
   try {
     input = await request.json();
   } catch {
-    return Response.json({ error: "请求不是有效的 JSON" }, { status: 400 });
+    return errorResponse(publicError("INVALID_REQUEST", "请求不是有效的 JSON", false), 400);
   }
 
   const parsedInput = worldCastRequestSchema.safeParse(input);
   if (!parsedInput.success) {
-    return Response.json({ error: "世界线信息不完整" }, { status: 400 });
+    return errorResponse(publicError("INVALID_REQUEST", "世界线信息不完整", false), 400);
   }
   if (!hasLlmKey()) {
-    return Response.json({ error: missingLlmKeyMessage() }, { status: 500 });
+    return errorResponse(publicError("CONFIG_MISSING", missingLlmKeyMessage(), false), 503);
   }
 
   const { scenarioId, title, content } = parsedInput.data;
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
           console.error("流式角色阵容生成失败", error);
           send({
             type: "error",
-            error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+            error: publicError("STREAM_FAILURE", "角色阵容生成失败,请重试", true),
           });
           controller.close();
         }

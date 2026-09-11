@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import type { ZodType } from "zod";
 
 import { generateFinaleChapterAction, generateFinalePlanAction } from "@/app/world/actions";
 import { Badge } from "@/components/ui/badge";
@@ -26,12 +27,14 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { WorldEventPanel } from "@/components/world-event";
+import { userErrorMessage } from "@/lib/app-error";
 import { worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   assembleFinaleArticle,
   attitudeLabels,
   countArticleChars,
   endingLabels,
+  finaleProgressSchema,
   finaleSchema,
   metricKeys,
   metricLabels,
@@ -65,11 +68,16 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-function readJson<T>(key: string): T | null {
+function readJson<T>(key: string, schema: ZodType<T>): T | null {
   const raw = sessionStorage.getItem(key);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as T;
+    const parsed = schema.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.data;
   } catch {
     sessionStorage.removeItem(key);
     return null;
@@ -143,16 +151,15 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
       }
       setSession(parsed.data);
 
-      const cachedFinale = readJson<WorldFinale>(finaleCacheKey(worldId));
-      const parsedFinale = cachedFinale ? finaleSchema.safeParse(cachedFinale) : null;
-      if (parsedFinale?.success) {
-        setFinale(parsedFinale.data);
+      const cachedFinale = readJson(finaleCacheKey(worldId), finaleSchema);
+      if (cachedFinale) {
+        setFinale(cachedFinale);
         setWritingLabel("全文已完成");
         return;
       }
 
-      const cachedProgress = readJson<FinaleProgress>(progressCacheKey(worldId));
-      if (cachedProgress?.plan) {
+      const cachedProgress = readJson(progressCacheKey(worldId), finaleProgressSchema);
+      if (cachedProgress) {
         setPlan(cachedProgress.plan);
         setChapters(cachedProgress.chapters);
       }
@@ -212,8 +219,8 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         setWritingLabel("史官正在梳理卷目……");
         const planned = await generateFinalePlanAction(gameRef(game));
         if (!planned.ok) {
-          setError(`${planned.error}${planned.detail ? `:${planned.detail}` : ""}`);
-          toast.add({ title: "卷目生成失败", description: planned.error, type: "error" });
+          setError(userErrorMessage(planned.error));
+          toast.add({ title: "卷目生成失败", description: planned.error.message, type: "error" });
           return;
         }
         activePlan = planned.data;
@@ -244,10 +251,10 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         });
 
         if (!drafted.ok) {
-          setError(`${drafted.error}${drafted.detail ? `:${drafted.detail}` : ""}`);
+          setError(userErrorMessage(drafted.error));
           toast.add({
             title: `第 ${index + 1} 章生成失败`,
-            description: drafted.error,
+            description: drafted.error.message,
             type: "error",
           });
           return;
@@ -286,7 +293,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
       toast.add({ title: "终章已写完", type: "success" });
     } catch (err) {
       console.error("终章生成异常", err);
-      setError(err instanceof Error ? err.message : "终章生成异常");
+      setError("终章生成失败,请重试");
     } finally {
       runningRef.current = false;
       setIsWriting(false);

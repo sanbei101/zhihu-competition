@@ -377,6 +377,11 @@ export const finaleChapterSchema = z.object({
 });
 export type FinaleChapter = z.infer<typeof finaleChapterSchema>;
 
+export const finaleProgressSchema = z.object({
+  plan: finalePlanSchema,
+  chapters: z.array(finaleChapterSchema),
+});
+
 /** 组装完成、可缓存可复制的终章。 */
 export const finaleSchema = z.object({
   verdictTitle: z.string(),

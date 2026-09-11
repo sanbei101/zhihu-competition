@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { publicErrorSchema } from "@/lib/app-error";
 import { worldCastSchema } from "@/lib/world-cast";
 
 /**
@@ -124,7 +125,14 @@ export const worldTurnEventSchema = z.discriminatedUnion("type", [
     againstId: z.string(),
     reaction: agentReactionSchema,
   }),
-  z.object({ type: z.literal("agent-error"), agentId: z.string(), error: z.string() }),
+  z.object({
+    type: z.literal("agent-error"),
+    agentId: z.string(),
+    phase: z.enum(["reaction", "retort"]),
+    againstId: z.string().optional(),
+    error: publicErrorSchema,
+  }),
+  z.object({ type: z.literal("error"), error: publicErrorSchema }),
   z.object({ type: z.literal("complete") }),
 ]);
 

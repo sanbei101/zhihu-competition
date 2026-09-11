@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test lib/app-error.test.ts lib/ndjson-stream.test.ts",
     "fmt": "oxfmt",
     "lint": "oxlint"
   },

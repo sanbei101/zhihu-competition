@@ -1,3 +1,4 @@
+import { errorResponse, publicError } from "@/lib/app-error";
 import { generateStructured, hasLlmKey, missingLlmKeyMessage } from "@/lib/deepseek";
 import { type WorldCast } from "@/lib/world-cast";
 import { type WorldMetrics } from "@/lib/world-ending";
@@ -159,15 +160,15 @@ export async function POST(request: Request) {
   try {
     input = await request.json();
   } catch {
-    return Response.json({ error: "请求不是有效的 JSON" }, { status: 400 });
+    return errorResponse(publicError("INVALID_REQUEST", "请求不是有效的 JSON", false), 400);
   }
 
   const parsedInput = worldTurnRequestSchema.safeParse(input);
   if (!parsedInput.success) {
-    return Response.json({ error: "回合决策信息不完整" }, { status: 400 });
+    return errorResponse(publicError("INVALID_REQUEST", "回合决策信息不完整", false), 400);
   }
   if (!hasLlmKey()) {
-    return Response.json({ error: missingLlmKeyMessage() }, { status: 500 });
+    return errorResponse(publicError("CONFIG_MISSING", missingLlmKeyMessage(), false), 503);
   }
 
   const {
@@ -186,7 +187,7 @@ export async function POST(request: Request) {
 
   const player = cast.playerCharacters.find((character) => character.id === playerId);
   if (!player) {
-    return Response.json({ error: "玩家角色不存在" }, { status: 400 });
+    return errorResponse(publicError("NOT_FOUND", "玩家角色不存在", false), 404);
   }
 
   const stream = new ReadableStream<Uint8Array>({
@@ -198,6 +199,7 @@ export async function POST(request: Request) {
           console.error("回合事件写入失败", error);
         }
       };
+      let hasAgentFailure = false;
 
       const environment = environmentBlock({
         cast,
@@ -230,10 +232,12 @@ export async function POST(request: Request) {
               return { agentId: character.id, reaction: parsed };
             } catch (error) {
               console.error(`${character.name} Agent 回应失败`, error);
+              hasAgentFailure = true;
               send({
                 type: "agent-error",
                 agentId: character.id,
-                error: error instanceof Error ? error.message : String(error),
+                phase: "reaction",
+                error: publicError("UPSTREAM_FAILURE", "角色回应生成失败,本回合无法继续", true),
               });
               return null;
             }
@@ -278,6 +282,14 @@ export async function POST(request: Request) {
               });
             } catch (error) {
               console.error(`${challenger.name} 对峙失败`, error);
+              hasAgentFailure = true;
+              send({
+                type: "agent-error",
+                agentId: challenger.id,
+                againstId: defender.id,
+                phase: "retort",
+                error: publicError("UPSTREAM_FAILURE", "对峙回应生成失败,本回合无法继续", true),
+              });
             }
           })(),
           (async () => {
@@ -306,23 +318,54 @@ export async function POST(request: Request) {
               });
             } catch (error) {
               console.error(`${defender.name} 对峙失败`, error);
+              hasAgentFailure = true;
+              send({
+                type: "agent-error",
+                agentId: defender.id,
+                againstId: challenger.id,
+                phase: "retort",
+                error: publicError("UPSTREAM_FAILURE", "对峙回应生成失败,本回合无法继续", true),
+              });
             }
           })(),
         ]);
       };
 
-      void run()
-        .catch((error) => {
-          console.error("回合推演流异常", error);
-        })
-        .finally(() => {
-          send({ type: "complete" });
-          try {
-            controller.close();
-          } catch {
-            // 客户端可能已断开,忽略
+      const close = () => {
+        try {
+          controller.close();
+        } catch {
+          // 客户端可能已断开,忽略
+        }
+      };
+
+      void run().then(
+        () => {
+          if (request.signal.aborted) {
+            close();
+            return;
           }
-        });
+          if (hasAgentFailure) {
+            send({
+              type: "error",
+              error: publicError("STREAM_FAILURE", "部分角色回应失败,本回合无法继续", true),
+            });
+          } else {
+            send({ type: "complete" });
+          }
+          close();
+        },
+        (error) => {
+          console.error("回合推演流异常", error);
+          if (!request.signal.aborted) {
+            send({
+              type: "error",
+              error: publicError("STREAM_FAILURE", "回合推演失败,请重试", true),
+            });
+          }
+          close();
+        },
+      );
     },
   });
 

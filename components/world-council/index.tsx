@@ -22,6 +22,8 @@ import {
 import { Timeline } from "@/components/world-council/timeline";
 import { WorldTabs } from "@/components/world-council/world-tabs";
 import { WorldIntro } from "@/components/world-intro";
+import { userErrorMessage } from "@/lib/app-error";
+import { readNdjsonStream } from "@/lib/ndjson-stream";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
@@ -331,17 +333,27 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       relations,
       crisis,
       ultimatum,
-    }).then((result) => {
-      if (cancelled) return;
-      setIsGeneratingOptions(false);
-      if (!result.ok) {
-        const message = `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失进度)`;
+    })
+      .then((result) => {
+        if (cancelled) return;
+        if (!result.ok) {
+          const message = userErrorMessage(result.error);
+          setOptionsError(message);
+          toast.add({ title: "选项生成失败", description: result.error.message, type: "error" });
+          return;
+        }
+        setOptions(result.data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("选项生成请求失败", error);
+        const message = "选项生成失败,请重试";
         setOptionsError(message);
-        toast.add({ title: "选项生成失败", description: result.error, type: "error" });
-        return;
-      }
-      setOptions(result.data);
-    });
+        toast.add({ title: "选项生成失败", description: message, type: "error" });
+      })
+      .finally(() => {
+        if (!cancelled) setIsGeneratingOptions(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -381,33 +393,41 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setIsJudging(true);
     setJudgeError("");
 
-    const result = await judgeTurnAction({
-      cast,
-      playerId: activePlayer.id,
-      metrics,
-      round,
-      situation: judgeSituation,
-      decision: judgeDecision,
-      reactions: collected,
-      retorts: retortRecords,
-      history: turns,
-      relations,
-      crisis,
-      ultimatum,
-    });
+    try {
+      const result = await judgeTurnAction({
+        cast,
+        playerId: activePlayer.id,
+        metrics,
+        round,
+        situation: judgeSituation,
+        decision: judgeDecision,
+        reactions: collected,
+        retorts: retortRecords,
+        history: turns,
+        relations,
+        crisis,
+        ultimatum,
+      });
 
-    setIsJudging(false);
-    if (!result.ok) {
-      const message = `${result.error}${result.detail ? `:${result.detail}` : ""}(可重试,不会丢失本回合回应)`;
+      if (!result.ok) {
+        const message = userErrorMessage(result.error);
+        setJudgeError(message);
+        toast.add({ title: "冲突裁决失败", description: result.error.message, type: "error" });
+        return;
+      }
+
+      pendingJudgeRef.current = null;
+      // 先攥在手里:等台上的戏演完再提交,不然裁决卡会插在别人说话中间
+      pendingVerdictRef.current = result.data;
+      setHasPendingVerdict(true);
+    } catch (error) {
+      console.error("冲突裁决请求失败", error);
+      const message = "冲突裁决失败,请重试";
       setJudgeError(message);
-      toast.add({ title: "冲突裁决失败", description: result.error, type: "error" });
-      return;
+      toast.add({ title: "冲突裁决失败", description: message, type: "error" });
+    } finally {
+      setIsJudging(false);
     }
-
-    pendingJudgeRef.current = null;
-    // 先攥在手里:等台上的戏演完再提交,不然裁决卡会插在别人说话中间
-    pendingVerdictRef.current = result.data;
-    setHasPendingVerdict(true);
   }
 
   /** 把裁决落进存档。只在演出收尾之后调用,所以它是'一幕'的最后一个动作。 */
@@ -542,16 +562,25 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
 
     const collected: TurnReactionRecord[] = [];
     const retortRecords: RetortRecord[] = [];
+    const expectedAgents = new Set<string>();
+    const expectedRetorts = new Set<string>();
+    const completedAgents = new Set<string>();
+    const completedRetorts = new Set<string>();
+    let streamCompleted = false;
+    let streamError = "";
 
     function applyEvent(turnEvent: WorldTurnEvent) {
       if (turnEvent.type === "agent-start") {
+        expectedAgents.add(turnEvent.agentId);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
       } else if (turnEvent.type === "agent-reaction") {
         const record = { agentId: turnEvent.agentId, reaction: turnEvent.reaction };
         collected.push(record);
+        completedAgents.add(turnEvent.agentId);
         setReactions((current) => [...current, record]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "retort-start") {
+        expectedRetorts.add(turnEvent.agentId);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
       } else if (turnEvent.type === "agent-retort") {
         const record = {
@@ -560,29 +589,17 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
           reaction: turnEvent.reaction,
         };
         retortRecords.push(record);
+        completedRetorts.add(turnEvent.agentId);
         setRetorts((current) => [...current, record]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "agent-error") {
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "error" }));
+        streamError = userErrorMessage(turnEvent.error);
+      } else if (turnEvent.type === "error") {
+        streamError = userErrorMessage(turnEvent.error);
+      } else if (turnEvent.type === "complete") {
+        streamCompleted = true;
       }
-    }
-
-    function applyLine(line: string) {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      let parsedJson: unknown;
-      try {
-        parsedJson = JSON.parse(trimmed);
-      } catch (error) {
-        console.error("回合事件不是合法 JSON", error, trimmed.slice(0, 200));
-        return;
-      }
-      const parsedEvent = worldTurnEventSchema.safeParse(parsedJson);
-      if (!parsedEvent.success) {
-        console.error("回合事件结构不匹配", parsedEvent.error, trimmed.slice(0, 200));
-        return;
-      }
-      applyEvent(parsedEvent.data);
     }
 
     try {
@@ -616,24 +633,17 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
         }
         throw new Error(message);
       }
-      if (!response.body) throw new Error("浏览器未收到回合响应流");
+      await readNdjsonStream(response, worldTurnEventSchema, applyEvent);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for (;;) {
-        // eslint-disable-next-line no-await-in-loop -- 流式读取必须串行等待每个 chunk
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) applyLine(line);
+      if (streamError) throw new Error(streamError);
+      if (!streamCompleted) throw new Error("回合响应未正常结束,请重试");
+      if (
+        expectedAgents.size !== cast.agentCharacters.length ||
+        completedAgents.size !== expectedAgents.size ||
+        expectedRetorts.size !== completedRetorts.size
+      ) {
+        throw new Error("部分角色回应失败,本回合无法继续");
       }
-
-      buffer += decoder.decode();
-      if (buffer.trim()) applyLine(buffer);
     } catch (error) {
       console.error("回合响应流失败", error);
       const message = error instanceof Error ? error.message : "回合推演失败";

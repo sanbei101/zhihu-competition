@@ -2,8 +2,9 @@
 
 import { z } from "zod";
 
+import { publicError, type PublicError } from "@/lib/app-error";
 import { generateStructured, hasLlmKey, missingLlmKeyMessage } from "@/lib/deepseek";
-import { worldCastRequestSchema, worldCastSchema, type WorldCast } from "@/lib/world-cast";
+import { worldCastSchema, type WorldCast } from "@/lib/world-cast";
 import {
   addDeltas,
   advanceCrisis,
@@ -54,7 +55,6 @@ import {
   type WorldMetrics,
 } from "@/lib/world-ending";
 import { roundOptionsSchema, type RoundOptions } from "@/lib/world-options";
-import { CAST_INSTRUCTIONS, buildCastPrompt } from "@/lib/world-prompts";
 import { worldEventSchema } from "@/lib/world-turn";
 
 // ==================== 提示词 ====================
@@ -273,11 +273,11 @@ ${summarizeTurnsForPrompt(input.turns, 6000)}
 // ==================== 返回包络 ====================
 
 type ActionOk<T> = { ok: true; data: T };
-type ActionErr = { ok: false; error: string; detail?: string };
+type ActionErr = { ok: false; error: PublicError };
 export type ActionResult<T> = ActionOk<T> | ActionErr;
 
-function fail(error: string, detail?: string): ActionErr {
-  return { ok: false, error, detail };
+function fail(error: PublicError): ActionErr {
+  return { ok: false, error };
 }
 
 /**
@@ -286,46 +286,22 @@ function fail(error: string, detail?: string): ActionErr {
  * 所以必须把'到底缺了哪个字段'直接说出来,别只丢一句'输入不完整'。
  */
 function failParse(what: string, error: z.ZodError): ActionErr {
-  const issues = error.issues
-    .map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`)
-    .join(" / ");
-  return fail(`${what}输入不完整`, issues);
+  return fail(
+    publicError(
+      "INVALID_REQUEST",
+      `${what}输入不完整`,
+      false,
+      error.issues.map((issue) => ({
+        path: issue.path.join(".") || "(root)",
+        message: issue.message,
+      })),
+    ),
+  );
 }
 
 function requireDeepSeekKey(): string | ActionErr {
-  if (!hasLlmKey()) return fail(missingLlmKeyMessage());
+  if (!hasLlmKey()) return fail(publicError("CONFIG_MISSING", missingLlmKeyMessage(), false));
   return "ok";
-}
-
-// ==================== 选角 ====================
-
-export async function generateCastAction(
-  input: unknown,
-): Promise<ActionResult<z.infer<typeof worldCastSchema>>> {
-  const parsed = worldCastRequestSchema.safeParse(input);
-  if (!parsed.success) return fail("世界线信息不完整");
-
-  const keyCheck = requireDeepSeekKey();
-  if (typeof keyCheck !== "string") return keyCheck;
-
-  try {
-    const { scenarioId, title, content } = parsed.data;
-    const object = await generateStructured({
-      instructions: CAST_INSTRUCTIONS,
-      prompt: buildCastPrompt({ scenarioId, title, content }),
-      schema: worldCastSchema,
-      temperature: 0.6,
-      maxOutputTokens: 14000,
-    });
-
-    return { ok: true, data: worldCastSchema.parse(object) };
-  } catch (error) {
-    console.error("角色阵容生成失败", error);
-    return fail(
-      "角色生成失败",
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    );
-  }
 }
 
 // ==================== 回合选项 ====================
@@ -350,7 +326,7 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
 
   const { cast, playerId, metrics, round, history, relations, crisis, ultimatum } = parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail("玩家角色不存在");
+  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
 
   try {
     const object = await generateStructured({
@@ -374,10 +350,7 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
     return { ok: true, data: { ...data, options: data.options.slice(0, 4) } };
   } catch (error) {
     console.error("回合选项生成失败", error);
-    return fail(
-      "选项生成失败",
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    );
+    return fail(publicError("UPSTREAM_FAILURE", "选项生成失败,请重试", true));
   }
 }
 
@@ -455,7 +428,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
     ultimatum,
   } = parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail("玩家角色不存在");
+  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
 
   try {
     const draft = await generateStructured({
@@ -558,10 +531,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
     };
   } catch (error) {
     console.error("回合裁决失败", error);
-    return fail(
-      "冲突裁决失败",
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    );
+    return fail(publicError("UPSTREAM_FAILURE", "冲突裁决失败,请重试", true));
   }
 }
 
@@ -594,7 +564,7 @@ export async function generateFinalePlanAction(input: unknown): Promise<ActionRe
 
   const { scenarioTitle, cast, playerId, turns, metrics, ending, relations, crisis } = parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail("玩家角色不存在");
+  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
 
   const chapterCount = finaleChapterCountFor(turns.length);
 
@@ -631,10 +601,7 @@ export async function generateFinalePlanAction(input: unknown): Promise<ActionRe
     return { ok: true, data: { ...plan, chapters } };
   } catch (error) {
     console.error("终章卷目生成失败", error);
-    return fail(
-      "终章卷目生成失败",
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    );
+    return fail(publicError("UPSTREAM_FAILURE", "终章卷目生成失败,请重试", true));
   }
 }
 
@@ -670,7 +637,7 @@ export async function generateFinaleChapterAction(
   const { scenarioTitle, cast, playerId, turns, metrics, ending, chapterCount, chapter } =
     parsed.data;
   const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail("玩家角色不存在");
+  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
 
   try {
     const object = await generateStructured({
@@ -695,9 +662,6 @@ export async function generateFinaleChapterAction(
     return { ok: true, data: finaleChapterSchema.parse(object) };
   } catch (error) {
     console.error(`终章第 ${chapter.index} 章生成失败`, error);
-    return fail(
-      `第 ${chapter.index} 章生成失败`,
-      error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-    );
+    return fail(publicError("UPSTREAM_FAILURE", `第 ${chapter.index} 章生成失败,请重试`, true));
   }
 }

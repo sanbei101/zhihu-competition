@@ -48,8 +48,7 @@ export function hasLlmKey(): boolean {
 
 /** 缺 key 时的统一提示,顺便把当前端点说清楚,方便排查。 */
 export function missingLlmKeyMessage(): string {
-  const { baseURL } = llmConfig();
-  return baseURL ? `服务端缺少 LLM_API_KEY(当前端点 ${baseURL})` : "服务端缺少 DEEPSEEK_API_KEY";
+  return "服务端尚未配置模型密钥";
 }
 
 export function llmModel() {
