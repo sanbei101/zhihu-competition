@@ -178,6 +178,7 @@ export function DecisionPanel({
                         {["A", "B", "C", "D"][index] ?? index + 1}
                       </span>
                       <span className="font-medium">{option.title}</span>
+                      {option.crisisAction ? <Badge variant="destructive">处理危机</Badge> : null}
                       <Badge variant="secondary" className="ml-auto shrink-0">
                         {option.risk}
                       </Badge>

@@ -32,6 +32,9 @@ export const decisionOptionSchema = z.object({
   title: z.string().min(1).max(30).describe("选项标题,不超过三十字"),
   desc: z.string().min(1).max(120).describe("选项具体做法与代价,不超过一百二十字"),
   risk: z.enum(["稳", "险", "赌"]).describe("选项风险等级"),
+  crisisAction: z
+    .boolean()
+    .describe("是否直接处理当前未决突发事件;有危机时至少一个选项为 true,无危机时全部为 false"),
   impact: impactHintSchema.describe("这个选项大致会拉动哪几维指标,只给定性方向"),
   forecast: z
     .array(forecastEntrySchema)
@@ -52,7 +55,7 @@ export type RoundOptions = z.infer<typeof roundOptionsSchema>;
 
 /** 点选后拼成 decision 字符串,复用现有回合链路。 */
 export function decisionTextOf(option: DecisionOption): string {
-  return `${option.title}:${option.desc}`;
+  return `${option.crisisAction ? "[处理当前危机] " : ""}${option.title}:${option.desc}`;
 }
 
 /** 内置的'按兵不动'选项:不是白给的安全牌,熵增会照常收账。 */
@@ -62,6 +65,7 @@ export function idleOptionFor(cast: { agentCharacters: { id: string }[] }): Deci
     title: "按兵不动",
     desc: "不下任何新命令,让各方先动。你能看清谁在替你扛事、谁在趁乱伸手,但局势不会停下来等你。",
     risk: "稳",
+    crisisAction: false,
     impact: { stability: "↓", morale: "↓", support: "-", resources: "↑" },
     forecast: cast.agentCharacters.map((character) => ({
       agentId: character.id,

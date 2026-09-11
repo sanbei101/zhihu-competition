@@ -49,7 +49,7 @@ const JUDGE_INSTRUCTIONS = `你是冷酷公正的世界线裁决者。你只根�
 规则:
 - 模型增量每项 -20 到 20,奖惩对称。但每回合至少要有一项指标的变化达到 8 以上--如果局势真的毫无波澜,那是你的推演失职,不是世界太平。
 - 每个指标都必须给出具体原因;事件必须有来源、参与者和可观察后果;nextSituation 必须从本回合行动自然推导。
-- crisisOutcome:若上方存在未决突发事件,判断玩家这次抉择是否实质解决了它,填 resolved 或 unresolved;若本来就没有未决事件,一律填 unresolved。
+- crisisOutcome:若上方存在未决突发事件,判断玩家这次抉择是否实质解决了它,填 resolved 或 unresolved;选项带有'[处理当前危机]'标记时,只要行动没有违反世界硬约束,必须填 resolved,即使付出了其他代价;若本来就没有未决事件,一律填 unresolved。
 - newCrisis:仅当上方没有未决突发事件时才允许抛出;必须是会自己倒计时、有明确量化代价的新麻烦,deadline 由系统设定,你只填 title/summary/source/severity/penalty;否则返回 null。
 - ultimatumOutcome:若上方存在未决通牒,判断玩家这次抉择是否满足了它的要求,填 honored 或 defied;若本来没有未决通牒,一律填 none。
 - 回合数没有上限,拖延本身就是代价。推演时要体现出各方耐心、资源与信任的持续消耗。
@@ -210,9 +210,13 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
       relations: withTrust,
       incoming: incomingUltimatum,
     });
+    const crisisResolved =
+      crisis !== null && decision.startsWith("[处理当前危机]")
+        ? true
+        : draft.crisisOutcome === "resolved";
     const crisisStep = advanceCrisis({
       pending: crisis,
-      resolved: draft.crisisOutcome === "resolved",
+      resolved: crisisResolved,
       incoming: draft.newCrisis ?? null,
       round,
     });
@@ -244,7 +248,7 @@ export async function judgeTurnAction(input: unknown): Promise<ActionResult<Judg
         nextSituation: draft.nextSituation,
         relations: ultimatumStep.relations,
         crisis: crisisStep.crisis,
-        crisisResolved: crisisStep.expired === false && draft.crisisOutcome === "resolved",
+        crisisResolved: crisisStep.expired === false && crisisResolved,
         ultimatum: ultimatumStep.ultimatum,
         ultimatumOutcome: ultimatumStep.defectedAgentId ? "defied" : draft.ultimatumOutcome,
         isEnded: systemEnding !== null,
