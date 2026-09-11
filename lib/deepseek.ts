@@ -2,6 +2,8 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { type FlexibleSchema, NoObjectGeneratedError, Output, generateText } from "ai";
 import { jsonrepair } from "jsonrepair";
 
+globalThis.AI_SDK_LOG_WARNINGS = false;
+
 /**
  * 模型接入点。默认走 DeepSeek 官方端点;
  * 只要在 .env 里配上 LLM_BASE_URL,就整体切到 OpenAI 兼容的中转站,调用方一行都不用改。
@@ -91,7 +93,7 @@ let roleRepairLogged = false;
 function noteRoleRepair() {
   if (roleRepairLogged) return;
   roleRepairLogged = true;
-  console.warn("中转站兼容层:已把响应里的空 role 修正为 assistant");
+  console.warn(JSON.stringify({ event: "relay.role_repaired" }));
 }
 
 export const relayTolerantFetch: typeof fetch = async (input, init) => {
@@ -280,13 +282,31 @@ interface StructuredCallOptions<T> {
 function logStructuredFailure(error: unknown, attempt: number) {
   if (!NoObjectGeneratedError.isInstance(error)) return;
 
-  console.log(`[AI structured output failed, attempt ${attempt}] raw text:`);
-  console.log(error.text ?? "<undefined>");
-  console.log(
-    `[AI structured output failed, attempt ${attempt}] escaped text:`,
-    JSON.stringify(error.text),
+  const seen = new WeakSet<object>();
+  const serialized = JSON.stringify(
+    {
+      event: "ai.structured_output_failed",
+      attempt,
+      text: error.text ?? null,
+      cause: error.cause ?? null,
+    },
+    (_key, value: unknown) => {
+      if (value instanceof Error) {
+        return {
+          name: value.name,
+          message: value.message,
+          ...(value.stack ? { stack: value.stack } : {}),
+          ...(value.cause !== undefined ? { cause: value.cause } : {}),
+        };
+      }
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return "[Circular]";
+        seen.add(value);
+      }
+      return value;
+    },
   );
-  console.log(`[AI structured output failed, attempt ${attempt}] cause:`, error.cause);
+  console.error(serialized);
 }
 
 /** 结构化对象生成(generateText + Output.object),返回按 schema 解析后的对象。 */
@@ -306,22 +326,20 @@ export async function generateStructured<T>(options: StructuredCallOptions<T>): 
   try {
     return (await call()).output;
   } catch (error) {
-    logStructuredFailure(error, 1);
-
     // 1. 先从原始文本里抢救
     const salvaged = salvageStructuredOutput(error, options.schema);
     if (salvaged !== undefined) return salvaged;
 
     if (options.abortSignal?.aborted || !NoObjectGeneratedError.isInstance(error)) throw error;
+    logStructuredFailure(error, 1);
 
     // 2. 再给模型一次机会
     try {
       return (await call()).output;
     } catch (retryError) {
-      logStructuredFailure(retryError, 2);
-
       const retrySalvaged = salvageStructuredOutput(retryError, options.schema);
       if (retrySalvaged !== undefined) return retrySalvaged;
+      logStructuredFailure(retryError, 2);
       throw retryError;
     }
   }

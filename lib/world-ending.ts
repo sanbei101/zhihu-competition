@@ -316,7 +316,7 @@ export const FINALE_TARGET_CHARS = 3000;
 /** 楔子(旁白 + '我是谁'自我介绍)算在这一份预算里。 */
 export const FINALE_PROLOGUE_CHARS = 450;
 export const FINALE_CHAPTER_MIN_CHARS = 400;
-export const FINALE_CHAPTER_MAX_CHARS = 1500;
+export const FINALE_CHAPTER_MAX_CHARS = 3000;
 export const FINALE_CHAPTER_MIN = 3;
 export const FINALE_CHAPTER_MAX = 5;
 

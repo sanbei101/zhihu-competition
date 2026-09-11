@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   experimental: {
     turbopackRustReactCompiler: true,
   },
+  logging: {
+    incomingRequests: false,
+  },
 };
 
 export default nextConfig;
