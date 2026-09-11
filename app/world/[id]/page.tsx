@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { WorldCastPanel } from "@/components/world-cast";
+import { WorldSeedPanel } from "@/components/world-seed";
 import { findScenario } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 
@@ -152,9 +152,7 @@ export default async function WorldPage({ params }: WorldPageProps) {
             </Card>
           </div>
 
-          <WorldCastPanel
-            scenario={{ id: topic.id, title: topic.title, content: "", url: topic.url }}
-          />
+          <WorldSeedPanel theme={theme} topic={topic} />
         </div>
       </section>
     </main>
