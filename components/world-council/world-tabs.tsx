@@ -147,7 +147,7 @@ export function WorldTabs({
 
             {entropyText || penaltyText ? (
               <p className="text-muted-foreground text-xs leading-5">
-                上一回合的账：
+                上一回合的账:
                 {entropyText ? `大势流失 ${entropyText}` : null}
                 {entropyText && penaltyText ? " · " : null}
                 {penaltyText ? `突发事件逾期 ${penaltyText}` : null}

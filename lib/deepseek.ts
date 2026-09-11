@@ -63,7 +63,7 @@ export function llmModel() {
 /**
  * 中转站(实测 d1api.xin,OneAPI 面板)返回的响应里 `role` 是空串 `""`,
  * 而 AI SDK 的非流式响应 schema 是 `role: z.literal("assistant").nullish()`、
- * 流式 chunk schema 是 `role: z.enum(["assistant"]).nullish()` —— 空串两个都过不了校验,
+ * 流式 chunk schema 是 `role: z.enum(["assistant"]).nullish()` -- 空串两个都过不了校验,
  * 于是整个响应被判定为 `AI_APICallError: Invalid JSON response`。
  *
  * 这里在 fetch 层把空 role 修回 assistant。只改这一个模式,别的字节一律不动。
@@ -76,7 +76,7 @@ function repairRole(text: string): string {
 
 /**
  * 响应体已经被解压/改写过了,这几个头必须摘掉,
- * 否则消费端会拿着「gzip」的声明去解一段明文,或者按旧的长度截断。
+ * 否则消费端会拿着'gzip'的声明去解一段明文,或者按旧的长度截断。
  */
 function repairedHeaders(source: Headers): Headers {
   const headers = new Headers(source);
@@ -147,8 +147,8 @@ export function llmProviderOptions() {
 
 /**
  * `@ai-sdk/deepseek` 的 `createLanguageModel()` 从不设置 `supportsStructuredOutputs`,
- * 于是 `this.config.supportsStructuredOutputs === true` 恒为 false —— 这个 provider 永远
- * 走不到原生 `response_format: json_schema`,只能落到「兼容模式」:把 schema 塞进 system message,
+ * 于是 `this.config.supportsStructuredOutputs === true` 恒为 false -- 这个 provider 永远
+ * 走不到原生 `response_format: json_schema`,只能落到'兼容模式':把 schema 塞进 system message,
  * 靠模型自己吐 JSON。
  *
  * 官方端点上的模型会老老实实吐裸 JSON;换成中转站 / 新模型之后,它很爱用 ```json 围栏包起来,
@@ -222,6 +222,18 @@ interface StructuredCallOptions<T> {
   abortSignal?: AbortSignal;
 }
 
+function logStructuredFailure(error: unknown, attempt: number) {
+  if (!NoObjectGeneratedError.isInstance(error)) return;
+
+  console.log(`[AI structured output failed, attempt ${attempt}] raw text:`);
+  console.log(error.text ?? "<undefined>");
+  console.log(
+    `[AI structured output failed, attempt ${attempt}] escaped text:`,
+    JSON.stringify(error.text),
+  );
+  console.log(`[AI structured output failed, attempt ${attempt}] cause:`, error.cause);
+}
+
 /** 结构化对象生成(generateText + Output.object),返回按 schema 解析后的对象。 */
 export async function generateStructured<T>(options: StructuredCallOptions<T>): Promise<T> {
   const call = () =>
@@ -239,6 +251,8 @@ export async function generateStructured<T>(options: StructuredCallOptions<T>): 
   try {
     return (await call()).output;
   } catch (error) {
+    logStructuredFailure(error, 1);
+
     // 1. 先从原始文本里抢救
     const salvaged = salvageStructuredOutput(error, options.schema);
     if (salvaged !== undefined) return salvaged;
@@ -249,6 +263,8 @@ export async function generateStructured<T>(options: StructuredCallOptions<T>): 
     try {
       return (await call()).output;
     } catch (retryError) {
+      logStructuredFailure(retryError, 2);
+
       const retrySalvaged = salvageStructuredOutput(retryError, options.schema);
       if (retrySalvaged !== undefined) return retrySalvaged;
       throw retryError;

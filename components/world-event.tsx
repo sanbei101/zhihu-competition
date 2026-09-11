@@ -72,7 +72,7 @@ function EventDetails({ event }: { event: WorldEvent }) {
           <p className="mt-1 text-sm">{event.casualties}</p>
         </div>
         <p className="text-muted-foreground text-sm leading-6 sm:col-span-3">
-          推进：{event.movement}
+          推进:{event.movement}
         </p>
       </div>
     );
@@ -94,7 +94,7 @@ function EventDetails({ event }: { event: WorldEvent }) {
           <p className="mt-1 text-sm">{event.relation}</p>
         </div>
         <p className="bg-muted/60 rounded-md p-3 text-sm leading-6 sm:col-span-3">
-          条件：{event.offer} · 回应：{event.response}
+          条件:{event.offer} · 回应:{event.response}
         </p>
       </div>
     );
@@ -113,7 +113,7 @@ function EventDetails({ event }: { event: WorldEvent }) {
             <p className="mt-1 text-sm">{event.spread}</p>
           </div>
         </div>
-        <p className="bg-muted/60 rounded-md p-3 text-sm leading-6">传闻：{event.claim}</p>
+        <p className="bg-muted/60 rounded-md p-3 text-sm leading-6">传闻:{event.claim}</p>
         <Progress value={event.credibility}>
           <ProgressLabel>可信度</ProgressLabel>
           <ProgressValue>{() => `${event.credibility}%`}</ProgressValue>
@@ -133,7 +133,7 @@ function EventDetails({ event }: { event: WorldEvent }) {
         <p className="mt-1 text-sm">{event.stock}</p>
       </div>
       <p className="bg-muted/60 rounded-md p-3 text-sm leading-6 sm:col-span-2">
-        压力：{event.pressure}
+        压力:{event.pressure}
       </p>
     </div>
   );
@@ -163,7 +163,7 @@ export function WorldEventPanel({ event }: { event: WorldEvent }) {
         <EventDetails event={event} />
       </div>
       <ItemFooter className="text-muted-foreground basis-full justify-start text-xs">
-        来源：{event.source} · 相关方：{event.actors.join("、")}
+        来源:{event.source} · 相关方:{event.actors.join("、")}
       </ItemFooter>
     </Item>
   );

@@ -182,7 +182,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     }
   }
 
-  /** 终章两次调用共用的结算上下文。字段必须与 Server Action 的入参 schema 对齐 —— 那边入参是 unknown,少传一个只会在运行时炸 */
+  /** 终章两次调用共用的结算上下文。字段必须与 Server Action 的入参 schema 对齐 -- 那边入参是 unknown,少传一个只会在运行时炸 */
   function gameRef(game: WorldGameSession) {
     return {
       scenarioId: game.scenarioId,
@@ -412,7 +412,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-muted-foreground text-xs leading-5">
-              「{player.privateGoal}」——这件事从头到尾没有第二个人知道。
+              '{player.privateGoal}'--这件事从头到尾没有第二个人知道。
             </p>
             <div className="flex items-center gap-2">
               <Badge

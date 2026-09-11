@@ -1,5 +1,5 @@
 // 人工精选,请勿编辑标题/链接。
-// 作为「知乎脑洞游乐园」的固化副本库,每个主题一片乐园。
+// 作为'知乎脑洞游乐园'的固化副本库,每个主题一片乐园。
 export interface ScenarioTopic {
   /** 知乎问题 ID,同时作为世界线 ID */
   id: string;
@@ -61,7 +61,7 @@ export const SCENARIO_THEMES: ScenarioTheme[] = [
       },
       {
         id: "458337262",
-        title: "如果「恐龙」存活至今,人类的生活将会是怎样的?",
+        title: "如果'恐龙'存活至今,人类的生活将会是怎样的?",
         url: "https://www.zhihu.com/question/458337262/answer/1878225663",
         votes: 56,
         comments: 6,
@@ -473,7 +473,7 @@ export const SCENARIO_THEMES: ScenarioTheme[] = [
       },
       {
         id: "401656499",
-        title: "人类如果点亮“不必睡眠”的技能,世界将会出现何种变革?",
+        title: "人类如果点亮"不必睡眠"的技能,世界将会出现何种变革?",
         url: "https://www.zhihu.com/question/401656499/answer/1285331223",
         votes: 74,
         comments: 11,

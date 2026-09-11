@@ -29,7 +29,7 @@ const PARADE: Array<{ id: string; height: number }> = [
 /**
  * 巡游精灵的高度上限。
  * 首屏大字是垂直居中的,下面那簇小字会一直压到约 440px 处,
- * 所以精灵最多只能用「(视口高 - 440) / 2 - 56」这点空间,矮屏才不会被小字压住。
+ * 所以精灵最多只能用'(视口高 - 440) / 2 - 56'这点空间,矮屏才不会被小字压住。
  */
 const PARADE_FIT = "w-auto max-h-[calc((100dvh_-_440px)/2_-_56px)]";
 
@@ -85,7 +85,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
             WORLDLINE ARCADE
           </Badge>
           <p className="max-w-2xl text-base leading-8 font-medium tracking-tight text-balance sm:text-xl">
-            一句「如果」,值得用<span className="text-primary">一整个世界</span>来回答。
+            一句'如果',值得用<span className="text-primary">一整个世界</span>来回答。
           </p>
           <p className="text-muted-foreground max-w-xl text-xs leading-6 sm:text-sm">
             知乎那些最出格的假设,在这里长成了可以走进去的副本。你下决定,世界接着写。
@@ -180,7 +180,7 @@ export function OutroPanel({
         <h2 className="mt-4 max-w-2xl text-2xl leading-snug font-semibold tracking-tight sm:text-4xl">
           每一条世界线,
           <br />
-          都从一个「如果」开始。
+          都从一个'如果'开始。
         </h2>
         <p className="text-muted-foreground mt-4 max-w-xl text-sm leading-7">
           挑一间副本走进去,剩下的交给议事厅。

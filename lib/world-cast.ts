@@ -50,7 +50,7 @@ export const playerCharacterSchema = characterSchema.extend({
   privateGoal: z
     .string()
     .describe(
-      "只有玩家自己知道的私密目标,一句话、具体到可以被判定是否达成(如「无论如何保住幼弟性命」),不能与公开目标重复",
+      "只有玩家自己知道的私密目标,一句话、具体到可以被判定是否达成(如'无论如何保住幼弟性命'),不能与公开目标重复",
     ),
 });
 

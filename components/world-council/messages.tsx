@@ -76,7 +76,7 @@ export function useTypewriter(
       index += 1;
       setCount(index);
       if (index >= text.length) return;
-      const pausedAtPunctuation = "。！？…；：,!、?\n".includes(text[index - 1]);
+      const pausedAtPunctuation = "。!?…;:,!、?\n".includes(text[index - 1]);
       timer = window.setTimeout(tick, pausedAtPunctuation ? TYPE_PAUSE_MS : TYPE_INTERVAL_MS);
     }, TYPE_INTERVAL_MS);
     return () => window.clearTimeout(timer);
@@ -187,7 +187,7 @@ export function ReactionMessage({
   characterName: string;
   reaction: AgentReaction;
   animate?: boolean;
-  /** 传了就是第二轮交锋:显示成「当场回击某人」 */
+  /** 传了就是第二轮交锋:显示成'当场回击某人' */
   againstName?: string;
 }) {
   const { typed, isTyping } = useTypewriter(reaction.speech, animate);
@@ -311,21 +311,21 @@ export function DirectorNarrationMessage({
         ) : null}
         {deltas ? (
           <MessageFooter className="max-w-2xl items-start leading-5">
-            四维净变化：{deltaSummary(deltas) || "四维指标持平"}
+            四维净变化:{deltaSummary(deltas) || "四维指标持平"}
           </MessageFooter>
         ) : null}
         {entropyText || penaltyText ? (
           <p className="text-muted-foreground max-w-2xl text-xs leading-5">
-            {entropyText ? `大势流失：${entropyText}` : null}
+            {entropyText ? `大势流失:${entropyText}` : null}
             {entropyText && penaltyText ? " · " : null}
-            {penaltyText ? `突发事件逾期：${penaltyText}` : null}
+            {penaltyText ? `突发事件逾期:${penaltyText}` : null}
           </p>
         ) : null}
         {metricReasons ? (
           <div className="text-muted-foreground mt-2 grid max-w-2xl gap-1 text-xs leading-5 sm:grid-cols-2">
             {metricKeys.map((key) => (
               <p key={key}>
-                <span className="text-foreground">{metricLabels[key]}：</span>
+                <span className="text-foreground">{metricLabels[key]}:</span>
                 {metricReasons[key]}
               </p>
             ))}
@@ -333,7 +333,7 @@ export function DirectorNarrationMessage({
         ) : null}
         {nextSituation ? (
           <MessageFooter className="max-w-2xl items-start leading-5">
-            下一回合逼近：{nextSituation}
+            下一回合逼近:{nextSituation}
           </MessageFooter>
         ) : null}
       </MessageContent>
@@ -361,8 +361,8 @@ export function CrisisBanner({ crisis }: { crisis: WorldCrisis }) {
       </div>
       <p className="text-muted-foreground mt-1.5 text-xs leading-5">{crisis.summary}</p>
       <p className="text-muted-foreground mt-1 text-xs leading-5">
-        来源：{crisis.source}
-        {penaltyText ? ` · 每回合代价：${penaltyText}` : ""}
+        来源:{crisis.source}
+        {penaltyText ? ` · 每回合代价:${penaltyText}` : ""}
       </p>
     </div>
   );

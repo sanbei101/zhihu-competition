@@ -62,7 +62,7 @@ import { worldEventSchema } from "@/lib/world-turn";
 const OPTIONS_INSTRUCTIONS = `你是世界线导演。每回合给出一个突发处境和恰好四个互斥抉择,供玩家点选。
 
 硬性要求:
-1. 每个选项都要填 impact(四维代价方向,只用 ↑↑ ↑ — ↓ ↓↓)和 forecast(在场每一方会站到哪一边)。玩家必须在点下去之前就看得出这笔交易划不划算,以及朝堂上会炸成什么样。
+1. 每个选项都要填 impact(四维代价方向,只用 ↑↑ ↑ - ↓ ↓↓)和 forecast(在场每一方会站到哪一边)。玩家必须在点下去之前就看得出这笔交易划不划算,以及朝堂上会炸成什么样。
 2. forecast 必须覆盖题目给出的全部在场角色,并且至少有一方是 doubt 或 oppose,不许所有人一致赞成。
 3. 四个选项的立场与代价差异要足够大,覆盖稳、险、赌三种风险,按 A/B/C/D 顺序排列。
 4. 至少有一个选项直面本回合处境,至少有一个是拆东墙补西墙。
@@ -115,7 +115,7 @@ ${lastTurn?.nextSituation ?? input.cast.setting.crisis}
 const JUDGE_INSTRUCTIONS = `你是冷酷公正的世界线裁决者。你只根据玩家决策与各方行动推演世界四维指标(政权稳定/军心士气/民众支持/战略资源)的单回合增量,写一段承上启下的旁白,记录真实发生的公开事件,并结算突发事件与最后通牒。
 
 规则:
-- 模型增量每项 -20 到 20,奖惩对称。但每回合至少要有一项指标的变化达到 8 以上——如果局势真的毫无波澜,那是你的推演失职,不是世界太平。
+- 模型增量每项 -20 到 20,奖惩对称。但每回合至少要有一项指标的变化达到 8 以上--如果局势真的毫无波澜,那是你的推演失职,不是世界太平。
 - 每个指标都必须给出具体原因;事件必须有来源、参与者和可观察后果;nextSituation 必须从本回合行动自然推导。
 - crisisOutcome:若上方存在未决突发事件,判断玩家这次抉择是否实质解决了它,填 resolved 或 unresolved;若本来就没有未决事件,一律填 unresolved。
 - newCrisis:仅当上方没有未决突发事件时才允许抛出;必须是会自己倒计时、有明确量化代价的新麻烦,deadline 由系统设定,你只填 title/summary/source/severity/penalty;否则返回 null。
@@ -158,7 +158,7 @@ ${describeRelations(input.relations)}
 此前已结算回合:
 ${summarizeTurnsForPrompt(input.history)}
 
-本回合玩家(${input.player.name},${input.player.identity})作出抉择:「${input.decision}」
+本回合玩家(${input.player.name},${input.player.identity})作出抉择:'${input.decision}'
 
 本回合各方第一轮表态:
 ${summarizeReactionsForPrompt(input.reactions)}
@@ -169,24 +169,24 @@ ${summarizeRetortsForPrompt(input.retorts)}
 请给出事件、四维增量、逐项变化原因、世界旁白、下一回合危机,并结算突发事件与最后通牒。若你认为局势已崩盘或大局已定,在 endingTitle/endingReason 中给出结局标题与理由(一句话),否则返回空字符串。`;
 
 const FINALE_VOICE_RULES = `写作纪律(每一条都必须遵守):
-- 除了楔子开头那一段旁白,通篇第一人称,用「我」指代自己;提到别人一律用他们的姓名与身份,绝对不许出现「玩家」「AI」「Agent」「系统」「选项」这类词。
+- 除了楔子开头那一段旁白,通篇第一人称,用'我'指代自己;提到别人一律用他们的姓名与身份,绝对不许出现'玩家''AI''Agent''系统''选项'这类词。
 - 只写推演记录里真实发生过的事。不许编造新的史实、新的人物、新的结局,人物只能用记录里出现过的名字。
 - 每一章都要落在具体场景里:谁站在哪里、说了哪句话、你有什么身体反应与心里翻覆。不许写成战报罗列。
-- 语言克制、具体、有体温,允许犹豫、自嘲与后悔。不许用「综上所述」「首先其次」「不难看出」这类腔调,也不许分点罗列。
+- 语言克制、具体、有体温,允许犹豫、自嘲与后悔。不许用'综上所述''首先其次''不难看出'这类腔调,也不许分点罗列。
 - 简体中文。`;
 
 const FINALE_PLAN_INSTRUCTIONS = (
   chapterCount: number,
-) => `你在替一位亲历者代笔,写成一篇发在知乎上的第一人称亲历故事——开头有楔子,然后分章往下讲。你先把楔子、卷目和判词定下来,正文会由你分章续写。
+) => `你在替一位亲历者代笔,写成一篇发在知乎上的第一人称亲历故事--开头有楔子,然后分章往下讲。你先把楔子、卷目和判词定下来,正文会由你分章续写。
 
 篇幅预算:楔子加正文合计 ${FINALE_TARGET_CHARS} 字左右。宁可写得准,不要写得多。
 
 三件事:
 1. 判决信息:verdictTitle(一句话标题)、verdictLine(一句话点评)、rating(S/A/B/C)、privateGoalVerdict(达成/部分达成/未达成)、privateGoalNote(一到两句依据)。私密目标的判定要严格,只根据记录里真实发生的事。
 2. 楔子(两拍合计约 ${FINALE_PROLOGUE_CHARS} 字):
-   prologue 是旁白。就像这个故事正要开场那样,先把时间、地点、正在发生的危机和当时的空气交代出来——天色、声音、谁的电话在响、屏幕上跳出了什么。旁白腔,克制、有画面,可以用「你」,但不许出现「我」。
-   selfIntro 紧接旁白换成第一人称:以「我是……」开头,交代自己是谁、什么身份、手里攥着什么、当时站在哪一边,再说明为什么隔了这么久才决定把这件事写下来。要把读者当成完全不知道这段历史的人来介绍,别写成履历。
-3. chapters(全部卷目):从序到跋,恰好 ${chapterCount} 章。每章给出 title 与 brief——brief 必须点明这一章写哪个场景、哪次交锋、谁说了哪句关键的话、你的心里怎么翻覆,要具体到能被直接扩写成 ${finaleChapterTargetFor(chapterCount)} 字上下。不许出现「叙述战况」「描写局势」这种空话。
+   prologue 是旁白。就像这个故事正要开场那样,先把时间、地点、正在发生的危机和当时的空气交代出来--天色、声音、谁的电话在响、屏幕上跳出了什么。旁白腔,克制、有画面,可以用'你',但不许出现'我'。
+   selfIntro 紧接旁白换成第一人称:以'我是……'开头,交代自己是谁、什么身份、手里攥着什么、当时站在哪一边,再说明为什么隔了这么久才决定把这件事写下来。要把读者当成完全不知道这段历史的人来介绍,别写成履历。
+3. chapters(全部卷目):从序到跋,恰好 ${chapterCount} 章。每章给出 title 与 brief--brief 必须点明这一章写哪个场景、哪次交锋、谁说了哪句关键的话、你的心里怎么翻覆,要具体到能被直接扩写成 ${finaleChapterTargetFor(chapterCount)} 字上下。不许出现'叙述战况''描写局势'这种空话。
 
 ${FINALE_VOICE_RULES}`;
 
@@ -282,8 +282,8 @@ function fail(error: string, detail?: string): ActionErr {
 
 /**
  * 入参校验失败的统一出口。
- * Server Action 的入参是 unknown,类型系统完全帮不上忙 —— 少传一个字段,只有运行时才知道,
- * 所以必须把「到底缺了哪个字段」直接说出来,别只丢一句「输入不完整」。
+ * Server Action 的入参是 unknown,类型系统完全帮不上忙 -- 少传一个字段,只有运行时才知道,
+ * 所以必须把'到底缺了哪个字段'直接说出来,别只丢一句'输入不完整'。
  */
 function failParse(what: string, error: z.ZodError): ActionErr {
   const issues = error.issues

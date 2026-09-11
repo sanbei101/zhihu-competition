@@ -112,12 +112,12 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   } | null>(null);
 
   // 舞台演出:每一拍排成一条队列,一次只演一拍,逐字说完才推进下一拍。
-  // 开场白也走同一套机制 —— 第一眼的观感不该还是「四条消息自己在下面打字」。
+  // 开场白也走同一套机制 -- 第一眼的观感不该还是'四条消息自己在下面打字'。
   const [playIndex, setPlayIndex] = useState(0);
   const [skipped, setSkipped] = useState(false);
   const [performance, setPerformance] = useState<"none" | "opening" | "turn">("none");
   const [openingStarted, setOpeningStarted] = useState(initial.turns.length > 0);
-  // 裁决先攥在手里,等演出收尾再提交 —— 否则裁决卡会在别人还在说话时弹出来
+  // 裁决先攥在手里,等演出收尾再提交 -- 否则裁决卡会在别人还在说话时弹出来
   const pendingVerdictRef = useRef<JudgeResult | null>(null);
   const [hasPendingVerdict, setHasPendingVerdict] = useState(false);
 
@@ -234,7 +234,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     ? "这条世界线已经收束,去终章看看它留下了什么。"
     : isTurnComplete
       ? "本轮已经裁决。看完下面的结果,再决定要不要往下走。"
-      : "该你下令了 —— 从下面的选项里挑一个。";
+      : "该你下令了 -- 从下面的选项里挑一个。";
 
   /**
    * 片头过场散场后自动开演序幕。已经有回合的存档不再重演。
@@ -410,7 +410,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     setHasPendingVerdict(true);
   }
 
-  /** 把裁决落进存档。只在演出收尾之后调用,所以它是「一幕」的最后一个动作。 */
+  /** 把裁决落进存档。只在演出收尾之后调用,所以它是'一幕'的最后一个动作。 */
   function commitJudgement(judged: JudgeResult) {
     // 找出这一回合新离心的人,单独提醒
     const newlyDefected = judged.relations.filter(
@@ -683,7 +683,7 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const stageSpeakerId = currentBeat?.speaker?.id ?? null;
   /** 交锋时站在对面的那个人 */
   const stageOpponentId = currentBeat?.against?.id ?? null;
-  /** 四条开场白只在「没在台上演」且片头已散场时才落进历史流,免得同一句话出现两次 */
+  /** 四条开场白只在'没在台上演'且片头已散场时才落进历史流,免得同一句话出现两次 */
   const showOpening = !showIntro && performance !== "opening";
 
   return (

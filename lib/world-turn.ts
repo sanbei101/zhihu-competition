@@ -4,7 +4,7 @@ import { worldCastSchema } from "@/lib/world-cast";
 
 /**
  * 本模块刻意不 import `world-ending`,避免循环依赖。
- * 关系 / 突发事件 / 通牒都以「已渲染好的文本摘要」形式传入,
+ * 关系 / 突发事件 / 通牒都以'已渲染好的文本摘要'形式传入,
  * 由 `world-ending` 侧的 `describeRelations` 等函数生成。
  */
 
@@ -15,7 +15,7 @@ const metricsPayloadSchema = z.object({
   resources: z.number().min(0).max(100),
 });
 
-/** 回合数不再设上限,由「大势熵增」保证收敛。 */
+/** 回合数不再设上限,由'大势熵增'保证收敛。 */
 export const worldTurnRequestSchema = z.object({
   cast: worldCastSchema,
   playerId: z.string(),

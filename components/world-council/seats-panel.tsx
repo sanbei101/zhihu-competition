@@ -37,7 +37,7 @@ interface SeatsPanelProps {
   ultimatum: WorldUltimatum | null;
   /** 台上正在发言的人(玩家的抉择也算):点亮他那一席,其余压暗 */
   speakingId?: string | null;
-  /** 交锋时站在他对面的那个人:给一圈红边,和「正在说话」区分开 */
+  /** 交锋时站在他对面的那个人:给一圈红边,和'正在说话'区分开 */
   opposingId?: string | null;
   skin: ScenarioSkin;
 }
@@ -262,7 +262,7 @@ export function SeatsPanel({
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">
-                        当前态度 · {attitudeLabels[attitude]}（信任 {trust}）
+                        当前态度 · {attitudeLabels[attitude]}(信任 {trust})
                       </p>
                       <p className="text-xs leading-5">{attitudeHints[attitude]}</p>
                     </div>

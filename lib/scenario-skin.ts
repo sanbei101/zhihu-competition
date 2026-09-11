@@ -7,7 +7,7 @@ import type { CSSProperties } from "react";
 export interface ScenarioSkin {
   id: string;
   name: string;
-  /** 氛围标签,如「白垩纪黄昏」 */
+  /** 氛围标签,如'白垩纪黄昏' */
   mood: string;
   bg: string;
   surface: string;

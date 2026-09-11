@@ -16,7 +16,7 @@ type Grid = string[];
 const CANVAS_W = 24;
 const CANVAS_H = 28;
 
-/** 各部件的落点。躯干最底行正好压在画布底边,人物才像「踩在同一条地平线」。 */
+/** 各部件的落点。躯干最底行正好压在画布底边,人物才像'踩在同一条地平线'。 */
 const HEAD_AT = { x: 8, y: 4 };
 const HAT_AT = { x: 5, y: 0 };
 const BEARD_AT = { x: 8, y: 9 };
@@ -298,7 +298,7 @@ function mix(a: string, b: string, t: number): string {
 /**
  * 立绘色板全部从皮肤的像素色演变而来,所以同一套立绘在 10 个主题下自动改色。
  * 肤色固定,只把它按皮肤暗部压暗一点做颊影与脖颈。
- * seed 用来给每个角色微调发色深浅 —— 不然同原型的两个人会像双胞胎。
+ * seed 用来给每个角色微调发色深浅 -- 不然同原型的两个人会像双胞胎。
  */
 export function portraitPaletteOf(skin: ScenarioSkin, seed = 0): Record<string, string> {
   const pixel = skin.pixel;
@@ -350,7 +350,7 @@ function hashOf(value: string): number {
   return Math.abs(hash);
 }
 
-/** 每个部件独立散列,避免「换了帽子就一定是换了衣服」这种成对出现的规律 */
+/** 每个部件独立散列,避免'换了帽子就一定是换了衣服'这种成对出现的规律 */
 function pick<T>(list: T[], key: string): T {
   return list[hashOf(key) % list.length];
 }
@@ -389,7 +389,7 @@ function strokeLine(
   }
 }
 
-/** 十字节点:世界线两端的「事件点」 */
+/** 十字节点:世界线两端的'事件点' */
 function markNode(grid: string[][], x: number, y: number, key: string) {
   const neighbours = [
     [0, 0],
@@ -409,8 +409,8 @@ function markNode(grid: string[][], x: number, y: number, key: string) {
 
 /**
  * 世界线导演的徽记:他不是人,所以没有立绘,给他一枚印章。
- * 深色外圈 + 主色盘面 + 一条从底部升起、到中间分成两岔的世界线 ——
- * 和界面里那个分叉图标是同一个隐喻,也就省掉了「导演长什么样」这个没法回答的问题。
+ * 深色外圈 + 主色盘面 + 一条从底部升起、到中间分成两岔的世界线 --
+ * 和界面里那个分叉图标是同一个隐喻,也就省掉了'导演长什么样'这个没法回答的问题。
  */
 export function directorEmblem(skin: ScenarioSkin): PortraitDef {
   const grid = makeCanvas();

@@ -24,14 +24,14 @@ export type StagePhase = "idle" | "performing" | "waiting" | "judging";
 export interface StageBeat {
   /** 每一拍唯一:换了这一拍,立绘与气泡都要重来 */
   key: string;
-  /** 说话的角色。导演不是人,他那一拍没有 speaker —— 只有 directorName */
+  /** 说话的角色。导演不是人,他那一拍没有 speaker -- 只有 directorName */
   speaker?: PortraitSubject;
   /** 导演登场:舞台上出徽记,标题用这个称呼 */
   directorName?: string;
   /** 他当场说的话 */
   speech: string;
   variant: "opening" | "decision" | "reaction" | "retort";
-  /** 开场那几条的由头,如「公开表态」 */
+  /** 开场那几条的由头,如'公开表态' */
   label?: string;
   stance?: AgentReaction["stance"];
   /** 第二轮交锋:站在他对面的人。有值就是两人同框 */
@@ -43,12 +43,12 @@ export interface StageBeat {
 }
 
 /**
- * 把「做了什么 / 冲着谁 / 后果」拼成一句旁白。
+ * 把'做了什么 / 冲着谁 / 后果'拼成一句旁白。
  * 这三个字段是数据,不是文案;直接摆成带标签的三行会像表单、把人从戏里拽出来,
- * 合成「他做了什么,冲着谁;结果如何」才像史笔。
+ * 合成'他做了什么,冲着谁;结果如何'才像史笔。
  */
 export function actionNoteOf(beat: StageBeat): string {
-  const clean = (value?: string) => value?.trim().replace(/[。;；、,]+$/, "") ?? "";
+  const clean = (value?: string) => value?.trim().replace(/[。;;、,]+$/, "") ?? "";
   const parts = [
     clean(beat.action),
     beat.target ? `冲着${clean(beat.target)}` : "",

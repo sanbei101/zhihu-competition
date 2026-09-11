@@ -12,11 +12,11 @@ export { ultimatumDraftSchema, type UltimatumDraft } from "@/lib/world-turn";
 
 // ==================== 局制常量 ====================
 
-/** 至少演满这么多回合,才解锁「主动收束」。 */
+/** 至少演满这么多回合,才解锁'主动收束'。 */
 export const MIN_ROUND_TO_CLOSE = 3;
 
 /**
- * 回合数没有上限,取而代之的是「大势熵增」:
+ * 回合数没有上限,取而代之的是'大势熵增':
  * 推演得越久,世界自我消耗得越快,逼着玩家在彻底崩盘前主动收束。
  */
 export const ENTROPY_PER_ROUND = 3;
@@ -313,7 +313,7 @@ export type FinaleRating = z.infer<typeof finaleRatingSchema>;
  * 单章目标不写死,而是由总预算与章数反算,保证不同章数下总长都落在三千字上下。
  */
 export const FINALE_TARGET_CHARS = 3000;
-/** 楔子(旁白 + 「我是谁」自我介绍)算在这一份预算里。 */
+/** 楔子(旁白 + '我是谁'自我介绍)算在这一份预算里。 */
 export const FINALE_PROLOGUE_CHARS = 450;
 export const FINALE_CHAPTER_MIN_CHARS = 400;
 export const FINALE_CHAPTER_MAX_CHARS = 1500;
@@ -334,9 +334,9 @@ export const finalePlanSchema = z.object({
   /** 玩家私密目标的达成情况 */
   privateGoalVerdict: z.enum(["达成", "部分达成", "未达成"]),
   privateGoalNote: z.string().min(1).max(400),
-  /** 楔子·旁白:像故事开场那样交代时间、地点与正在发生的危机,旁白腔,不出现「我」 */
+  /** 楔子·旁白:像故事开场那样交代时间、地点与正在发生的危机,旁白腔,不出现'我' */
   prologue: z.string().min(60).max(600),
-  /** 楔子·自述:紧接旁白转第一人称,以「我是」开头做自我介绍 */
+  /** 楔子·自述:紧接旁白转第一人称,以'我是'开头做自我介绍 */
   selfIntro: z.string().min(100).max(900),
   chapters: z
     .array(
@@ -481,7 +481,7 @@ export function entropyForRound(round: number): number {
 }
 
 /**
- * 熵增按「缺口越大、流失越快」的比例分摊到四维:
+ * 熵增按'缺口越大、流失越快'的比例分摊到四维:
  * 已经很低的那一维会更快见底,于是崩盘有征兆、收束有压力。
  */
 export function entropyDeltasForRound(metrics: WorldMetrics, round: number): MetricDeltas {
@@ -517,7 +517,7 @@ export function addDeltas(base: DeltaShape, ...extras: DeltaShape[]): AppliedDel
   };
 }
 
-/** 把「代价」转成负增量。 */
+/** 把'代价'转成负增量。 */
 export function penaltyAsDeltas(penalty: CrisisPenalty): AppliedDeltas {
   return {
     stability: -penalty.stability,
@@ -591,7 +591,7 @@ function collapseEnding(metrics: WorldMetrics): WorldEnding {
   return {
     type: "collapse",
     title: `${metricLabels[key]}归零,世界线崩断`,
-    reason: `四项指标中的「${metricLabels[key]}」已跌至 ${value},局势无法维持,进入崩盘结局。`,
+    reason: `四项指标中的'${metricLabels[key]}'已跌至 ${value},局势无法维持,进入崩盘结局。`,
   };
 }
 
@@ -620,7 +620,7 @@ export function endingForMetrics(metrics: WorldMetrics): WorldEnding {
     return {
       type: "pyrrhic",
       title: "惨胜收场,代价沉重",
-      reason: `世界均值 ${avg},「${metricLabels[min.key]}」仅剩 ${min.value},胜利名存实亡。`,
+      reason: `世界均值 ${avg},'${metricLabels[min.key]}'仅剩 ${min.value},胜利名存实亡。`,
     };
   }
   return collapseEnding(metrics);
@@ -649,7 +649,7 @@ export function checkEnding(metrics: WorldMetrics): WorldEnding | null {
   return null;
 }
 
-/** 玩家主动收束:结局档位由当时的四维决定,不再是固定的「开放式」。 */
+/** 玩家主动收束:结局档位由当时的四维决定,不再是固定的'开放式'。 */
 export function buildVoluntaryEnding(round: number, metrics: WorldMetrics): WorldEnding {
   const base = endingForMetrics(metrics);
   return {
@@ -774,9 +774,9 @@ export function summarizeTurnsForPrompt(turns: TurnRecord[], maxChars = 2200): s
         ? `;未决突发事件:${turn.crisis.title}(剩${turn.crisis.roundsLeft}回合)`
         : "";
       const ultimatum = turn.ultimatum
-        ? `;未决通牒:${turn.ultimatum.agentId} 要求「${turn.ultimatum.demand}」`
+        ? `;未决通牒:${turn.ultimatum.agentId} 要求'${turn.ultimatum.demand}'`
         : "";
-      return `第${turn.round}回合:玩家「${turn.decision}」;各方(${stances || "无回应"})${retorts};事件:${events};旁白:${turn.narration.slice(0, 140)};下引:${turn.nextSituation.slice(0, 100)}${trust}${crisis}${ultimatum}`;
+      return `第${turn.round}回合:玩家'${turn.decision}';各方(${stances || "无回应"})${retorts};事件:${events};旁白:${turn.narration.slice(0, 140)};下引:${turn.nextSituation.slice(0, 100)}${trust}${crisis}${ultimatum}`;
     })
     .join("\n");
 
@@ -811,7 +811,7 @@ export function describeRelations(relations: AgentRelation[]): string {
   return relations
     .map(
       (relation) =>
-        `- ${relation.agentId}:信任 ${relation.trust}/100,态度「${attitudeLabels[relation.attitude]}」(${attitudeHints[relation.attitude]})`,
+        `- ${relation.agentId}:信任 ${relation.trust}/100,态度'${attitudeLabels[relation.attitude]}'(${attitudeHints[relation.attitude]})`,
     )
     .join("\n");
 }

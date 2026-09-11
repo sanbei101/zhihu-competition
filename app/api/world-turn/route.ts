@@ -77,7 +77,7 @@ const buildAgentPrompt = (input: {
 }) =>
   `${input.environment}
 
-玩家是${input.player.name}(${input.player.identity}),刚刚作出抉择:「${input.decision}」
+玩家是${input.player.name}(${input.player.identity}),刚刚作出抉择:'${input.decision}'
 
 其他在场角色:
 ${input.cast.agentCharacters
@@ -108,9 +108,9 @@ const buildRetortPrompt = (input: {
 }) =>
   `${input.environment}
 
-上一刻你${input.character.name}当众说:「${input.ownLine}」
+上一刻你${input.character.name}当众说:'${input.ownLine}'
 
-现在,${input.opponent.name}(${input.opponent.identity})当着所有人的面回敬你:「${input.opponentLine}」
+现在,${input.opponent.name}(${input.opponent.identity})当着所有人的面回敬你:'${input.opponentLine}'
 
 轮到你当场回应。不要复述对方的整段话,直接掐住你不同意的那一句。`;
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** 定性代价提示:只给方向,不给确切数字,避免玩家把推演玩成算分。 */
-export const metricHintSchema = z.enum(["↑↑", "↑", "—", "↓", "↓↓"]);
+export const metricHintSchema = z.enum(["↑↑", "↑", "-", "↓", "↓↓"]);
 export type MetricHint = z.infer<typeof metricHintSchema>;
 
 export const impactHintSchema = z.object({
@@ -55,14 +55,14 @@ export function decisionTextOf(option: DecisionOption): string {
   return `${option.title}:${option.desc}`;
 }
 
-/** 内置的「按兵不动」选项:不是白给的安全牌,熵增会照常收账。 */
+/** 内置的'按兵不动'选项:不是白给的安全牌,熵增会照常收账。 */
 export function idleOptionFor(cast: { agentCharacters: { id: string }[] }): DecisionOption {
   return {
     id: "idle",
     title: "按兵不动",
     desc: "不下任何新命令,让各方先动。你能看清谁在替你扛事、谁在趁乱伸手,但局势不会停下来等你。",
     risk: "稳",
-    impact: { stability: "↓", morale: "↓", support: "—", resources: "↑" },
+    impact: { stability: "↓", morale: "↓", support: "-", resources: "↑" },
     forecast: cast.agentCharacters.map((character) => ({
       agentId: character.id,
       lean: "doubt" as const,
