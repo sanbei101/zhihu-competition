@@ -19,7 +19,7 @@ export const MIN_ROUND_TO_CLOSE = 3;
  * 回合数没有上限,取而代之的是'大势熵增':
  * 推演得越久,世界自我消耗得越快,逼着玩家在彻底崩盘前主动收束。
  */
-export const ENTROPY_PER_ROUND = 3;
+export const ENTROPY_PER_ROUND = 2;
 export const MAX_ENTROPY = 20;
 
 /** 信任度的初始值与上下限。 */
