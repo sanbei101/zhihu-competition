@@ -2,22 +2,23 @@ import { generateStructured } from "@/lib/deepseek";
 import {
   ADJUDICATION_INSTRUCTIONS,
   ENTITY_INSTRUCTIONS,
-  OBSERVATION_INSTRUCTIONS,
   SEED_INSTRUCTIONS,
   buildAdjudicationPrompt,
   buildEntityPrompt,
-  buildObservationPrompt,
   buildSeedPrompt,
 } from "@/lib/prompts";
 import { getScenarioProfile } from "@/lib/scenario-profiles";
-import type { EntitySimulationReport, WorldSeed, WorldSimSession } from "@/lib/world-sim";
+import type {
+  EntitySimulationReport,
+  PlayerDirective,
+  WorldSeed,
+  WorldSimSession,
+} from "@/lib/world-sim";
 import {
   adjudicationSchema,
   entityReportDraftSchema,
-  observationOptionsSchema,
   seedGenerationSchema,
   type Adjudication,
-  type ObservationOptions,
   type WorldSimulateEvent,
 } from "@/lib/world-sim-events";
 import {
@@ -40,7 +41,8 @@ import {
  *                      关系互为指向,一次调用才能保证内部一致;拆开必然互相不知道对方存在。
  *   2. simulateEraStream  每个主体一次并行调用,互不可见;全部回收后才交裁决器合并。
  *                      这是真正需要并行的部分,也是"多智能体"的实际含义。
- *   3. adjudicate      一次调用完成 plan §6.4 的合并裁定,产出快照与自然分叉。
+ *   3. adjudicate      一次调用完成 plan §6.4 的合并裁定:产出快照、自然分叉,
+ *                      以及每个事件上"玩家可以取舍的节点"。
  */
 
 // ==================== 1. 世界种子 ====================
@@ -158,6 +160,8 @@ export async function adjudicate(input: {
   reports: EntitySimulationReport[];
   followedEntityId?: string;
   forkChoiceNote?: string;
+  /** 玩家上一阶段在事件卡上的取舍。它已是条件,不是提议 */
+  directives?: PlayerDirective[];
   signal?: AbortSignal;
 }): Promise<Adjudication> {
   const result = await generateStructured({
@@ -167,6 +171,7 @@ export async function adjudicate(input: {
       reports: input.reports,
       ...(input.followedEntityId ? { followedEntityId: input.followedEntityId } : {}),
       ...(input.forkChoiceNote ? { forkChoiceNote: input.forkChoiceNote } : {}),
+      ...(input.directives?.length ? { directives: input.directives } : {}),
     }),
     schema: adjudicationSchema,
     temperature: 0.75,
@@ -205,6 +210,7 @@ export function activeForkNote(session: WorldSimSession): string | undefined {
 export async function* simulateEraStream(input: {
   session: WorldSimSession;
   followedEntityId?: string;
+  directives?: PlayerDirective[];
   signal?: AbortSignal;
 }): AsyncGenerator<WorldSimulateEvent> {
   const { session } = input;
@@ -275,6 +281,7 @@ export async function* simulateEraStream(input: {
       reports,
       ...(input.followedEntityId ? { followedEntityId: input.followedEntityId } : {}),
       ...(note ? { forkChoiceNote: note } : {}),
+      ...(input.directives?.length ? { directives: input.directives } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   } catch (error) {
@@ -286,7 +293,16 @@ export async function* simulateEraStream(input: {
     return;
   }
 
-  const { session: next, snapshot, fork } = applyAdjudication({ session, reports, adjudication });
+  const {
+    session: next,
+    snapshot,
+    fork,
+  } = applyAdjudication({
+    session,
+    reports,
+    adjudication,
+    ...(input.directives?.length ? { directives: input.directives } : {}),
+  });
 
   for (const event of snapshot.events) yield { type: "world-event", event };
   for (const chain of snapshot.causalChains) yield { type: "causal-chain", chain };
@@ -302,6 +318,7 @@ export async function simulateEraOnce(
   input: {
     session: WorldSimSession;
     followedEntityId?: string;
+    directives?: PlayerDirective[];
     signal?: AbortSignal;
   },
   onEvent?: (event: WorldSimulateEvent) => void,
@@ -317,97 +334,4 @@ export async function simulateEraOnce(
 
   if (!finalSession) throw new Error(lastError ?? "推演未能完成");
   return finalSession;
-}
-
-// ==================== 5. 观测选项 ====================
-
-/** 未决分叉是硬约束:它必须出现在选项里,否则玩家会卡在无法推进的状态 */
-function buildFallbackObservations(session: WorldSimSession): ObservationOptions {
-  const pendingFork = session.forks.find((fork) => !fork.selectedAlternativeId);
-  const latest = session.snapshots.at(-1) ?? null;
-  const changed = session.state.entities.find((entity) => entity.changedThisEra);
-
-  const options: ObservationOptions["options"] = [
-    ...(pendingFork
-      ? [
-          {
-            id: "choose-fork",
-            label: `决定「${pendingFork.title}」`,
-            hint: "历史停在岔口上,先选一条继续观察,否则时间无法往前。",
-            kind: "choose-fork" as const,
-            targetId: pendingFork.id,
-          },
-        ]
-      : []),
-    {
-      id: "advance-era",
-      label: `推进到纪元 ${session.state.currentEra + 1}`,
-      hint: "所有主体按各自目标自主行动一个阶段,再由世界裁决合并冲突。",
-      kind: "advance-era" as const,
-    },
-    ...(changed
-      ? [
-          {
-            id: `follow-${changed.id}`,
-            label: `追踪 ${changed.name}`,
-            hint: `${changed.name} 正处于变化之中,展开它的完整决策链。`,
-            kind: "follow-entity" as const,
-            targetId: changed.id,
-          },
-        ]
-      : []),
-    ...(latest?.events[0]
-      ? [
-          {
-            id: `inspect-${latest.events[0].id}`,
-            label: `查看「${latest.events[0].title}」`,
-            hint: "看清这件事是怎么从各个主体的行动里长出来的。",
-            kind: "inspect-event" as const,
-            targetId: latest.events[0].id,
-          },
-        ]
-      : []),
-  ];
-
-  return { options: options.slice(0, 4) };
-}
-
-/** 模型漏掉分叉选项时补上,并保证总数不超过 4 */
-function ensureForkOption(
-  options: ObservationOptions,
-  fallback: ObservationOptions,
-): ObservationOptions {
-  const forkOption = fallback.options.find((option) => option.kind === "choose-fork");
-  if (!forkOption) return { options: options.options.slice(0, 4) };
-  if (options.options.some((option) => option.kind === "choose-fork")) {
-    return { options: options.options.slice(0, 4) };
-  }
-  const trimmed = options.options.filter((option) => option.kind !== "advance-era").slice(0, 3);
-  return { options: [forkOption, ...trimmed] };
-}
-
-export async function generateObservations(input: {
-  session: WorldSimSession;
-  followedEntityId?: string;
-  signal?: AbortSignal;
-}): Promise<ObservationOptions> {
-  const fallback = buildFallbackObservations(input.session);
-
-  try {
-    const result = await generateStructured({
-      instructions: OBSERVATION_INSTRUCTIONS,
-      prompt: buildObservationPrompt({
-        session: input.session,
-        ...(input.followedEntityId ? { followedEntityId: input.followedEntityId } : {}),
-      }),
-      schema: observationOptionsSchema,
-      temperature: 0.7,
-      maxOutputTokens: 1200,
-      abortSignal: input.signal,
-    });
-    return ensureForkOption(observationOptionsSchema.parse(result), fallback);
-  } catch (error) {
-    console.error("观测选项生成失败,使用确定性兜底", error);
-    return fallback;
-  }
 }

@@ -3,13 +3,17 @@
  *
  * 对应 plan.md §6.4:把若干互相冲突的主体提议合并成唯一历史。
  *
- * 十一步的顺序是有意为之:先定时间跨度,再验硬约束,再判胜负,
+ * 十三个步骤的顺序是有意为之:先定时间跨度,再验硬约束,再判胜负,
  * 最后才写结论。顺序反过来(先想好结局再补理由)会让推演退化成编剧。
+ *
+ * 第六、七步是这个版本新增的:裁决器现在不只写"发生了什么",
+ * 还要挑出"这件事上玩家可以在哪几条路之间取舍"。
+ * 世界依然是自主的 —— 选项不是改写权,而是让玩家替世界坍缩一次。
  */
 
-import type { EntitySimulationReport, WorldSimSession } from "@/lib/world-sim";
+import type { EntitySimulationReport, PlayerDirective, WorldSimSession } from "@/lib/world-sim";
 
-import { WORLD_DISCIPLINE } from "./shared";
+import { WITNESS_VOICE, WORLD_DISCIPLINE } from "./shared";
 
 export const ADJUDICATION_INSTRUCTIONS = `你是这个世界的历史裁决者。若干主体刚刚各自提交了它们想做的事,现在由你决定真实历史走向哪里。
 
@@ -46,42 +50,96 @@ timeAfter 要给出一对**确实在移动**的时间:
 自然过程(灾荒、天象、生态突变)可以用 scope="natural",但也要把它归到受影响的主体上,不允许出现无主事件。
 严重度要克制:critical 只能给真正改写格局的事,不要把每件事都写成危急。
 
-第六步 推导连锁后果
+每条事件都要配一句见证者的评述,填进 narrator:
+- speaker 填【见证者】里的名字,line 是它对这件事的反应。
+- 它只评述已经发生的事,不预告结局,不替玩家做决定。
+- 它是这件事的"人味",不是这件事的"总结"。宁可写一句偏心的、片面的、带情绪的话。
+
+第六步 为事件挑出可干预点
+这是本次裁决里最重要的一步:不是每条事件都值得发牌,请只挑那些**玩家真的能取舍、
+且两条路都站得住**的事件,给它们配 choices。
+
+- 一个阶段应该有 **2 到 4 条**事件带 choices。这是硬性期望,不是"可以为零"的建议:
+  零条意味着玩家在这个阶段什么都做不了,整次裁决会退化成一段不能互动的旁白 ——
+  这是最失败的一种输出。哪怕局势再平淡,也总有"顺着它走还是拧着它走"的区别。
+  反过来超过 4 条就是堆内容了,玩家会在第三张牌之后开始闭眼点。
+  其余事件不要填 choices,让它们作为叙事留在 conclusion 里就好。
+- 每条带 choices 的事件给 **2-3 个**选项:
+  - label:四到六字的动作,如"乘胜再压""屯田待春""遣使许昌"。不要写"选择A"这类占位符。
+  - hint:一句话说清代价与收益,要让玩家能凭它做决定。不要写"这样做有好处"这种空话。
+  - tone:bold(进取)/ cautious(持重)/ cunning(权变)/ mercy(怀柔)。
+  - effects:对全局指标的**量级提示**,2-4 条,metricId 必须来自【当前全局指标】。
+    这只是给玩家看的预估,**不是承诺** —— 真正的后果由下一阶段的裁决在合并全部主体行动之后给出。
+    所以数值要克制,不要让它看起来像必然后果。
+- **最关键的一条:选项之间不能有明显更优的那个。**
+  如果其中一个在所有方面都更好,那就不是取舍,是提示。两条路必须各自有代价,
+  而且都得是对**当时局势**的合理反应 —— 玩家不是上帝,他只是在世界本来就站得住的路之间替它选一次。
+- 如果一件事只有一个合理走向,就不要给它配 choices。那是世界的事,不是玩家的选择。
+
+第七步 安排特殊事件
+大多数事件是世界按部就班走出来的。特殊事件是三类"不按部就班"的东西,
+用来打破推演的自我重复。一个阶段**最多一条**,大多数阶段应该是零条。宁缺毋滥。
+
+在事件的 special 字段里填 crisis / echo / anomaly 之一:
+
+- crisis(危机):硬约束被逼到边缘,整个世界的存续受到威胁。
+  选项的代价必须都很高,不允许有"轻松的解法"。例:豫州蝗灾、粮道被切断、恒星耀斑、生态链断裂。
+  只在严重度确实是 critical 的时候用它。
+
+- echo(回响):玩家早先某次取舍在远处结出的果。
+  这条**必须回指**那一次具体的选择 —— 在 summary 里说清"当初那件事"与"现在这件事"的联系,
+  在 narrator 里让见证者点破它。它让玩家看到自己的选择真的有后果,
+  这是整个玩法里最重要的一次反馈。
+  只有在【观测者此前的取舍】里确实有可回指的选择时才用它,没有就别硬编。
+
+- anomaly(异象):规则之外的东西闯进来,引入一个此前不存在的变量。
+  它必须仍然符合世界的硬约束,只是超出了所有人的预期。例:一件不该出现在这个时代的造物、
+  一个不属于这个生态的物种、一段谁都读不懂的信号。
+  不要用它来作弊式地解决僵局 —— 异象应该让局势更复杂,不是更简单。
+
+填了 special 的事件,severity 至少是 severe,并且**必须有 2-3 个 choices** ——
+特殊事件就是一张特殊的牌,它不能只是一段叙述。
+
+第八步 推导连锁后果
 至少给出一条跨主体的因果链。一条链把若干主体和事件串成"因 -> 果 -> 再因此"的序列。
 链条的价值在于展示"这不是几个人在开会",而是世界的某处变化如何传导到另一处。
 每一条 cause 与 effect 都必须是具体的行动或状态,不要写"局势恶化"这种没有信息量的句子。
 
-第七步 裁定各主体状态
+第九步 裁定各主体状态
 给每个提交了行动的主体一个结算:它成功了还是失败了,它的内部指标怎么变,它与谁的关系怎么变。
 metricShifts 的绝对值通常不超过 15;单个阶段里同一个主体不要所有指标一起大幅上涨。
 status 是一句状态词,如"扩张中""拖延编户""濒临崩溃",要能一眼看出它现在的处境。
 
-第八步 裁定全局指标
+第十步 裁定全局指标
 metricDeltas 的绝对值通常不超过 12,除非发生了改写格局的重大事件。每一个变化都要给出 reason。
 好的推演是:指标变化不大,但方向明确且能追溯到具体事件。
 
-第九步 判断是否需要分叉
+第十一步 判断是否需要分叉
 只有在**重大且无法调和**的冲突下才开分叉:两条路都站得住脚,且走下去会得到完全不同的世界。
 如果只是胜负已定、或者只是暂时的战术选择,就不要开分叉,fork 填 null。
 分叉给 2-3 个候选,每个候选要有 title、premise(这条路具体怎么走)、drivers(为什么会有人选它)、expectedEffects(走下去会怎样)、plausibility。
 
-第十步 写阶段结论
+第十二步 写阶段结论
 conclusion 要能用一句话解释这一段历史,并且点出**代价**:谁得到了什么,谁为此付出了什么。
 不要写"最终实现了和平与繁荣"这种没有张力的总结。
 
-第十一步 判断收敛
+第十三步 判断收敛
 如果这个世界的核心矛盾已经解决、或者已经无可挽回地崩坏,stabilized 填 true,表示可以收尾。
 
 全局纪律:
 ${WORLD_DISCIPLINE}
 - 不要引入任何主体没有能力做到的事。世界的资源只有主体清单里那些。
-- 不要为了戏剧性让弱者突然获胜。如果它赢了,你要在 reason 里说清是什么客观条件允许了它。`;
+- 不要为了戏剧性让弱者突然获胜。如果它赢了,你要在 reason 里说清是什么客观条件允许了它。
+
+${WITNESS_VOICE}`;
 
 export function buildAdjudicationPrompt(input: {
   session: WorldSimSession;
   reports: EntitySimulationReport[];
   followedEntityId?: string;
   forkChoiceNote?: string;
+  /** 玩家上一阶段在事件卡上做的取舍。它已经成为条件,不是提议 */
+  directives?: PlayerDirective[];
 }): string {
   const { session, reports } = input;
   const { seed, state } = session;
@@ -139,16 +197,48 @@ ${report.actions.map((action) => `    - ${action}`).join("\n")}
     return `\n【历史刚刚在分叉点上做出的选择】${input.forkChoiceNote}\n所有主体接下来都必须在这一新的前提下行动,请把它的影响体现在本阶段的裁决里。\n`;
   })();
 
+  /**
+   * 玩家的取舍块。
+   *
+   * 这是这套玩法成立的关键:玩家做的事情必须真的在后面回来,
+   * 否则"选择"就只是装饰。所以这一段要写得很硬 —— 它是条件,不是建议。
+   */
+  const directiveBlock = (() => {
+    const list = input.directives ?? [];
+    if (!list.length) return "";
+
+    const lines = list
+      .map(
+        (item, index) =>
+          `${index + 1}. 在「${item.cardTitle}」上,观测者选了「${item.choiceLabel}」—— ${item.note}`,
+      )
+      .join("\n");
+
+    const hasEarlier = session.directives.length > 0;
+
+    return `\n【观测者此前的取舍】
+观测者不是上帝,他没有改写任何已经发生的事。但他在几个节点上替世界做了一次坍缩。
+下面这些取舍**已经是既成事实**,请当作本阶段的既有条件来处理 —— 它们的影响应该体现在
+主体的行动空间、事件的走向与指标的变化里:
+
+${lines}
+
+${hasEarlier ? "在这场推演更早的阶段,观测者还做过别的取舍。如果本阶段适合安排 echo(回响),优先从这些取舍里挑一条来回收。\n" : ""}`;
+  })();
+
   return `【反事实前提】${seed.premise.statement}
 分岔点:${seed.premise.divergencePoint}
+
+【见证者】${seed.witness.name} —— ${seed.witness.role}
+本阶段每条事件的 narrator.speaker 都必须填「${seed.witness.name}」。
 
 【世界硬约束 — 违背者一律判定失败】
 ${rulesBlock}
 
 【当前时间】
-纪元 ${state.currentEra} · ${state.globalMetrics.length ? "" : ""}起点:${seed.startTime.label}(${seed.startTime.elapsed})
+纪元 ${state.currentEra} · 起点:${seed.startTime.label}(${seed.startTime.elapsed})
 当前主线:${session.branches.find((branch) => branch.id === state.currentBranchId)?.label ?? "主线"}
-${forkBlock}
+${forkBlock}${directiveBlock}
 【当前全局指标】
 ${metricsBlock}
 
@@ -165,7 +255,12 @@ ${reportsBlock || "(没有任何主体提交行动,请裁定世界缓慢自然�
 现在请你裁决这一阶段的历史。
 填满 schema:timeAfter(只需要 label 与 elapsed,era 由系统递增)、spanLabel、events、causalChains、conclusion、metricDeltas、entityUpdates、fork(没有分叉就填 null)、stabilized。
 
-event 的 actorEntityIds、causalChain 的 entityId、entityUpdates 的 entityId 都必须使用上面出现过的 id。
+事件请按第五、六、七步填写 —— 每条事件都要有 narrator;
+值得取舍的事件配 2-3 个 choices(整个阶段最多 4 条这样的事件);
+如果这个阶段确实适合,给最多一条事件填上 special(crisis / echo / anomaly)。
+
+event 的 actorEntityIds、causalChain 的 entityId、entityUpdates 的 entityId、
+choices[].effects[].metricId 都必须使用上面出现过的 id。
 ${input.followedEntityId ? `\n【观测者关注】观测者正在追踪 id=${input.followedEntityId} 的主体,请在 entityUpdates 里确保包含它,并让它的结算比别的更具体。` : ""}
 
 只输出本阶段的结果,不要重述主体提议,不要写任何额外解释。`;

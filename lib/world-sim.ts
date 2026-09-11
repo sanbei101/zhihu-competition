@@ -1,12 +1,17 @@
 /**
- * World Simulation v2 的世界模型。
+ * World Simulation v3 的世界模型。
  *
  * 与旧的 world-cast 不同:这里不再有"角色"这个概念。
  * 世界主体(WorldEntity)可以是政权、生态、物种、技术、AI、行星系统 --
- * 它们都有目标、能力、约束和指标,由独立 Agent 推演,玩家只负责观测和推进时间。
+ * 它们都有目标、能力、约束和指标,由独立 Agent 推演。
  *
- * 本文件同时承载 UI demo 的静态数据结构:第一版界面不依赖后端,
- * 但字段命名严格对齐 plan.md §5,后续接入 /api/world-seed 时可直接替换数据源。
+ * 玩家是观察者,不是上帝:世界自主演化,玩家能做的只有两件事 --
+ *   1. 推进时间,看世界自己发出什么牌
+ *   2. 在世界本来就站得住的几条路之间替它坍缩一次(EventChoice)
+ * 玩家的取舍不改写已发生的事,而是成为下一阶段的既有条件(PlayerDirective)。
+ *
+ * 见证者(WorldWitness)是唯一有温度的东西:它站在卡牌旁边替玩家解说,
+ * 可以有情绪、有立场,但说不错事实。
  */
 
 /** 模拟模式:决定世界如何演化,以及会出现哪些主体 */
@@ -174,6 +179,57 @@ export interface GlobalMetric {
   delta?: number;
 }
 
+/**
+ * 可干预点:事件卡上的一个选项。
+ *
+ * 世界是自主的,玩家的取舍不是"改写世界",而是在世界本来就站得住的几条路
+ * 之间替它坍缩一次。所以每个选项都必须等价成立,不能有"明显更优"的那一个。
+ */
+export interface EventChoice {
+  id: string;
+  /** 选项名,四到六字,直接写动作 */
+  label: string;
+  /** 一句话说清这个选择的代价与收益 */
+  hint: string;
+  /** 倾向。决定卡面上的图标与语气,不参与数值结算 */
+  tone: "bold" | "cautious" | "cunning" | "mercy";
+  /**
+   * 预估影响。**这只是给玩家看的量级提示**,不是承诺 ——
+   * 真正的后果由下一阶段的裁决在合并全部主体行动之后给出。
+   */
+  effects: { metricId: string; delta: number }[];
+}
+
+export const eventChoiceToneLabels: Record<EventChoice["tone"], string> = {
+  bold: "进取",
+  cautious: "持重",
+  cunning: "权变",
+  mercy: "怀柔",
+};
+
+/** 见证者的一句评述。它是"人味"的来源,不是事实来源 */
+export interface WitnessLine {
+  /** 说话者自称,与种子里的见证者一致 */
+  speaker: string;
+  line: string;
+}
+
+/**
+ * 特殊事件。普通事件是世界按部就班走出来的结果,
+ * 特殊事件是三类"不按部就班"的东西:
+ *
+ *   crisis  危机 —— 硬约束被逼到边缘,世界级的威胁,选项代价都很高
+ *   echo    回响 —— 玩家早先某次取舍在远处结出的果,必须回指那一次选择
+ *   anomaly 异象 —— 规则之外的东西闯进来,用来打破世界的自我重复
+ */
+export type SpecialEventKind = "crisis" | "echo" | "anomaly";
+
+export const specialEventLabels: Record<SpecialEventKind, string> = {
+  crisis: "危机",
+  echo: "回响",
+  anomaly: "异象",
+};
+
 /** 世界事件:由主体行动合并冲突后产生的全球级变化 */
 export interface WorldEvent {
   id: string;
@@ -187,6 +243,12 @@ export interface WorldEvent {
   /** 触发它的主体 */
   actorEntityIds: string[];
   summary: string;
+  /** 这件事上玩家可以取舍的节点。为空则是纯叙事事件,不单独发一张牌 */
+  choices?: EventChoice[];
+  /** 见证者对这件事的一句评述 */
+  narrator?: WitnessLine;
+  /** 特殊事件标记。普通事件不填 */
+  special?: SpecialEventKind;
 }
 
 export const eventSeverityLabels: Record<WorldEvent["severity"], string> = {
@@ -202,6 +264,46 @@ export const eventScopeLabels: Record<WorldEvent["scope"], string> = {
   entity: "主体内部",
   natural: "自然过程",
 };
+
+/**
+ * 见证者的像素原型。
+ *
+ * 刻意与 themeId 一一映射、而不是让模型自己挑 ——
+ * 三国世界里站出一只恐龙会让整套视觉立刻垮掉。
+ * 模型只负责给这位见证者起名字、写身份和台词。
+ */
+export type WitnessArchetype =
+  | "human"
+  | "dinosaur"
+  | "alien"
+  | "machine"
+  | "astronaut"
+  | "microbe"
+  | "survivor";
+
+export const witnessArchetypeLabels: Record<WitnessArchetype, string> = {
+  human: "人",
+  dinosaur: "恐龙",
+  alien: "外星来客",
+  machine: "机器",
+  astronaut: "宇航员",
+  microbe: "菌落",
+  survivor: "幸存者",
+};
+
+/**
+ * 世界见证者:站在卡牌旁边说话的那个像素角色。
+ *
+ * 它不是主体(WorldEntity),也不是玩家。它是"陪着你看完这条世界线的人" ——
+ * 所以它可以有情绪、有立场、有私心,而主体不能。
+ */
+export interface WorldWitness {
+  name: string;
+  /** 它是谁、为什么能看见这一切,一句话 */
+  role: string;
+  /** 世界刚开始时它说的第一句话 */
+  openingLine: string;
+}
 
 /**
  * 跨主体因果链。这是"不是几个人在聊天"的关键证据:
@@ -256,6 +358,8 @@ export interface EraSnapshot {
   conclusion: string;
   /** 本阶段各全局指标的变化 */
   metricDeltas: { metricId: string; delta: number; reason: string }[];
+  /** 裁决器判定这个世界已经收敛(矛盾解决或彻底崩坏),UI 据此发出结算卡 */
+  stabilized?: boolean;
 }
 
 /** 自然分叉的一个候选未来 */
@@ -298,16 +402,6 @@ export interface WorldBranch {
   summary: string;
 }
 
-/** 玩家的观测操作。第一版只有四种,不提供自由改写 */
-export type ObservationAction = "advance-era" | "follow-entity" | "inspect-event" | "choose-fork";
-
-export const observationActionLabels: Record<ObservationAction, string> = {
-  "advance-era": "推进时代",
-  "follow-entity": "追踪主体",
-  "inspect-event": "查看因果",
-  "choose-fork": "选择分支",
-};
-
 /** 世界种子:一次模拟的全部初始条件 */
 export interface WorldSeed {
   scenarioId: string;
@@ -318,10 +412,29 @@ export interface WorldSeed {
   premise: CounterfactualPremise;
   startTime: TimeState;
   timeScale: TimeScale;
+  /** 站在卡牌旁边解说的那个人 */
+  witness: WorldWitness;
   hardRules: HardRule[];
   entities: WorldEntity[];
   globalMetrics: GlobalMetric[];
   initialEvents: WorldEvent[];
+}
+
+/**
+ * 玩家在事件卡上做出的取舍。
+ *
+ * 它不改写已经发生的事 —— 它是"下一阶段的前提":主体 Agent 与裁决器都会看到它,
+ * 于是玩家的一次取舍会在后面几个阶段里以因果的形式回来。
+ * 这就是"观察者"与"上帝"的区别。
+ */
+export interface PlayerDirective {
+  /** 做出取舍的那张牌 */
+  cardId: string;
+  cardTitle: string;
+  choiceId: string;
+  choiceLabel: string;
+  /** 取舍的语义,喂给下一阶段的裁决 */
+  note: string;
 }
 
 /** 当前世界状态指针。只是"主线到哪儿了",不是历史本身 */
@@ -334,9 +447,9 @@ export interface WorldState {
   latestSnapshotId: string;
 }
 
-/** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 */
+/** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 + 玩家取舍 */
 export interface WorldSimSession {
-  version: 2;
+  version: 3;
   scenarioId: string;
   scenarioTitle: string;
   scenarioUrl: string;
@@ -345,9 +458,11 @@ export interface WorldSimSession {
   forks: WorldFork[];
   branches: WorldBranch[];
   state: WorldState;
+  /** 玩家在事件卡上做过的全部取舍,按时间顺序。下一阶段会把它送给裁决器 */
+  directives: PlayerDirective[];
 }
 
-/** 存档 key。v2 世界制会话的本地存档位置 */
+/** 存档 key。v3 牌局式会话的本地存档位置 */
 export function worldSimStorageKey(scenarioId: string) {
   return `world-sim:${scenarioId}`;
 }

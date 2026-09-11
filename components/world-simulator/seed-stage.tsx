@@ -1,196 +1,182 @@
 "use client";
 
-import { LoaderCircle, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, RotateCcw } from "lucide-react";
 
 import { EntityEmblem } from "@/components/pixel/entity-emblem-view";
+import { StageBackdrop } from "@/components/pixel/theme-stage";
+import { witnessArchetypeFor } from "@/components/pixel/witness";
+import { WitnessFigure } from "@/components/pixel/witness-figure";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { seedProgressPercent } from "@/components/world-simulator/progress";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import {
-  hardRuleScopeLabels,
   timeScaleLabels,
   type CounterfactualPremise,
   type GlobalMetric,
   type HardRule,
   type TimeScale,
   type TimeState,
+  type WitnessLine,
   type WorldEntity,
 } from "@/lib/world-sim";
 
 /**
- * 世界构建中。
+ * 世界成形中。
  *
- * 这是 /api/world-seed 流式事件的可视化:前提先落地,再是硬约束,
- * 然后主体一个接一个站到舞台上,最后指标与初始事件补齐。
+ * 顺序是刻意的:见证者先出场,世界再从他身后长出来。
+ * 反过来(先看一堆数据,最后冒出来一个人)就完全没有"有人陪着你"的感觉了。
  *
- * 之所以专门做这个界面:直接甩一个转圈,玩家会以为程序卡死;
- * 而把"世界怎么被推出来"的过程本身演出来,正好是这个作品要卖的东西。
+ * 这一屏只活几秒,但它决定了玩家对整局的第一印象,所以它值得有一个自己的像素舞台。
  */
 export function SeedStage({
   skin,
   themeName,
+  themeId,
   phase,
+  witness,
   premise,
   startTime,
   timeScale,
   hardRules,
   entities,
-  announcedIds,
   globalMetrics,
   error,
   onRetry,
 }: {
   skin: ScenarioSkin;
   themeName: string;
+  themeId: string;
   phase: "connecting" | "building" | "error";
+  witness: WitnessLine | null;
   premise: CounterfactualPremise | null;
   startTime: TimeState | null;
   timeScale: TimeScale | null;
   hardRules: HardRule[];
   entities: WorldEntity[];
-  announcedIds: string[];
   globalMetrics: GlobalMetric[];
   error: string;
   onRetry: () => void;
 }) {
   const percent = seedProgressPercent({ premise, hardRules, entities, globalMetrics });
+  const archetype = witnessArchetypeFor(themeId);
 
   return (
-    <Card className="shadow-none">
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{skin.name}</Badge>
-          <Badge variant="outline">{themeName}</Badge>
-          {phase === "error" ? (
-            <Badge variant="destructive">构建中断</Badge>
+    <section className="relative min-h-[32rem] overflow-hidden rounded-lg border">
+      <StageBackdrop skin={skin} />
+
+      <div className="relative flex min-h-[32rem] flex-col items-center justify-center gap-8 px-6 py-12">
+        {/* 见证者先出场 */}
+        <div className="flex flex-col items-center gap-4">
+          <WitnessFigure
+            archetype={archetype}
+            skin={skin}
+            label={witness?.speaker ?? "见证者"}
+            speaking={Boolean(witness)}
+            scale={6}
+          />
+
+          {witness ? (
+            <div className="max-w-md text-center">
+              <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+                {witness.speaker}
+              </p>
+              <p className="mt-2 text-sm leading-7">{witness.line}</p>
+            </div>
           ) : (
-            <Badge>
-              <LoaderCircle className="animate-spin" data-icon="inline-start" />
-              {phase === "connecting" ? "正在接入推演引擎" : "正在构建世界"}
-            </Badge>
+            <p className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="size-3.5 animate-spin" />
+              正在找一个能替你看住这条世界线的人
+            </p>
           )}
         </div>
-        <CardTitle className="pt-3 text-xl">世界线正在成形</CardTitle>
-        <CardDescription>
-          反事实前提先被钉死,随后硬约束落地,各主体依次登场。任何一条都不可违背。
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* 反事实前提 */}
-        <section className="space-y-2">
-          <p className="text-muted-foreground text-xs">反事实前提</p>
-          {premise ? (
-            <>
-              <p className="text-sm leading-6">{premise.statement}</p>
-              <p className="text-muted-foreground text-xs">分岔点 · {premise.divergencePoint}</p>
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {premise.affectedDomains.map((domain) => (
-                  <Badge key={domain} variant="outline">
-                    {domain}
-                  </Badge>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">正在推导唯一被改动的那个条件……</p>
-          )}
-        </section>
 
-        {startTime && timeScale ? (
-          <>
-            <Separator />
-            <section className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground text-xs">起算</span>
-              <Badge variant="outline">{startTime.label}</Badge>
-              <span className="text-muted-foreground text-xs">{startTime.elapsed}</span>
-              <Badge variant="secondary">默认尺度 · {timeScaleLabels[timeScale]}</Badge>
-            </section>
-          </>
-        ) : null}
+        {/* 世界正在从他身后成形 */}
+        <Card className="w-full max-w-xl shadow-none">
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-center justify-between gap-3">
+              <Badge variant="secondary">{themeName}</Badge>
+              {timeScale ? (
+                <span className="text-muted-foreground font-mono text-[11px]">
+                  时间尺度 · {timeScaleLabels[timeScale]}
+                </span>
+              ) : null}
+            </div>
 
-        {hardRules.length ? (
-          <>
-            <Separator />
-            <section className="space-y-2">
-              <p className="text-muted-foreground text-xs">
-                世界硬约束({hardRules.length})· 违背者一律判定失败
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {hardRules.map((rule) => (
-                  <div key={rule.id} className="rounded-md border p-2.5">
-                    <Badge variant="outline">{hardRuleScopeLabels[rule.scope]}</Badge>
-                    <p className="mt-1.5 text-xs leading-5">{rule.statement}</p>
+            {phase === "error" ? (
+              <Alert variant="destructive">
+                <AlertCircle />
+                <AlertTitle>世界没能搭起来</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <Progress value={percent} />
+
+                {premise ? (
+                  <div className="space-y-1.5">
+                    <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+                      反事实原点
+                    </p>
+                    <p className="text-sm leading-6 font-medium">{premise.statement}</p>
+                    <p className="text-muted-foreground text-xs leading-6">
+                      改动发生在{premise.divergencePoint}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
+                ) : null}
 
-        {entities.length ? (
-          <>
-            <Separator />
-            <section className="space-y-2">
-              <p className="text-muted-foreground text-xs">登场主体({entities.length})</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {entities.map((entity) => (
-                  <div
-                    key={entity.id}
-                    className={`flex items-start gap-2.5 rounded-md border p-2.5 ${
-                      announcedIds.includes(entity.id) ? "" : "opacity-60"
-                    }`}
-                  >
-                    <EntityEmblem entity={entity} skin={skin} scale={2} className="mt-0.5" />
-                    <div className="min-w-0">
-                      <span className="truncate text-sm font-medium">{entity.name}</span>
-                      <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-5">
-                        {entity.description}
+                {hardRules.length ? (
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+                      这个世界无法违背的事
+                    </p>
+                    {hardRules.slice(0, 4).map((rule) => (
+                      <p key={rule.id} className="text-muted-foreground text-xs leading-6">
+                        · {rule.statement}
                       </p>
+                    ))}
+                  </div>
+                ) : null}
+
+                {entities.length ? (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+                      台上会有 {entities.length} 股力量
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {entities.map((entity) => (
+                        <span
+                          key={entity.id}
+                          className="bg-muted/40 animate-in fade-in zoom-in-95 flex items-center gap-1.5 rounded-sm border px-2 py-1"
+                        >
+                          <EntityEmblem entity={entity} skin={skin} scale={2} />
+                          <span className="text-xs">{entity.name}</span>
+                        </span>
+                      ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
+                ) : null}
 
-        {globalMetrics.length ? (
-          <>
-            <Separator />
-            <section className="space-y-2">
-              <p className="text-muted-foreground text-xs">全局指标口径</p>
-              <div className="flex flex-wrap gap-1.5">
-                {globalMetrics.map((metric) => (
-                  <span
-                    key={metric.id}
-                    className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 text-[0.7rem]"
-                  >
-                    {metric.label} · {metric.value}
-                  </span>
-                ))}
-              </div>
-            </section>
-          </>
-        ) : null}
-
-        <div className="border-border space-y-2 border-t pt-4">
-          <Progress value={percent} />
-          <p className="text-muted-foreground text-xs">
-            {phase === "error" ? error : `构建进度 ${percent}%`}
-          </p>
-        </div>
+                {startTime ? (
+                  <p className="text-muted-foreground font-mono text-[11px]">
+                    起点 · {startTime.label}({startTime.elapsed})
+                  </p>
+                ) : null}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
         {phase === "error" ? (
           <Button onClick={onRetry}>
-            <Sparkles data-icon="inline-start" />
-            重新构建这个世界
+            <RotateCcw data-icon="inline-start" />
+            再试一次
           </Button>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

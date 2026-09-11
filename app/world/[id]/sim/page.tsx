@@ -12,10 +12,10 @@ interface WorldSimPageProps {
 }
 
 /**
- * 世界线控制台。
+ * 世界线牌局。
  *
- * 这是 v2 玩法的正式入口:数据全部来自真实模型链路
- * (/api/world-seed 构建世界, /api/world-simulate 推进时代, /api/world-observations 给观测选项)。
+ * 这是 v3 玩法的正式入口:数据全部来自真实模型链路
+ * (/api/world-seed 构建世界, /api/world-simulate 推进一个阶段并发牌)。
  * 页面本身只做两件事:按题目 id 找到副本、决定用哪套皮肤,剩下的交给 WorldRunner。
  */
 export default async function WorldSimPage({ params }: WorldSimPageProps) {

@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     return errorResponse(publicError("CONFIG_MISSING", missingLlmKeyMessage(), false), 503);
   }
 
-  const { session: rawSession, followedEntityId, forkChoice } = parsedInput.data;
+  const { session: rawSession, followedEntityId, forkChoice, directives } = parsedInput.data;
 
   // 分叉选择先写进会话,再交给引擎 —— 这样主体 Agent 与裁决器看到的是同一个前提
   const session = forkChoice ? applyForkChoice(rawSession, forkChoice) : rawSession;
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         for await (const event of simulateEraStream({
           session,
           ...(followedEntityId ? { followedEntityId } : {}),
+          ...(directives?.length ? { directives } : {}),
           signal: request.signal,
         })) {
           send(event);

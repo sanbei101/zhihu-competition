@@ -1,175 +1,159 @@
 "use client";
 
-import { ArrowLeft, Clock3, GitFork, Globe2, RotateCcw, ScrollText, Users } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, GitFork, RotateCcw } from "lucide-react";
 
+import { witnessArchetypeFor } from "@/components/pixel/witness";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { EntityPanel } from "@/components/world-simulator/entity-panel";
-import { EraReport } from "@/components/world-simulator/era-report";
-import { WorldConsole, type AdvanceProgress } from "@/components/world-simulator/world-console";
-import { WorldHistory } from "@/components/world-simulator/world-history";
+import { Separator } from "@/components/ui/separator";
+import { MetricStrip } from "@/components/world-simulator/metric-strip";
+import { WorldDeck, type DeckSummary } from "@/components/world-simulator/world-deck";
 import { WorldStage } from "@/components/world-simulator/world-stage";
-import { getScenarioProfile } from "@/lib/scenario-profiles";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
-import { simulationModeLabels, timeScaleLabels, type WorldSimSession } from "@/lib/world-sim";
-import type { ObservationOptions } from "@/lib/world-sim-events";
+import type { WorldCard } from "@/lib/world-cards";
+import {
+  timeScaleLabels,
+  type EventChoice,
+  type WitnessLine,
+  type WorldSimSession,
+} from "@/lib/world-sim";
 
 /**
- * 世界线控制台的壳。
+ * 世界线牌局的壳。
  *
- * 结构上刻意与旧 world-council/index.tsx 对齐:
- * 顶部像素带 -> 标题状态行 -> Tabs -> 内部三列网格。
- * 视觉语言(皮肤变量、像素舞台、徽记)完全沿用,换掉的只是"台上在演什么"。
+ * 一屏四层,从上到下:
+ *   舞台(我在哪) → 标题行(这是什么) → 牌桌(发生了什么、我可以怎么取舍) → 指标条(世界怎么样)
  *
- * 这个组件是纯展示:会话、追踪目标、推演进度、观测选项全部由 WorldRunner 注入。
- * 好处是它不关心数据从哪来 —— 静态 mock 与真实 LLM 链路都能直接喂进来。
+ * 这个组件是纯展示:会话、手牌、光标、进度、见证者的话全部由 WorldRunner 注入。
+ * 好处是它完全不关心数据从哪来 —— 换数据源不需要动它一行。
  */
 export function WorldSimulator({
   session,
   skin,
-  onBack,
-  followedEntityId,
-  onFollow,
-  advance,
+  cards,
+  cursor,
+  resolvedChoiceId,
+  played,
+  summary,
+  witnessLine,
+  onChoose,
+  onCardAction,
   onAdvance,
-  onChooseFork,
-  observations,
+  advanceLabel,
+  advanceDisabled,
+  progress,
+  busy,
+  followedEntityId,
+  onFocus,
   notice,
+  onBack,
   onReset,
 }: {
   session: WorldSimSession;
   skin: ScenarioSkin;
-  onBack: () => void;
-  followedEntityId: string | null;
-  onFollow: (entityId: string) => void;
-  advance: AdvanceProgress;
+  cards: WorldCard[];
+  cursor: number;
+  resolvedChoiceId: string | null;
+  played: { label: string; severity: WorldCard["severity"] }[];
+  /** 空桌时展示的阶段结算。手上有牌时为 null */
+  summary: DeckSummary | null;
+  witnessLine: WitnessLine | null;
+  onChoose: (card: WorldCard, choice: EventChoice) => void;
+  /** 原点卡 / 结算卡的单一动作。事件卡的推进不走这里 */
+  onCardAction: (card: WorldCard) => void;
   onAdvance: () => void;
-  onChooseFork: (forkId: string, alternativeId: string) => void;
-  observations: ObservationOptions | null;
+  advanceLabel: string;
+  advanceDisabled: boolean;
+  progress: { label: string; done: number; total: number } | null;
+  busy: boolean;
+  followedEntityId: string | null;
+  onFocus: (entityId: string | null) => void;
   notice: string;
+  onBack: () => void;
   onReset: () => void;
 }) {
-  const profile = getScenarioProfile(session.seed.themeId);
-  const [era, setEra] = useState(session.state.currentEra);
+  const card = cards[cursor] ?? null;
+  const isLastCard = cursor >= cards.length - 1;
+  const archetype = witnessArchetypeFor(session.seed.themeId);
 
-  const latest = session.snapshots.at(-1) ?? null;
-  const pendingFork = session.forks.find((fork) => !fork.selectedAlternativeId) ?? null;
-  const activeBranch = session.branches.find((branch) => branch.active) ?? null;
-  const isRunning = advance.phase !== "idle";
+  const actionLabel = (() => {
+    if (!card) return "继续";
+    if (card.kind === "origin") return "拉开这条世界线";
+    if (card.kind === "settle") return "重新洗一次牌";
+    return isLastCard ? "回到牌桌" : "下一张";
+  })();
 
   return (
-    <div className="space-y-4">
-      {/* 世界舞台:整屏像素演出,台上是正在变化的主体 */}
+    <div className="space-y-5">
       <WorldStage
         skin={skin}
         session={session}
         focusedEntityId={followedEntityId}
-        onFocus={onFollow}
+        onFocus={onFocus}
       />
 
-      {/* 标题状态行 */}
-      <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回世界线">
+      {/* 标题行 */}
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="返回">
             <ArrowLeft />
           </Button>
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge>
-                <Clock3 data-icon="inline-start" />
-                {latest?.timeAfter.label ?? session.seed.startTime.label}
-              </Badge>
-              <Badge variant="outline">
-                <Globe2 data-icon="inline-start" />
-                {simulationModeLabels[session.seed.simulationMode]}
-              </Badge>
-              <Badge variant="outline">
-                <Users data-icon="inline-start" />
-                {session.state.entities.length} 个主体
-              </Badge>
-              <Badge variant="outline">
-                <GitFork data-icon="inline-start" />
-                {activeBranch?.label ?? "主线"}
-              </Badge>
-              {pendingFork ? <Badge variant="destructive">分叉待决</Badge> : null}
-              {isRunning ? <Badge variant="secondary">推演中</Badge> : null}
-              <Badge variant="secondary">{skin.name}</Badge>
-            </div>
-            <h1 className="mt-2 text-xl font-semibold">世界线控制台</h1>
-            <p className="text-muted-foreground mt-1 line-clamp-1 text-sm">
-              {session.scenarioTitle}
-            </p>
+            <h1 className="text-lg font-semibold">世界线牌局</h1>
+            <p className="text-muted-foreground line-clamp-1 text-xs">{session.scenarioTitle}</p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
-          <div className="text-muted-foreground text-sm sm:text-right">
-            <p>时间尺度 · {timeScaleLabels[session.seed.timeScale]}</p>
-            <p className="line-clamp-1">{profile.horizonHint.split(";")[0]}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onReset} disabled={isRunning}>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">
+            <GitFork data-icon="inline-start" />
+            {session.directives.length} 次取舍
+          </Badge>
+          <Badge variant="secondary">{timeScaleLabels[session.seed.timeScale]}尺度</Badge>
+          <Badge variant="secondary">{skin.name}</Badge>
+          <Button variant="ghost" size="sm" onClick={onReset} disabled={busy}>
             <RotateCcw data-icon="inline-start" />
-            重建这个世界
+            重建世界
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="console" className="gap-4">
-        <TabsList className="grid h-10 w-full grid-cols-2 sm:w-fit sm:min-w-[34rem] sm:grid-cols-4">
-          <TabsTrigger value="console">
-            <Globe2 data-icon="inline-start" />
-            世界控制台
-          </TabsTrigger>
-          <TabsTrigger value="report">
-            <ScrollText data-icon="inline-start" />
-            时代报告
-          </TabsTrigger>
-          <TabsTrigger value="history">
-            <GitFork data-icon="inline-start" />
-            世界线
-          </TabsTrigger>
-          <TabsTrigger value="entities">
-            <Users data-icon="inline-start" />
-            主体档案
-          </TabsTrigger>
-        </TabsList>
+      {notice ? <p className="text-muted-foreground text-xs leading-6">{notice}</p> : null}
 
-        <TabsContent value="console" className="mt-0">
-          <WorldConsole
-            session={session}
-            skin={skin}
-            followedEntityId={followedEntityId}
-            onFocus={onFollow}
-            advance={advance}
-            onAdvance={onAdvance}
-            observations={observations}
-            notice={notice}
-          />
-        </TabsContent>
+      <WorldDeck
+        skin={skin}
+        archetype={archetype}
+        witnessLine={witnessLine}
+        card={card}
+        metrics={session.state.globalMetrics}
+        resolvedChoiceId={resolvedChoiceId}
+        onChoose={(choice) => {
+          if (card) onChoose(card, choice);
+        }}
+        onAction={() => {
+          if (card) onCardAction(card);
+        }}
+        onNext={() => {
+          if (card) onCardAction(card);
+        }}
+        nextLabel={actionLabel}
+        actionLabel={actionLabel}
+        busy={busy}
+        deckLeft={cards.length - cursor}
+        played={played}
+        summary={summary}
+      />
 
-        <TabsContent value="report" className="mt-0">
-          <EraReport session={session} skin={skin} era={era} onSelectEra={setEra} />
-        </TabsContent>
+      <Separator />
 
-        <TabsContent value="history" className="mt-0">
-          <WorldHistory
-            session={session}
-            skin={skin}
-            onSelectForkAlternative={onChooseFork}
-            advancing={isRunning}
-          />
-        </TabsContent>
-
-        <TabsContent value="entities" className="mt-0">
-          <EntityPanel
-            session={session}
-            skin={skin}
-            focusedEntityId={followedEntityId}
-            onFocus={onFollow}
-          />
-        </TabsContent>
-      </Tabs>
+      <MetricStrip
+        metrics={session.state.globalMetrics}
+        onAdvance={onAdvance}
+        advanceLabel={advanceLabel}
+        advanceDisabled={advanceDisabled}
+        busy={busy}
+        progress={progress}
+      />
     </div>
   );
 }

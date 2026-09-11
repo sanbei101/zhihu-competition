@@ -5,7 +5,9 @@ import type {
   EntityRelation,
   EntitySimulationReport,
   EraSnapshot,
+  EventChoice,
   GlobalMetric,
+  PlayerDirective,
   WorldBranch,
   WorldEntity,
   WorldEvent,
@@ -38,6 +40,8 @@ const GLOBAL_DELTA_LIMIT = 12;
 const GLOBAL_DELTA_LIMIT_CRITICAL = 20;
 /** 单阶段单个主体内部指标的涨跌上限 */
 const ENTITY_DELTA_LIMIT = 15;
+/** 单阶段最多带几张"有取舍"的牌。超过这个数玩家会开始闭眼点 */
+const MAX_CHOICE_CARDS = 4;
 
 const METRIC_FLOOR = 0;
 const METRIC_CEILING = 100;
@@ -66,6 +70,8 @@ const DISPLAY = {
   chains: 4,
   links: 6,
   forkAlternatives: 3,
+  choices: 3,
+  effects: 4,
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
@@ -81,6 +87,51 @@ function take<T>(items: readonly T[], limit: number): T[] {
 }
 
 // ==================== 种子规范化 ====================
+
+/**
+ * 清洗一条事件的可选字段(choices / narrator / special)。
+ *
+ * 卡牌的全部内容都从这里过一遍:
+ *   - 选项裁到 3 个 —— 再多玩家就不读了,只会闭眼点第一个
+ *   - effects 里引用不存在的指标就地丢掉,而不是让整张卡作废
+ *   - 少于 2 个选项的事件不算"有取舍",直接退回成纯叙事事件
+ *
+ * allowCard 是这个阶段还剩不剩牌额。为 false 时 choices 与 special **必须一起**摘掉 ——
+ * 留下一个"自称危机却没有选项"的孤儿事件,比直接把它降级成叙事糟糕得多。
+ */
+function normalizeEventExtras(
+  event: {
+    choices?: EventChoice[];
+    narrator?: WorldEvent["narrator"];
+    special?: WorldEvent["special"];
+  },
+  metricIds: Set<string>,
+  allowCard: boolean,
+): Pick<WorldEvent, "choices" | "narrator" | "special"> {
+  const extras: Pick<WorldEvent, "choices" | "narrator" | "special"> = {};
+
+  if (event.narrator) extras.narrator = event.narrator;
+
+  if (!allowCard) return extras;
+
+  const choices = take(event.choices ?? [], DISPLAY.choices)
+    .map((choice) => {
+      const effects = take(
+        choice.effects.filter((effect) => metricIds.has(effect.metricId)),
+        DISPLAY.effects,
+      );
+      return Object.assign({}, choice, { effects });
+    })
+    .filter((choice) => choice.label.trim().length > 0);
+
+  // 一道选择题至少要两个选项,一个选项的"选择"是假的
+  if (choices.length >= 2) {
+    extras.choices = choices;
+    if (event.special) extras.special = event.special;
+  }
+
+  return extras;
+}
 
 /**
  * 把模型产出的种子整理成一份引用完整的 WorldSeed。
@@ -167,26 +218,7 @@ export function normalizeSeed(input: {
     Object.assign({}, rule, { id: `rule-${index + 1}-${rule.scope}` }),
   );
 
-  // 4. 初始事件:行动者必须存在,否则归给第一个主体(自然事件才允许无主,这里统一兜底)
-  const fallbackActor = linkedEntities[0]?.id;
-  const initialEvents: WorldEvent[] = take(generation.initialEvents, DISPLAY.initialEvents).map(
-    (event, index) => {
-      const actors = event.actorEntityIds
-        .map((actor) => resolveId(actor))
-        .filter((actor): actor is string => Boolean(actor));
-      return {
-        id: `evt-0-${index + 1}`,
-        era: 0,
-        title: event.title,
-        scope: event.scope,
-        severity: event.severity,
-        actorEntityIds: actors.length ? [...new Set(actors)] : fallbackActor ? [fallbackActor] : [],
-        summary: event.summary,
-      };
-    },
-  );
-
-  // 5. 全局指标:优先保留与本主题 profile 对应的那些,超出预算的裁掉
+  // 4. 全局指标:优先保留与本主题 profile 对应的那些,超出预算的裁掉
   const profileIds = new Set(profile.metricDefinitions.map((metric) => metric.id));
   const picked = generation.globalMetrics.filter((metric) => profileIds.has(metric.id));
   const chosen = take(
@@ -206,6 +238,28 @@ export function normalizeSeed(input: {
       goodDirection: metric.goodDirection,
     });
   }
+  const metricIds = new Set(globalMetrics.map((metric) => metric.id));
+
+  // 5. 初始事件:行动者必须存在,否则归给第一个主体(自然事件才允许无主,这里统一兜底)
+  const fallbackActor = linkedEntities[0]?.id;
+  const initialEvents: WorldEvent[] = take(generation.initialEvents, DISPLAY.initialEvents).map(
+    (event, index) => {
+      const actors = event.actorEntityIds
+        .map((actor) => resolveId(actor))
+        .filter((actor): actor is string => Boolean(actor));
+      const built: WorldEvent = {
+        id: `evt-0-${index + 1}`,
+        era: 0,
+        title: event.title,
+        scope: event.scope,
+        severity: event.severity,
+        actorEntityIds: actors.length ? [...new Set(actors)] : fallbackActor ? [fallbackActor] : [],
+        summary: event.summary,
+      };
+      // 起跑线上的事件只是叙事:牌要等世界真的走起来之后再发
+      return Object.assign(built, normalizeEventExtras(event, metricIds, false));
+    },
+  );
 
   return {
     scenarioId,
@@ -220,6 +274,11 @@ export function normalizeSeed(input: {
     },
     startTime: { ...generation.startTime, era: 0 },
     timeScale: generation.timeScale,
+    witness: {
+      name: generation.witness.name,
+      role: generation.witness.role,
+      openingLine: generation.witness.openingLine,
+    },
     hardRules,
     entities: linkedEntities,
     globalMetrics,
@@ -267,7 +326,7 @@ export function createSession(seed: WorldSeed): WorldSimSession {
   };
 
   return {
-    version: 2,
+    version: 3,
     scenarioId: seed.scenarioId,
     scenarioTitle: seed.scenarioTitle,
     scenarioUrl: seed.scenarioUrl,
@@ -276,6 +335,7 @@ export function createSession(seed: WorldSeed): WorldSimSession {
     forks: [],
     branches,
     state,
+    directives: [],
   };
 }
 
@@ -367,6 +427,8 @@ export function applyAdjudication(input: {
   session: WorldSimSession;
   reports: EntitySimulationReport[];
   adjudication: Adjudication;
+  /** 玩家上一阶段在事件卡上做的取舍,原样记进会话 */
+  directives?: PlayerDirective[];
 }): { session: WorldSimSession; snapshot: EraSnapshot; fork: WorldFork | null } {
   const { session, reports, adjudication } = input;
   const era = session.state.currentEra + 1;
@@ -388,9 +450,31 @@ export function applyAdjudication(input: {
   const fallbackActor = entities[0]?.id;
 
   // 3. 事件:清洗行动者,并按展示预算裁掉多余的
-  const events: WorldEvent[] = take(adjudication.events, DISPLAY.events).map((event, index) => {
+  //
+  //    带 choices 的事件就是"牌"。一阶段最多发 4 张,超出的降级成纯叙事事件 ——
+  //    让玩家连点八张牌不是深度,是疲劳。
+  //
+  //    分配牌额时**特殊事件优先**:危机 / 回响 / 异象被一条常规事件挤掉,
+  //    是这个阶段最不能接受的事。真实事故:一次裁决里模型给了 crisis,
+  //    但因为排在四张常规牌之后被降级,最后留下一个"自称危机却没有选项"的孤儿事件。
+  const metricIds = new Set(session.state.globalMetrics.map((metric) => metric.id));
+  const ordered = take(adjudication.events, DISPLAY.events);
+
+  const candidates = ordered
+    .map((event, index) => ({ event, index }))
+    .filter((item) => (item.event.choices ?? []).length >= 2);
+  const withBudget = new Set(
+    [
+      ...candidates.filter((item) => item.event.special),
+      ...candidates.filter((item) => !item.event.special),
+    ]
+      .slice(0, MAX_CHOICE_CARDS)
+      .map((item) => item.index),
+  );
+
+  const events: WorldEvent[] = ordered.map((event, index) => {
     const actors = [...new Set(event.actorEntityIds.filter((actor) => entityIds.has(actor)))];
-    return {
+    const built: WorldEvent = {
       id: `evt-${era}-${index + 1}`,
       era,
       title: event.title,
@@ -399,6 +483,7 @@ export function applyAdjudication(input: {
       actorEntityIds: actors.length ? actors : fallbackActor ? [fallbackActor] : [],
       summary: event.summary,
     };
+    return Object.assign(built, normalizeEventExtras(event, metricIds, withBudget.has(index)));
   });
 
   // 事件 id 会重新编号,所以因果链里模型给的 eventId 引用一律丢弃,改由顺序承接
@@ -465,6 +550,7 @@ export function applyAdjudication(input: {
     causalChains,
     conclusion: adjudication.conclusion,
     metricDeltas,
+    ...(adjudication.stabilized !== undefined ? { stabilized: adjudication.stabilized } : {}),
   };
 
   const forks = fork ? [...session.forks, fork] : session.forks;
@@ -491,6 +577,9 @@ export function applyAdjudication(input: {
       forks,
       branches,
       state: nextState,
+      directives: input.directives?.length
+        ? [...session.directives, ...input.directives]
+        : session.directives,
     },
     snapshot,
     fork,

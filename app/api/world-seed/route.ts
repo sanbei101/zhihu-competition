@@ -70,6 +70,10 @@ export async function POST(request: Request) {
           request.signal,
         );
 
+        // 见证者先出场。玩家先看见一个人站在那儿,再看见世界从他身后长出来 ——
+        // 顺序反过来就没有那个"有人陪着"的感觉了。
+        send({ type: "seed-witness", witness: seed.witness });
+
         send({
           type: "seed-setting",
           premise: seed.premise,

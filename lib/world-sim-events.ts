@@ -55,6 +55,8 @@ const LOOSE = {
   metricDeltas: 12,
   entityUpdates: 10,
   alternatives: 4,
+  choices: 5,
+  effects: 8,
 } as const;
 
 const entityKindSchema = z.enum([
@@ -168,6 +170,28 @@ export const globalMetricSchema = z.object({
   delta: freeNumber.optional(),
 });
 
+export const eventChoiceSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  hint: z.string().min(1),
+  tone: z.enum(["bold", "cautious", "cunning", "mercy"]),
+  // 预估影响只是给玩家看的量级提示,允许为空 —— 有些取舍本来就说不清代价
+  effects: z.array(z.object({ metricId: z.string().min(1), delta: freeNumber })).max(LOOSE.effects),
+});
+
+export const witnessLineSchema = z.object({
+  speaker: z.string().min(1),
+  line: z.string().min(1),
+});
+
+export const specialEventKindSchema = z.enum(["crisis", "echo", "anomaly"]);
+
+export const worldWitnessSchema = z.object({
+  name: z.string().min(1),
+  role: z.string().min(1),
+  openingLine: z.string().min(1),
+});
+
 export const worldEventSchema = z.object({
   id: z.string().min(1),
   era: freeNumber,
@@ -176,6 +200,13 @@ export const worldEventSchema = z.object({
   severity: z.enum(["info", "notable", "severe", "critical"]),
   actorEntityIds: z.array(z.string().min(1)).max(8),
   summary: z.string().min(1),
+  /**
+   * 这三个字段是"事件 -> 卡牌"的全部桥梁。
+   * 全部可选:一个事件没有 choices,就只是一条叙事,不单独发牌。
+   */
+  choices: z.array(eventChoiceSchema).max(LOOSE.choices).optional(),
+  narrator: witnessLineSchema.optional(),
+  special: specialEventKindSchema.optional(),
 });
 
 export const causalLinkSchema = z.object({
@@ -224,6 +255,7 @@ export const eraSnapshotSchema = z.object({
   causalChains: z.array(causalChainSchema).max(LOOSE.chains),
   conclusion: z.string().min(1),
   metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
+  stabilized: z.boolean().optional(),
 });
 
 export const worldForkAlternativeSchema = z.object({
@@ -263,6 +295,7 @@ export const worldSeedSchema = z.object({
   premise: counterfactualPremiseSchema,
   startTime: timeStateSchema,
   timeScale: timeScaleSchema,
+  witness: worldWitnessSchema,
   // 这些 max 必须与 lib/world-sim-reducer.ts 的 DISPLAY 预算一致:
   // reducer 只负责裁到预算内,这里的下限必须足够松,才接得住裁完之后的结果。
   hardRules: z.array(hardRuleSchema).max(6),
@@ -271,8 +304,16 @@ export const worldSeedSchema = z.object({
   initialEvents: z.array(worldEventSchema).max(5),
 });
 
+export const playerDirectiveSchema = z.object({
+  cardId: z.string().min(1),
+  cardTitle: z.string().min(1),
+  choiceId: z.string().min(1),
+  choiceLabel: z.string().min(1),
+  note: z.string().min(1),
+});
+
 export const worldSimSessionSchema = z.object({
-  version: z.literal(2),
+  version: z.literal(3),
   scenarioId: z.string().min(1),
   scenarioTitle: z.string().min(1),
   scenarioUrl: z.string(),
@@ -287,6 +328,7 @@ export const worldSimSessionSchema = z.object({
     entities: z.array(worldEntitySchema),
     latestSnapshotId: z.string(),
   }),
+  directives: z.array(playerDirectiveSchema),
 });
 
 // ==================== 结构化生成的中间 schema ====================
@@ -299,6 +341,7 @@ export const seedGenerationSchema = z.object({
   premise: counterfactualPremiseSchema,
   startTime: timeStateSchema,
   timeScale: timeScaleSchema,
+  witness: worldWitnessSchema,
   // 硬规则与初始事件允许为空:少了它们世界只是约束更松,不该整份作废
   hardRules: z.array(hardRuleSchema.omit({ id: true })).max(8),
   // 主体与全局指标是 UI 的骨架,至少要有一个,否则没有东西可画
@@ -354,21 +397,6 @@ export const adjudicationSchema = z.object({
   stabilized: z.boolean().optional(),
 });
 
-export const observationOptionsSchema = z.object({
-  options: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        label: z.string().min(1),
-        hint: z.string().min(1),
-        kind: z.enum(["advance-era", "follow-entity", "inspect-event", "choose-fork"]),
-        targetId: z.string().optional(),
-      }),
-    )
-    .min(1)
-    .max(5),
-});
-
 // ==================== 请求 schema ====================
 
 export const worldSeedRequestSchema = z.object({
@@ -388,12 +416,15 @@ export const worldSimulateRequestSchema = z.object({
       alternativeId: z.string().min(1),
     })
     .optional(),
+  /**
+   * 玩家上一阶段在事件卡上做的取舍。
+   * 它不改写已经发生的事,而是成为下一阶段裁决的前提 —— 一次取舍会在
+   * 后面几个阶段里以因果的形式回来,这是"观察者"与"上帝"的分界。
+   */
+  directives: z.array(playerDirectiveSchema).max(12).optional(),
 });
 
-export const worldObservationsRequestSchema = worldSimulateRequestSchema;
-
 // ==================== 流事件 ====================
-
 const streamErrorSchema = z.object({
   code: errorCodeSchema,
   message: z.string().min(1).max(200),
@@ -407,6 +438,7 @@ const streamErrorSchema = z.object({
 /** /api/world-seed 的事件序列 */
 export const worldSeedEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("seed-start"), themeId: z.string().min(1) }),
+  z.object({ type: z.literal("seed-witness"), witness: worldWitnessSchema }),
   z.object({
     type: z.literal("seed-setting"),
     premise: counterfactualPremiseSchema,
@@ -467,7 +499,6 @@ export type WorldSeedEvent = z.infer<typeof worldSeedEventSchema>;
 export type WorldSimulateEvent = z.infer<typeof worldSimulateEventSchema>;
 export type SeedGeneration = z.infer<typeof seedGenerationSchema>;
 export type Adjudication = z.infer<typeof adjudicationSchema>;
-export type ObservationOptions = z.infer<typeof observationOptionsSchema>;
 
 // 类型层面的对照,防止 zod schema 与世界模型悄悄漂移
 type _SeedMatches = WorldSeed extends z.infer<typeof worldSeedSchema> ? true : never;
