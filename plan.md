@@ -576,11 +576,7 @@ interface GlobalMetric {
 第一版将玩家操作命名为“观测操作”，避免暗示玩家拥有全能改造能力：
 
 ```ts
-type ObservationAction =
-  | "advance-era"
-  | "follow-entity"
-  | "inspect-event"
-  | "choose-fork";
+type ObservationAction = "advance-era" | "follow-entity" | "inspect-event" | "choose-fork";
 ```
 
 玩家可以：

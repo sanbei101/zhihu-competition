@@ -1,12 +1,18 @@
-import { ArrowLeft, ExternalLink, MessageCircle, Quote, ThumbsUp } from "lucide-react";
+import { ArrowLeft, ExternalLink, GitFork, MessageCircle, Quote, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 
 import { ThemeScene } from "@/components/pixel/theme-scene";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { WorldCastPanel } from "@/components/world-cast";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { findScenario } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 
@@ -152,9 +158,65 @@ export default async function WorldPage({ params }: WorldPageProps) {
             </Card>
           </div>
 
-          <WorldCastPanel
-            scenario={{ id: topic.id, title: topic.title, content: "", url: topic.url }}
-          />
+          <div className="space-y-6">
+            {/* 主玩法入口。放在最上面,因为打开反事实开关是这个作品的核心动作 */}
+            <Card className="border-primary shadow-none">
+              <CardHeader className="p-6">
+                <Badge variant="secondary" className="w-fit">
+                  MAIN / WORLDLINE
+                </Badge>
+                <CardTitle className="pt-2 text-xl leading-8">打开反事实开关</CardTitle>
+                <CardDescription className="leading-6">
+                  以这道题的反事实为前提,让政权、势力、人群、生态各自按自己的目标自主演化。
+                  你只负责观测和推进时间,世界会自己长出历史,并在重大冲突处自然分叉。
+                </CardDescription>
+              </CardHeader>
+              <CardFooter className="bg-muted/30 border-t px-6 py-4">
+                <Button
+                  className="w-full"
+                  nativeButton={false}
+                  render={<Link href={`/world/${encodeURIComponent(topic.id)}/sim`} />}
+                >
+                  进入世界线控制台
+                  <GitFork data-icon="inline-end" />
+                </Button>
+              </CardFooter>
+            </Card>
+
+            {/* 玩法说明。玩家不需要扮演谁,所以这里要说清"你在这个世界里是什么角色" */}
+            <Card className="shadow-none">
+              <CardHeader className="p-6">
+                <CardTitle className="text-base">你会看到什么</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 px-6 text-sm leading-6">
+                <div>
+                  <p className="font-medium">世界主体,不是角色</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs leading-5">
+                    台上站的是政权、军镇、士族、物种这类力量。它们各自追求不重叠的目标,
+                    由独立推演并行盘算,再由世界裁决合并冲突。
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium">时间是变量</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs leading-5">
+                    每一阶段推进多久由局势决定。危机时刻按天走,制度变迁按年走, 生态演化按千年走。
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium">分叉是自然长出来的</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs leading-5">
+                    只有出现无法调和的重大冲突时,历史才会岔开。届时由你决定继续观察哪一条。
+                  </p>
+                </div>
+                <div>
+                  <p className="font-medium">硬约束不可违背</p>
+                  <p className="text-muted-foreground mt-0.5 text-xs leading-5">
+                    倒伏的后勤、疫病、地理通道与合法性都写成了世界法则, 任何主体违背都会被判定失败。
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
     </main>
