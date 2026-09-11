@@ -60,6 +60,10 @@ interface WorldCouncilProps {
   skin: ScenarioSkin;
 }
 
+type TurnBeatEvent =
+  | { type: "reaction"; agentId: string }
+  | { type: "retort"; agentId: string; againstId: string };
+
 export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const router = useRouter();
   const cast: WorldCast = initial.cast;
@@ -82,6 +86,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
   const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [reactions, setReactions] = useState<TurnReactionRecord[]>([]);
   const [retorts, setRetorts] = useState<RetortRecord[]>([]);
+  const [turnBeatEvents, setTurnBeatEvents] = useState<TurnBeatEvent[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
   const [isResolving, setIsResolving] = useState(false);
   const [isJudging, setIsJudging] = useState(false);
@@ -157,10 +162,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     return list;
   }, [cast]);
 
-  /**
-   * 本回合的演出队列:你的抉择 → 各方表态 → 面对面的交锋。
-   * 四个人不再是同时冒出来的一堆气泡,而是排成一队、一个一个上台。
-   */
+  /** 本回合按事件抵达顺序演出,辩论不必等所有 Agent 表态结束。 */
   const turnBeats = useMemo<StageBeat[]>(() => {
     const list: StageBeat[] = [];
 
@@ -173,25 +175,31 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
       });
     }
 
-    for (const record of reactions) {
-      const character = agentById.get(record.agentId);
-      if (!character) continue;
-      const { reaction } = record;
-      list.push({
-        key: `reaction:${round}:${record.agentId}`,
-        speaker: character,
-        speech: reaction.speech,
-        variant: "reaction",
-        stance: reaction.stance,
-        action: reaction.action,
-        target: reaction.target,
-        impact: reaction.impact,
-      });
-    }
+    for (const event of turnBeatEvents) {
+      if (event.type === "reaction") {
+        const record = reactions.find((candidate) => candidate.agentId === event.agentId);
+        const character = agentById.get(event.agentId);
+        if (!record || !character) continue;
+        const { reaction } = record;
+        list.push({
+          key: `reaction:${round}:${record.agentId}`,
+          speaker: character,
+          speech: reaction.speech,
+          variant: "reaction",
+          stance: reaction.stance,
+          action: reaction.action,
+          target: reaction.target,
+          impact: reaction.impact,
+        });
+        continue;
+      }
 
-    for (const record of retorts) {
-      const character = agentById.get(record.agentId);
-      if (!character) continue;
+      const record = retorts.find(
+        (candidate) =>
+          candidate.agentId === event.agentId && candidate.againstId === event.againstId,
+      );
+      const character = agentById.get(event.agentId);
+      if (!record || !character) continue;
       const { reaction } = record;
       list.push({
         key: `retort:${round}:${record.agentId}`,
@@ -208,7 +216,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     }
 
     return list;
-  }, [agentById, player, reactions, retorts, round, submittedDecision]);
+  }, [agentById, player, reactions, retorts, round, submittedDecision, turnBeatEvents]);
 
   const beats = performance === "opening" ? openingBeats : turnBeats;
 
@@ -513,6 +521,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     setOptionsError("");
     setReactions([]);
     setRetorts([]);
+    setTurnBeatEvents([]);
     setAgentStatuses({});
     setIsTurnComplete(false);
     setTurnError("");
@@ -542,6 +551,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     setSubmittedDecision(content);
     setReactions([]);
     setRetorts([]);
+    setTurnBeatEvents([]);
     setAgentStatuses({});
     setIsResolving(true);
     setIsTurnComplete(false);
@@ -560,6 +570,10 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
       } else if (turnEvent.type === "agent-reaction") {
         const record = { agentId: turnEvent.agentId, reaction: turnEvent.reaction };
         setReactions((current) => [...current, record]);
+        setTurnBeatEvents((current) => [
+          ...current,
+          { type: "reaction", agentId: turnEvent.agentId },
+        ]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "retort-start") {
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
@@ -571,6 +585,10 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
             againstId: turnEvent.againstId,
             reaction: turnEvent.reaction,
           },
+        ]);
+        setTurnBeatEvents((current) => [
+          ...current,
+          { type: "retort", agentId: turnEvent.agentId, againstId: turnEvent.againstId },
         ]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "agent-error") {

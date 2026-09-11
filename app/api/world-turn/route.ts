@@ -33,7 +33,7 @@ const buildAgentInstructions = (character: AgentCharacter) =>
 关键关系:${character.relationship}
 惯用手段:${character.pressureMethod}
 
-秘密动机用于决定行动,但绝不能直接泄露。信任度高于 70 时你会主动替玩家分担代价;信任度低于 20 时你只做对自己有利的事,并且可以不再听令。
+秘密动机用于决定行动,但绝不能直接泄露。信任度高于 45 时,除非玩家直接触碰你的底线,你应优先选择 support 或 negotiate,并主动寻找替玩家分担代价的办法;信任度低于 20 时你才只做对自己有利的事,并且可以不再听令。
 回应必须包含一句符合身份的现场发言和一个立刻执行的具体行动。使用简体中文。`;
 
 const environmentBlock = (input: {
@@ -75,6 +75,7 @@ const buildAgentPrompt = (input: {
   player: PlayerCharacter;
   decision: string;
   character: AgentCharacter;
+  cooperationHint: string;
 }) =>
   `${input.environment}
 
@@ -85,6 +86,10 @@ ${input.cast.agentCharacters
   .filter((other) => other.id !== input.character.id)
   .map((other) => `- ${other.name}:${other.identity},公开目标是${other.publicGoal}`)
   .join("\n")}
+
+本回合立场要求:
+${input.cooperationHint}
+不要为了制造冲突自动反对玩家。若玩家决策没有触碰你的底线,优先给出支持或协商,并说明你愿意提供的具体帮助;只有利益直接冲突时才 oppose 或 exploit。
 
 立即作出你的独立回应。只描述你能立刻调动的行动,写清行动成本和可观察后果。不要替其他角色发言,不要替导演宣布结局。`;
 
@@ -214,22 +219,111 @@ export async function POST(request: Request) {
       });
 
       const run = async () => {
-        // ===== 第一轮:四人各自表态,并行 =====
-        const settled = await Promise.all(
-          cast.agentCharacters.map(async (character): Promise<RoundEntry | null> => {
+        const nameById = new Map(cast.agentCharacters.map((c) => [c.id, c.name]));
+        const firstRound: RoundEntry[] = [];
+        let retortRun: Promise<void> | null = null;
+
+        const runRetort = async ({
+          character,
+          opponent,
+          ownLine,
+          opponentLine,
+        }: {
+          character: AgentCharacter;
+          opponent: AgentCharacter;
+          ownLine: string;
+          opponentLine: string;
+        }) => {
+          send({ type: "retort-start", agentId: character.id, againstId: opponent.id });
+          try {
+            const reaction = await generateStructured({
+              instructions: buildRetortInstructions(character),
+              prompt: buildRetortPrompt({
+                environment,
+                character,
+                opponent,
+                ownLine,
+                opponentLine,
+              }),
+              schema: agentReactionSchema,
+              temperature: 0.9,
+              maxOutputTokens: 700,
+              abortSignal: request.signal,
+            });
+            const parsed = agentReactionSchema.parse(reaction);
+            send({
+              type: "agent-retort",
+              agentId: character.id,
+              againstId: opponent.id,
+              reaction: parsed,
+            });
+          } catch (error) {
+            console.error(`${character.name} 对峙失败`, error);
+            hasAgentFailure = true;
+            send({
+              type: "agent-error",
+              agentId: character.id,
+              againstId: opponent.id,
+              phase: "retort",
+              error: publicError("UPSTREAM_FAILURE", "对峙回应生成失败,本回合无法继续", true),
+            });
+          }
+        };
+
+        const runRetorts = async (pair: { challenger: RoundEntry; defender: RoundEntry }) => {
+          const challenger = cast.agentCharacters.find((c) => c.id === pair.challenger.agentId);
+          const defender = cast.agentCharacters.find((c) => c.id === pair.defender.agentId);
+          if (!challenger || !defender) return;
+
+          await Promise.all([
+            runRetort({
+              character: challenger,
+              opponent: defender,
+              ownLine: pair.challenger.reaction.speech,
+              opponentLine: pair.defender.reaction.speech,
+            }),
+            runRetort({
+              character: defender,
+              opponent: challenger,
+              ownLine: pair.defender.reaction.speech,
+              opponentLine: pair.challenger.reaction.speech,
+            }),
+          ]);
+        };
+
+        const maybeStartRetort = () => {
+          if (retortRun || firstRound.length < 2) return;
+          const pair = pickConflictPair(firstRound, nameById);
+          if (pair) retortRun = runRetorts(pair);
+        };
+
+        // 第一轮仍然并行,但第二轮在任意两个回应完成后立即开始。
+        await Promise.all(
+          cast.agentCharacters.map(async (character, index): Promise<void> => {
             send({ type: "agent-start", agentId: character.id });
             try {
               const reaction = await generateStructured({
                 instructions: buildAgentInstructions(character),
-                prompt: buildAgentPrompt({ environment, cast, player, decision, character }),
+                prompt: buildAgentPrompt({
+                  environment,
+                  cast,
+                  player,
+                  decision,
+                  character,
+                  cooperationHint:
+                    index === 0
+                      ? "你是本回合最可能与玩家合作的一方。只要没有触碰底线,请用 support 表态,并提出一项具体援助。"
+                      : "你可以支持、协商或反对,但必须先承认玩家决策中合理的部分,不要无条件唱反调。",
+                }),
                 schema: agentReactionSchema,
                 temperature: 0.85,
                 maxOutputTokens: 1100,
                 abortSignal: request.signal,
               });
               const parsed = agentReactionSchema.parse(reaction);
+              firstRound.push({ agentId: character.id, reaction: parsed });
               send({ type: "agent-reaction", agentId: character.id, reaction: parsed });
-              return { agentId: character.id, reaction: parsed };
+              maybeStartRetort();
             } catch (error) {
               console.error(`${character.name} Agent 回应失败`, error);
               hasAgentFailure = true;
@@ -239,96 +333,10 @@ export async function POST(request: Request) {
                 phase: "reaction",
                 error: publicError("UPSTREAM_FAILURE", "角色回应生成失败,本回合无法继续", true),
               });
-              return null;
             }
           }),
         );
-
-        const firstRound = settled.filter((entry): entry is RoundEntry => entry !== null);
-
-        // ===== 第二轮:挑一对立场最冲突的,当场对峙 =====
-        const nameById = new Map(cast.agentCharacters.map((c) => [c.id, c.name]));
-        const pair = pickConflictPair(firstRound, nameById);
-        if (!pair) return;
-
-        const challenger = cast.agentCharacters.find((c) => c.id === pair.challenger.agentId);
-        const defender = cast.agentCharacters.find((c) => c.id === pair.defender.agentId);
-        if (!challenger || !defender) return;
-
-        await Promise.all([
-          (async () => {
-            send({ type: "retort-start", agentId: challenger.id, againstId: defender.id });
-            try {
-              const reaction = await generateStructured({
-                instructions: buildRetortInstructions(challenger),
-                prompt: buildRetortPrompt({
-                  environment,
-                  character: challenger,
-                  opponent: defender,
-                  ownLine: pair.challenger.reaction.speech,
-                  opponentLine: pair.defender.reaction.speech,
-                }),
-                schema: agentReactionSchema,
-                temperature: 0.9,
-                maxOutputTokens: 700,
-                abortSignal: request.signal,
-              });
-              const parsed = agentReactionSchema.parse(reaction);
-              send({
-                type: "agent-retort",
-                agentId: challenger.id,
-                againstId: defender.id,
-                reaction: parsed,
-              });
-            } catch (error) {
-              console.error(`${challenger.name} 对峙失败`, error);
-              hasAgentFailure = true;
-              send({
-                type: "agent-error",
-                agentId: challenger.id,
-                againstId: defender.id,
-                phase: "retort",
-                error: publicError("UPSTREAM_FAILURE", "对峙回应生成失败,本回合无法继续", true),
-              });
-            }
-          })(),
-          (async () => {
-            send({ type: "retort-start", agentId: defender.id, againstId: challenger.id });
-            try {
-              const reaction = await generateStructured({
-                instructions: buildRetortInstructions(defender),
-                prompt: buildRetortPrompt({
-                  environment,
-                  character: defender,
-                  opponent: challenger,
-                  ownLine: pair.defender.reaction.speech,
-                  opponentLine: pair.challenger.reaction.speech,
-                }),
-                schema: agentReactionSchema,
-                temperature: 0.9,
-                maxOutputTokens: 700,
-                abortSignal: request.signal,
-              });
-              const parsed = agentReactionSchema.parse(reaction);
-              send({
-                type: "agent-retort",
-                agentId: defender.id,
-                againstId: challenger.id,
-                reaction: parsed,
-              });
-            } catch (error) {
-              console.error(`${defender.name} 对峙失败`, error);
-              hasAgentFailure = true;
-              send({
-                type: "agent-error",
-                agentId: defender.id,
-                againstId: challenger.id,
-                phase: "retort",
-                error: publicError("UPSTREAM_FAILURE", "对峙回应生成失败,本回合无法继续", true),
-              });
-            }
-          })(),
-        ]);
+        if (retortRun) await Promise.resolve(retortRun);
       };
 
       const close = () => {

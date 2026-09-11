@@ -614,7 +614,7 @@ export function endingForMetrics(metrics: WorldMetrics): WorldEnding {
       reason: `世界均值 ${avg},各条战线均稳固,堪称最优世界线。`,
     };
   }
-  if (avg >= 55) {
+  if (avg >= 45 && min.value >= 20) {
     return {
       type: "balanced",
       title: "均势收束,各方止血",
