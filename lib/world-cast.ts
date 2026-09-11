@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { publicErrorSchema } from "@/lib/app-error";
-
-export const worldCastRequestSchema = z.object({
+const scenarioSchema = z.object({
   scenarioId: z.string().trim().min(1).max(100),
   title: z.string().trim().min(1).max(300),
   content: z.string().trim().max(6000),
@@ -47,6 +45,14 @@ const characterSchema = z.object({
   redLine: z.string().describe("角色绝不会接受的结果或底线"),
 });
 
+export const characterRosterSchema = characterSchema.pick({
+  id: true,
+  name: true,
+  identity: true,
+  faction: true,
+  archetype: true,
+});
+
 export const playerCharacterSchema = characterSchema.extend({
   decisionPower: z.string().describe("玩家扮演此角色时能直接调动的关键资源或权力"),
   privateGoal: z
@@ -85,21 +91,40 @@ export const worldCastSchema = z.object({
     .describe("四个将在后续回合中分别由独立 AI Agent 扮演的角色"),
 });
 
+export const worldCastRequestSchema = z.discriminatedUnion("stage", [
+  scenarioSchema.extend({ stage: z.literal("setting") }),
+  z.object({
+    stage: z.literal("player"),
+    setting: worldSettingSchema,
+    roster: characterRosterSchema,
+    existing: z.array(playerCharacterSchema).max(3),
+  }),
+  z.object({
+    stage: z.literal("agent"),
+    setting: worldSettingSchema,
+    players: z.array(playerCharacterSchema).length(3),
+    roster: characterRosterSchema,
+  }),
+]);
+
+export const worldCastSettingResponseSchema = z.object({
+  setting: worldSettingSchema,
+  playerRoster: z.array(characterRosterSchema).length(3),
+  agentRoster: z.array(characterRosterSchema).length(4),
+});
+
+export const worldCastPlayerResponseSchema = z.object({
+  character: playerCharacterSchema,
+});
+
+export const worldCastAgentResponseSchema = z.object({
+  character: agentCharacterSchema,
+});
+
 export type WorldCast = z.infer<typeof worldCastSchema>;
 
 export const worldCastStageSchema = z.enum(["setting", "players", "agents"]);
 export type WorldCastStage = z.infer<typeof worldCastStageSchema>;
-
-export const worldCastStreamEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("stage"), stage: worldCastStageSchema }),
-  z.object({ type: z.literal("setting"), setting: worldSettingSchema }),
-  z.object({ type: z.literal("player-character"), character: playerCharacterSchema }),
-  z.object({ type: z.literal("agent-character"), character: agentCharacterSchema }),
-  z.object({ type: z.literal("complete"), cast: worldCastSchema }),
-  z.object({ type: z.literal("error"), error: publicErrorSchema }),
-]);
-
-export type WorldCastStreamEvent = z.infer<typeof worldCastStreamEventSchema>;
 
 export function worldCouncilStorageKey(scenarioId: string) {
   return `world-council:${scenarioId}`;

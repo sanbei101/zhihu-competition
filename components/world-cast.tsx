@@ -3,6 +3,7 @@
 import { Bot, LoaderCircle, Play, RefreshCw, Sparkles, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { ZodType } from "zod";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,15 +18,41 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/toast";
 import { errorEnvelopeSchema, userErrorMessage } from "@/lib/app-error";
-import { readNdjsonStream } from "@/lib/ndjson-stream";
 import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
 import {
   type WorldCast,
   type WorldCastStage,
-  worldCastStreamEventSchema,
+  worldCastAgentResponseSchema,
+  worldCastPlayerResponseSchema,
+  worldCastSchema,
+  worldCastSettingResponseSchema,
   worldCouncilStorageKey,
 } from "@/lib/world-cast";
 import { createInitialGameSession } from "@/lib/world-ending";
+
+async function requestCastStage<T>(body: unknown, schema: ZodType<T>): Promise<T> {
+  const response = await fetch("/api/world-cast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let message = `角色生成请求失败(${response.status})`;
+    try {
+      const responseBody: unknown = await response.json();
+      const parsedError = errorEnvelopeSchema.safeParse(responseBody);
+      if (parsedError.success) message = userErrorMessage(parsedError.data.error);
+    } catch {
+      // 保留状态码兜底提示
+    }
+    throw new Error(message);
+  }
+
+  const parsed = schema.safeParse(await response.json());
+  if (!parsed.success) throw new Error("角色生成响应结构不匹配");
+  return parsed.data;
+}
 
 interface WorldCastProps {
   scenario: {
@@ -77,51 +104,57 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     const startedAt = Date.now();
 
     try {
-      const response = await fetch("/api/world-cast", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const stage1 = await requestCastStage(
+        {
+          stage: "setting",
           scenarioId: scenario.id,
           title: scenario.title,
           content: scenario.content,
-        }),
-      });
+        },
+        worldCastSettingResponseSchema,
+      );
+      setStreamingSetting(stage1.setting);
 
-      if (!response.ok) {
-        let message = `角色生成请求失败(${response.status})`;
-        try {
-          const body: unknown = await response.json();
-          const parsedError = errorEnvelopeSchema.safeParse(body);
-          if (parsedError.success) message = userErrorMessage(parsedError.data.error);
-        } catch {
-          // 保留状态码兜底提示
-        }
-        throw new Error(message);
+      setStreamingStage("players");
+      const playerCharacters: WorldCast["playerCharacters"] = [];
+      for (const roster of stage1.playerRoster) {
+        // 角色需要保留生成顺序,同时让每次请求独立受 EdgeOne 函数时限保护。
+        // eslint-disable-next-line no-await-in-loop
+        const result = await requestCastStage(
+          {
+            stage: "player",
+            setting: stage1.setting,
+            roster,
+            existing: playerCharacters,
+          },
+          worldCastPlayerResponseSchema,
+        );
+        playerCharacters.push(result.character);
+        setStreamingPlayers([...playerCharacters]);
       }
-      const completedCast: { value: WorldCast | null } = { value: null };
 
-      await readNdjsonStream(response, worldCastStreamEventSchema, (event) => {
-        if (event.type === "stage") setStreamingStage(event.stage);
-        if (event.type === "setting") setStreamingSetting(event.setting);
-        if (event.type === "player-character") {
-          setStreamingPlayers((current) =>
-            current.some((character) => character.id === event.character.id)
-              ? current
-              : [...current, event.character],
-          );
-        }
-        if (event.type === "agent-character") {
-          setStreamingAgents((current) =>
-            current.some((character) => character.id === event.character.id)
-              ? current
-              : [...current, event.character],
-          );
-        }
-        if (event.type === "error") throw new Error(userErrorMessage(event.error));
-        if (event.type === "complete") completedCast.value = event.cast;
+      setStreamingStage("agents");
+      const agentCharacters: WorldCast["agentCharacters"] = [];
+      for (const roster of stage1.agentRoster) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await requestCastStage(
+          {
+            stage: "agent",
+            setting: stage1.setting,
+            players: playerCharacters,
+            roster,
+          },
+          worldCastAgentResponseSchema,
+        );
+        agentCharacters.push(result.character);
+        setStreamingAgents([...agentCharacters]);
+      }
+
+      const finalCast = worldCastSchema.parse({
+        setting: stage1.setting,
+        playerCharacters,
+        agentCharacters,
       });
-      const finalCast = completedCast.value;
-      if (!finalCast) throw new Error("角色阵容没有完整生成");
 
       setCast(finalCast);
       setStreamingSetting(finalCast.setting);
