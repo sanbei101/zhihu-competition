@@ -46,8 +46,8 @@ const HEADS: Record<string, Grid> = {
     "..hhhh..",
     ".hhhhhh.",
     ".hssssh.",
-    ".hkkkkh.",
-    ".hssssh.",
+    ".hskksh.",
+    ".hssmsh.",
     ".hsSSsh.",
     "..ssss..",
     "...ss...",
@@ -57,7 +57,7 @@ const HEADS: Record<string, Grid> = {
     "..hhhh..",
     ".hssssh.",
     ".hskksh.",
-    ".hssssh.",
+    ".hssmsh.",
     ".hsSSsh.",
     ".ssssss.",
     "..ssss..",
@@ -67,7 +67,7 @@ const HEADS: Record<string, Grid> = {
     ".hhhhhh.",
     ".hssssh.",
     ".hskksh.",
-    ".hssssh.",
+    ".hssmsh.",
     ".hSSSsh.",
     "..ssss..",
     "...ss...",
@@ -76,8 +76,8 @@ const HEADS: Record<string, Grid> = {
 
 const BEARDS: Record<string, Grid | null> = {
   none: null,
-  short: ["..hhhh..", ".hhhhhh.", "..hhhh..", "........", "........"],
-  long: ["..hhhh..", ".hhhhhh.", ".hhhhhh.", "..hhhh..", "...hh..."],
+  short: ["........", "........", "..hhhh..", ".hhhhhh.", "..hhhh.."],
+  long: ["........", "........", ".hhhhhh.", ".hhhhhh.", "..hhhh.."],
 };
 
 // ==================== 部件:冠帽 ====================
@@ -253,18 +253,18 @@ interface ArchetypeKit {
 export type PortraitMotion = "scribe" | "guard" | "plead" | "weigh" | "scan" | "work";
 
 const GESTURES: Record<string, Grid> = {
-  /** 持笏低眉:文臣的手臂收在袖中,不是所有人都垂直站立。 */
-  scribe: ["....o.", "...ox.", "..oxx.", "...x.."],
-  /** 按住刀柄:武将的肩线与重心明显偏向一侧。 */
-  guard: [".....o", "....ox", "...oxx", "....x."],
+  /** 持笏低眉:文臣的手臂收在袖中,保留手部轮廓。 */
+  scribe: ["......", ".s....", ".ss...", "..s..."],
+  /** 按住刀柄:武将的一只手落在腰侧。 */
+  guard: ["......", "....s.", "....ss", ".....s"],
   /** 展袖示意:使者的手臂朝对面打开。 */
-  plead: ["o.....", "xo....", "xxo...", ".x...."],
+  plead: ["s.....", "ss....", ".s....", ".s...."],
   /** 托住钱袋:商贾的手势更低,轮廓也更圆。 */
-  weigh: [".....o", "....ox", "....xx", ".....x"],
+  weigh: ["......", "....s.", "...ss.", "....s."],
   /** 举板核对:技术人员一只手抬到胸前。 */
-  scan: ["...o..", "...ox.", "...xx.", "....x."],
-  /** 扛包/递物:平民的手势更宽,带一点前倾感。 */
-  work: ["o.....", "xo....", "xx....", ".x...."],
+  scan: ["...s..", "...ss.", "....s.", "....s."],
+  /** 扛包/递物:平民的手臂自然垂下。 */
+  work: ["s.....", "ss....", ".s....", ".s...."],
 };
 
 /**
@@ -387,6 +387,7 @@ export function portraitPaletteOf(skin: ScenarioSkin, seed = 0): Record<string, 
     e: pixel.e,
     s: mix(SKIN_TONE, "#000000", shift * 0.02),
     S: mix(SKIN_TONE, pixel.o, 0.3),
+    m: mix(SKIN_TONE, "#000000", 0.58),
     w: "#f2ede0",
   };
 }
@@ -415,6 +416,33 @@ function stamp(canvas: string[][], part: Grid, atX: number, atY: number) {
 function put(canvas: string[][], x: number, y: number, key: string) {
   if (y < 0 || y >= CANVAS_H || x < 0 || x >= CANVAS_W) return;
   canvas[y][x] = key;
+}
+
+function drawHumanAnatomy(canvas: string[][], bodyKind: string) {
+  // 领口、手与脚把宽袍重新拆回一个能读出姿态的人形。
+  put(canvas, 10, 11, "s");
+  put(canvas, 11, 11, "s");
+  put(canvas, 4, 18, "s");
+  put(canvas, 19, 18, "s");
+
+  // 甲胄、短打和外套露出两条腿;长袍保留开衩,不画成机器人方底。
+  if (bodyKind === "robe") {
+    put(canvas, 11, 24, ".");
+    put(canvas, 12, 24, ".");
+  } else {
+    for (const y of [23, 24, 25, 26]) {
+      put(canvas, 11, y, ".");
+      put(canvas, 12, y, ".");
+      put(canvas, 9, y, "x");
+      put(canvas, 10, y, "x");
+      put(canvas, 13, y, "x");
+      put(canvas, 14, y, "x");
+    }
+  }
+  put(canvas, 8, 27, "o");
+  put(canvas, 9, 27, "o");
+  put(canvas, 14, 27, "o");
+  put(canvas, 15, 27, "o");
 }
 
 /** FNV-1a:同一个 id 永远挑到同一套部件 */
@@ -575,7 +603,8 @@ export function portraitFor(subject: PortraitSubject, skin: ScenarioSkin): Portr
   const key = `${subject.id}:${subject.name}`;
   const seed = hashOf(key);
 
-  const body = BODIES[pick(kit.bodies, `${key}:body`)];
+  const bodyKind = pick(kit.bodies, `${key}:body`);
+  const body = BODIES[bodyKind];
   const head = HEADS[pick(kit.faces, `${key}:face`)];
   const beard = BEARDS[pick(kit.beards, `${key}:beard`)];
   const hat = HATS[pick(kit.hats, `${key}:hat`)];
@@ -585,6 +614,7 @@ export function portraitFor(subject: PortraitSubject, skin: ScenarioSkin): Portr
   function frameOf(frame: number): string[] {
     const canvas = makeCanvas();
     stamp(canvas, body, BODY_AT.x, BODY_AT.y);
+    drawHumanAnatomy(canvas, bodyKind);
     stamp(canvas, head, HEAD_AT.x, HEAD_AT.y);
     if (beard) stamp(canvas, beard, BEARD_AT.x, BEARD_AT.y);
 
@@ -593,11 +623,7 @@ export function portraitFor(subject: PortraitSubject, skin: ScenarioSkin): Portr
     stamp(canvas, gesture, 3, 16);
     if (prop) stamp(canvas, prop, PROP_AT.x - frame, PROP_AT.y);
 
-    // 第二帧眨眼,并让手中物轻微换重心,避免整张立绘只是 CSS 在抖。
-    if (frame === 1) {
-      put(canvas, HEAD_AT.x + 3, HEAD_AT.y + 3, "s");
-      put(canvas, HEAD_AT.x + 4, HEAD_AT.y + 3, "s");
-    }
+    // 第二帧只让道具换一点重心,脸部特征始终保持可读。
     return canvas.map((row) => row.join(""));
   }
 
