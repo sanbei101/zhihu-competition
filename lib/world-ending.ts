@@ -237,6 +237,10 @@ export type RetortRecord = z.infer<typeof retortRecordSchema>;
 
 export const turnRecordSchema = z.object({
   round: z.number().int().min(1),
+  /** 玩家从本回合候选未来中选入的分支编号,旧存档可以没有。 */
+  branchId: z.string().min(1).max(20).optional(),
+  /** 分支标题,用于在世界线时间线中回放,旧存档可以没有。 */
+  branchTitle: z.string().min(1).max(100).optional(),
   decision: z.string(),
   /** 第一轮:四个 Agent 各自表态 */
   reactions: z.array(turnReactionRecordSchema),

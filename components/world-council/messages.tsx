@@ -147,10 +147,12 @@ export function PlayerDecisionMessage({
   playerName,
   decision,
   roundLabel,
+  branchLabel,
 }: {
   playerName: string;
   decision: string;
   roundLabel?: string;
+  branchLabel?: string;
 }) {
   return (
     <Message align="end">
@@ -160,6 +162,7 @@ export function PlayerDecisionMessage({
       <MessageContent>
         <MessageHeader>
           {playerName} · 你的抉择{roundLabel ? ` · ${roundLabel}` : null}
+          {branchLabel ? ` · ${branchLabel}` : null}
         </MessageHeader>
         <div className="bg-primary text-primary-foreground max-w-4xl rounded-lg px-4 py-3 leading-7">
           {decision}

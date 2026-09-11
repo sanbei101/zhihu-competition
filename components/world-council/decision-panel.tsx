@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Flag, LoaderCircle, PauseCircle, ScrollText } from "lucide-react";
+import { Check, Flag, GitFork, LoaderCircle, PauseCircle, ScrollText } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ interface DecisionPanelProps {
   ended: boolean;
   currentTurnSettled: boolean;
   submittedDecision: string;
+  submittedBranch: DecisionOption | null;
   isGeneratingOptions: boolean;
   options: RoundOptions | null;
   optionsError: string;
@@ -111,6 +112,7 @@ export function DecisionPanel({
   ended,
   currentTurnSettled,
   submittedDecision,
+  submittedBranch,
   isGeneratingOptions,
   options,
   optionsError,
@@ -162,7 +164,15 @@ export function DecisionPanel({
           ) : null}
           {options && !isGeneratingOptions ? (
             <div className="space-y-3">
-              <p className="text-sm leading-7">{options.situation}</p>
+              <div className="border-primary/30 bg-primary/5 flex items-start gap-3 rounded-md border p-3">
+                <GitFork className="text-primary mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">世界线分叉点</p>
+                  <p className="text-muted-foreground mt-1 text-xs leading-5">
+                    {options.situation}
+                  </p>
+                </div>
+              </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {options.options.map((option, index) => (
                   <Button
@@ -174,7 +184,7 @@ export function DecisionPanel({
                     className="h-auto min-w-0 flex-col items-start gap-2 p-4 text-left"
                   >
                     <span className="flex w-full min-w-0 items-start gap-2 whitespace-normal">
-                      <span className="bg-primary text-primary-foreground grid size-5 shrink-0 place-items-center rounded font-mono text-[11px]">
+                      <span className="bg-primary text-primary-foreground grid size-6 shrink-0 place-items-center rounded font-mono text-xs">
                         {["A", "B", "C", "D"][index] ?? index + 1}
                       </span>
                       <span className="min-w-0 flex-1 font-medium break-words">{option.title}</span>
@@ -218,6 +228,22 @@ export function DecisionPanel({
               </p>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {submittedBranch ? (
+        <div
+          className="border-primary/30 bg-primary/5 flex items-start gap-3 rounded-md border p-3"
+          aria-live="polite"
+        >
+          <GitFork className="text-primary mt-0.5 size-4 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              已进入世界线分支{" "}
+              {submittedBranch.id === "idle" ? "停驻" : submittedBranch.id.toUpperCase()}
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs leading-5">{submittedBranch.title}</p>
+          </div>
         </div>
       ) : null}
 

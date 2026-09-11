@@ -1,6 +1,14 @@
 "use client";
 
-import { ArrowLeft, CircleDot, Clock3, ScrollText, TrendingDown, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleDot,
+  Clock3,
+  GitFork,
+  ScrollText,
+  TrendingDown,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
+import { BranchTimeline } from "@/components/world-council/branch-timeline";
 import { DecisionPanel } from "@/components/world-council/decision-panel";
 import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-panel";
 import {
@@ -82,6 +91,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
   // 开场片头只在新开对局播一次:中途刷新、下一回合不再重播。
   const [showIntro, setShowIntro] = useState(initial.turns.length === 0);
   const [options, setOptions] = useState<RoundOptions | null>(null);
+  const [submittedBranch, setSubmittedBranch] = useState<DecisionOption | null>(null);
   const [isGeneratingOptions, setIsGeneratingOptions] = useState(false);
   const [optionsError, setOptionsError] = useState("");
   const [optionsAttempt, setOptionsAttempt] = useState(0);
@@ -454,6 +464,8 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
       ...current,
       {
         round,
+        branchId: submittedBranch?.id,
+        branchTitle: submittedBranch?.title,
         decision: pendingJudgeRef.current?.decision ?? submittedDecision,
         reactions,
         retorts,
@@ -518,6 +530,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     if (ended) return;
     setRound(round + 1);
     setSubmittedDecision("");
+    setSubmittedBranch(null);
     setOptions(null);
     setOptionsError("");
     setReactions([]);
@@ -550,6 +563,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
     if (!content || isResolving || isJudging || isTurnComplete || ended) return;
 
     setSubmittedDecision(content);
+    setSubmittedBranch(option);
     setReactions([]);
     setRetorts([]);
     setTurnBeatEvents([]);
@@ -621,6 +635,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
       toast.add({ title: "回合推演失败", description: message, type: "error" });
       // 失败时收回提交态,选项卡片恢复可点,保证可以直接重试
       setSubmittedDecision("");
+      setSubmittedBranch(null);
       setIsResolving(false);
       return;
     }
@@ -716,7 +731,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
       </div>
 
       <Tabs defaultValue="council" className="gap-4">
-        <TabsList className="grid h-10 w-full grid-cols-2 sm:w-fit sm:min-w-80">
+        <TabsList className="grid h-10 w-full grid-cols-3 sm:w-fit sm:min-w-96">
           <TabsTrigger value="council">
             <Users data-icon="inline-start" />
             议事现场
@@ -724,6 +739,10 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
           <TabsTrigger value="messages">
             <ScrollText data-icon="inline-start" />
             消息记录
+          </TabsTrigger>
+          <TabsTrigger value="branches">
+            <GitFork data-icon="inline-start" />
+            世界线
           </TabsTrigger>
         </TabsList>
 
@@ -758,6 +777,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
                     ended={ended}
                     currentTurnSettled={currentTurnSettled}
                     submittedDecision={submittedDecision}
+                    submittedBranch={submittedBranch}
                     isGeneratingOptions={isGeneratingOptions}
                     options={options}
                     optionsError={optionsError}
@@ -819,6 +839,19 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="branches" className="mt-0">
+          <BranchTimeline
+            round={round}
+            turns={turns}
+            options={options}
+            submittedBranch={submittedBranch}
+            ended={ended}
+            ending={ending}
+            choiceDisabled={choiceDisabled}
+            onChooseOption={(option) => void chooseOption(option)}
+          />
         </TabsContent>
       </Tabs>
     </div>

@@ -105,6 +105,11 @@ export function Timeline({
                     playerName={activePlayer.name}
                     decision={turn.decision}
                     roundLabel={`第 ${turn.round} 回合`}
+                    branchLabel={
+                      turn.branchId
+                        ? `世界线分支 ${turn.branchId === "idle" ? "停驻" : turn.branchId.toUpperCase()}`
+                        : undefined
+                    }
                   />
                 </MessageScrollerItem>
                 {turn.reactions.map(({ agentId, reaction }) => {
