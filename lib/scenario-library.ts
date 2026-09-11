@@ -473,7 +473,7 @@ export const SCENARIO_THEMES: ScenarioTheme[] = [
       },
       {
         id: "401656499",
-        title: "人类如果点亮"不必睡眠"的技能,世界将会出现何种变革?",
+        title: '人类如果点亮"不必睡眠"的技能,世界将会出现何种变革?',
         url: "https://www.zhihu.com/question/401656499/answer/1285331223",
         votes: 74,
         comments: 11,

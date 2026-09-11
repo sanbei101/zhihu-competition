@@ -1,5 +1,6 @@
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { type FlexibleSchema, NoObjectGeneratedError, Output, generateText } from "ai";
+import { jsonrepair } from "jsonrepair";
 
 /**
  * 模型接入点。默认走 DeepSeek 官方端点;
@@ -158,7 +159,44 @@ export const JSON_ONLY_INSTRUCTION = `
 
 输出格式:你的整条回复必须是一个裸 JSON 对象。不要用 markdown 代码块包裹,不要写 \`\`\`json,不要在 JSON 前后添加任何解释、前言或后记。`;
 
-/** 从模型原始回复里硬挖出 JSON 对象(剥围栏、去前后废话、容错尾逗号)。 */
+/** 删除根对象提前闭合后留下的逗号,例如 `{"a":1},"b":2}`。 */
+function removePrematureRootClosure(text: string): string | undefined {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+
+    if (character === '"') {
+      inString = true;
+    } else if (character === "{") {
+      depth += 1;
+    } else if (character === "}") {
+      depth -= 1;
+      if (
+        depth === 0 &&
+        text
+          .slice(index + 1)
+          .trimStart()
+          .startsWith(",")
+      ) {
+        return text.slice(0, index) + text.slice(index + 1);
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/** 从模型原始回复里硬挖出 JSON 对象(剥围栏、去前后废话、修复常见 JSON 错误)。 */
 export function extractJsonObject(text: string | undefined): unknown {
   if (!text) return undefined;
 
@@ -178,6 +216,23 @@ export function extractJsonObject(text: string | undefined): unknown {
     for (const attempt of [trimmed, trimmed.replace(/,\s*([}\]])/g, "$1")]) {
       try {
         const parsed: unknown = JSON.parse(attempt);
+        if (parsed !== null && typeof parsed === "object") return parsed;
+      } catch {
+        // 换下一种候选文本继续试
+      }
+
+      const withoutPrematureClosure = removePrematureRootClosure(attempt);
+      if (withoutPrematureClosure !== undefined) {
+        try {
+          const parsed: unknown = JSON.parse(withoutPrematureClosure);
+          if (parsed !== null && typeof parsed === "object") return parsed;
+        } catch {
+          // 换下一种候选文本继续试
+        }
+      }
+
+      try {
+        const parsed: unknown = JSON.parse(jsonrepair(attempt));
         if (parsed !== null && typeof parsed === "object") return parsed;
       } catch {
         // 换下一种候选文本继续试
