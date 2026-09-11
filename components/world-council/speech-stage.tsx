@@ -4,7 +4,12 @@ import { FastForward, Gavel, Swords } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { PixelSprite } from "@/components/pixel/pixel-sprite";
-import { directorEmblem, portraitFor, type PortraitSubject } from "@/components/pixel/portraits";
+import {
+  directorEmblem,
+  portraitFor,
+  portraitMotionClass,
+  type PortraitSubject,
+} from "@/components/pixel/portraits";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,13 +84,7 @@ function StageFigure({
 
   return (
     <div className={dimmed ? "opacity-45" : undefined}>
-      <div
-        className={
-          talking
-            ? "animate-portrait-talk motion-reduce:animate-none"
-            : "animate-portrait-idle motion-reduce:animate-none"
-        }
-      >
+      <div className={`${portraitMotionClass(art.motion, talking)} motion-reduce:animate-none`}>
         <div className="origin-bottom scale-[0.72] sm:scale-100">
           <PixelSprite frames={art.frames} palette={art.palette} scale={scale} label={art.label} />
         </div>

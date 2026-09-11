@@ -3,7 +3,7 @@
 import { ShieldQuestion, Swords, UserRound } from "lucide-react";
 
 import { PixelSprite } from "@/components/pixel/pixel-sprite";
-import { portraitFor } from "@/components/pixel/portraits";
+import { portraitFor, portraitMotionClass } from "@/components/pixel/portraits";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -113,9 +113,10 @@ export function SeatsPanel({
           >
             <ItemMedia>
               <div
-                className={
-                  playerSpeaking ? "animate-portrait-talk motion-reduce:animate-none" : undefined
-                }
+                className={`${portraitMotionClass(
+                  playerPortrait.motion,
+                  playerSpeaking,
+                )} motion-reduce:animate-none`}
               >
                 <PixelSprite
                   frames={playerPortrait.frames}
@@ -197,9 +198,10 @@ export function SeatsPanel({
                   <div className="flex w-full items-center gap-2">
                     <ItemMedia>
                       <div
-                        className={
-                          speaking ? "animate-portrait-talk motion-reduce:animate-none" : undefined
-                        }
+                        className={`${portraitMotionClass(
+                          portrait.motion,
+                          speaking,
+                        )} motion-reduce:animate-none`}
                       >
                         <PixelSprite
                           frames={portrait.frames}

@@ -40,6 +40,40 @@ const HEAD: Grid = [
   "...ss...",
 ];
 
+const HEADS: Record<string, Grid> = {
+  composed: HEAD,
+  sharp: [
+    "..hhhh..",
+    ".hhhhhh.",
+    ".hssssh.",
+    ".hkkkkh.",
+    ".hssssh.",
+    ".hsSSsh.",
+    "..ssss..",
+    "...ss...",
+  ],
+  round: [
+    "...hh...",
+    "..hhhh..",
+    ".hssssh.",
+    ".hskksh.",
+    ".hssssh.",
+    ".hsSSsh.",
+    ".ssssss.",
+    "..ssss..",
+  ],
+  guarded: [
+    "..hhhh..",
+    ".hhhhhh.",
+    ".hssssh.",
+    ".hskksh.",
+    ".hssssh.",
+    ".hSSSsh.",
+    "..ssss..",
+    "...ss...",
+  ],
+};
+
 const BEARDS: Record<string, Grid | null> = {
   none: null,
   short: ["..hhhh..", ".hhhhhh.", "..hhhh..", "........", "........"],
@@ -211,7 +245,27 @@ interface ArchetypeKit {
   bodies: string[];
   beards: string[];
   props: string[];
+  faces: string[];
+  gestures: string[];
+  motion: PortraitMotion;
 }
+
+export type PortraitMotion = "scribe" | "guard" | "plead" | "weigh" | "scan" | "work";
+
+const GESTURES: Record<string, Grid> = {
+  /** 持笏低眉:文臣的手臂收在袖中,不是所有人都垂直站立。 */
+  scribe: ["....o.", "...ox.", "..oxx.", "...x.."],
+  /** 按住刀柄:武将的肩线与重心明显偏向一侧。 */
+  guard: [".....o", "....ox", "...oxx", "....x."],
+  /** 展袖示意:使者的手臂朝对面打开。 */
+  plead: ["o.....", "xo....", "xxo...", ".x...."],
+  /** 托住钱袋:商贾的手势更低,轮廓也更圆。 */
+  weigh: [".....o", "....ox", "....xx", ".....x"],
+  /** 举板核对:技术人员一只手抬到胸前。 */
+  scan: ["...o..", "...ox.", "...xx.", "....x."],
+  /** 扛包/递物:平民的手势更宽,带一点前倾感。 */
+  work: ["o.....", "xo....", "xx....", ".x...."],
+};
 
 /**
  * 原型 → 部件池。池子里重复写一项就是加权:同一原型的人不必各各不同,
@@ -223,36 +277,54 @@ const ARCHETYPE_KITS: Record<CharacterArchetype, ArchetypeKit> = {
     bodies: ["robe"],
     beards: ["long", "short", "none", "long"],
     props: ["none", "tablet"],
+    faces: ["composed", "sharp"],
+    gestures: ["scribe"],
+    motion: "scribe",
   },
   general: {
     hats: ["kui", "guan"],
     bodies: ["armor"],
     beards: ["short", "short", "long"],
     props: ["blade"],
+    faces: ["sharp", "guarded"],
+    gestures: ["guard"],
+    motion: "guard",
   },
   envoy: {
     hats: ["jin", "guan", "cap"],
     bodies: ["robe"],
     beards: ["none", "short"],
     props: ["staff"],
+    faces: ["composed", "round"],
+    gestures: ["plead"],
+    motion: "plead",
   },
   magnate: {
     hats: ["jin", "cap", "guan"],
     bodies: ["robe", "coat"],
     beards: ["short", "none", "none"],
     props: ["sack"],
+    faces: ["round", "composed"],
+    gestures: ["weigh"],
+    motion: "weigh",
   },
   technician: {
     hats: ["cap", "jin", "cap"],
     bodies: ["coat"],
     beards: ["none", "none", "short"],
     props: ["tablet"],
+    faces: ["sharp", "round"],
+    gestures: ["scan"],
+    motion: "scan",
   },
   commoner: {
     hats: ["dou", "cap", "jin"],
     bodies: ["tunic"],
     beards: ["short", "none"],
     props: ["sack", "staff", "none"],
+    faces: ["round", "composed"],
+    gestures: ["work"],
+    motion: "work",
   },
 };
 
@@ -338,6 +410,11 @@ function stamp(canvas: string[][], part: Grid, atX: number, atY: number) {
       canvas[targetY][targetX] = key;
     }
   });
+}
+
+function put(canvas: string[][], x: number, y: number, key: string) {
+  if (y < 0 || y >= CANVAS_H || x < 0 || x >= CANVAS_W) return;
+  canvas[y][x] = key;
 }
 
 /** FNV-1a:同一个 id 永远挑到同一套部件 */
@@ -446,6 +523,7 @@ export function directorEmblem(skin: ScenarioSkin): PortraitDef {
     frames: [grid.map((row) => row.join(""))],
     palette: portraitPaletteOf(skin),
     label: "世界线导演的徽记",
+    motion: "director",
   };
 }
 
@@ -454,6 +532,32 @@ export interface PortraitDef {
   frames: string[][];
   palette: Record<string, string>;
   label: string;
+  motion: PortraitMotion | "director";
+}
+
+/** 让不同身份拥有不同重心,说话时也不会全员做同一个上下弹跳。 */
+export function portraitMotionClass(motion: PortraitDef["motion"], talking: boolean): string {
+  if (motion === "director") {
+    return talking ? "animate-portrait-talk" : "animate-portrait-idle";
+  }
+  if (talking) {
+    return {
+      scribe: "animate-portrait-scribe-talk",
+      guard: "animate-portrait-guard-talk",
+      plead: "animate-portrait-plead-talk",
+      weigh: "animate-portrait-weigh-talk",
+      scan: "animate-portrait-scan-talk",
+      work: "animate-portrait-work-talk",
+    }[motion];
+  }
+  return {
+    scribe: "animate-portrait-scribe",
+    guard: "animate-portrait-guard",
+    plead: "animate-portrait-plead",
+    weigh: "animate-portrait-weigh",
+    scan: "animate-portrait-scan",
+    work: "animate-portrait-work",
+  }[motion];
 }
 
 export interface PortraitSubject {
@@ -471,22 +575,36 @@ export function portraitFor(subject: PortraitSubject, skin: ScenarioSkin): Portr
   const key = `${subject.id}:${subject.name}`;
   const seed = hashOf(key);
 
-  const canvas = makeCanvas();
-  stamp(canvas, BODIES[pick(kit.bodies, `${key}:body`)], BODY_AT.x, BODY_AT.y);
-  stamp(canvas, HEAD, HEAD_AT.x, HEAD_AT.y);
-
+  const body = BODIES[pick(kit.bodies, `${key}:body`)];
+  const head = HEADS[pick(kit.faces, `${key}:face`)];
   const beard = BEARDS[pick(kit.beards, `${key}:beard`)];
-  if (beard) stamp(canvas, beard, BEARD_AT.x, BEARD_AT.y);
-
-  // 冠帽最后盖上去,压住头顶那一排头发
-  stamp(canvas, HATS[pick(kit.hats, `${key}:hat`)], HAT_AT.x, HAT_AT.y);
-
+  const hat = HATS[pick(kit.hats, `${key}:hat`)];
   const prop = PROPS[pick(kit.props, `${key}:prop`)];
-  if (prop) stamp(canvas, prop, PROP_AT.x, PROP_AT.y);
+  const gesture = GESTURES[pick(kit.gestures, `${key}:gesture`)];
+
+  function frameOf(frame: number): string[] {
+    const canvas = makeCanvas();
+    stamp(canvas, body, BODY_AT.x, BODY_AT.y);
+    stamp(canvas, head, HEAD_AT.x, HEAD_AT.y);
+    if (beard) stamp(canvas, beard, BEARD_AT.x, BEARD_AT.y);
+
+    // 冠帽最后盖上去,压住头顶那一排头发
+    stamp(canvas, hat, HAT_AT.x, HAT_AT.y);
+    stamp(canvas, gesture, 3, 16);
+    if (prop) stamp(canvas, prop, PROP_AT.x - frame, PROP_AT.y);
+
+    // 第二帧眨眼,并让手中物轻微换重心,避免整张立绘只是 CSS 在抖。
+    if (frame === 1) {
+      put(canvas, HEAD_AT.x + 3, HEAD_AT.y + 3, "s");
+      put(canvas, HEAD_AT.x + 4, HEAD_AT.y + 3, "s");
+    }
+    return canvas.map((row) => row.join(""));
+  }
 
   return {
-    frames: [canvas.map((row) => row.join(""))],
+    frames: [frameOf(0), frameOf(1)],
     palette: portraitPaletteOf(skin, seed),
     label: `${subject.name}的立绘`,
+    motion: kit.motion,
   };
 }
