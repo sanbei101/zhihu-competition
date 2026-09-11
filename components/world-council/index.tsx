@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CircleDot, Clock3, TrendingDown } from "lucide-react";
+import { ArrowLeft, CircleDot, Clock3, ScrollText, TrendingDown, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +11,7 @@ import { ThemeScene } from "@/components/pixel/theme-scene";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
 import { DecisionPanel } from "@/components/world-council/decision-panel";
 import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-panel";
@@ -714,29 +715,97 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
         </div>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-        <SeatsPanel
-          cast={cast}
-          activePlayer={activePlayer}
-          agentStatuses={agentStatuses}
-          relations={relations}
-          ultimatum={ultimatum}
-          speakingId={stageSpeakerId}
-          opposingId={stageOpponentId}
-          skin={skin}
-        />
+      <Tabs defaultValue="council" className="gap-4">
+        <TabsList className="grid h-10 w-full grid-cols-2 sm:w-fit sm:min-w-80">
+          <TabsTrigger value="council">
+            <Users data-icon="inline-start" />
+            议事现场
+          </TabsTrigger>
+          <TabsTrigger value="messages">
+            <ScrollText data-icon="inline-start" />
+            消息记录
+          </TabsTrigger>
+        </TabsList>
 
-        <div className="order-1 min-w-0 space-y-4 lg:order-2">
-          <SpeechStage
-            skin={skin}
-            beat={currentBeat}
-            player={activePlayer}
-            phase={stagePhase}
-            idleHint={stageIdleHint}
-            onBeatDone={handleBeatDone}
-            onSkip={skipPerformance}
-          />
+        <TabsContent value="council" className="mt-0">
+          <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
+            <SeatsPanel
+              cast={cast}
+              activePlayer={activePlayer}
+              agentStatuses={agentStatuses}
+              relations={relations}
+              ultimatum={ultimatum}
+              speakingId={stageSpeakerId}
+              opposingId={stageOpponentId}
+              skin={skin}
+            />
 
+            <div className="order-1 min-w-0 space-y-4 lg:order-2">
+              <SpeechStage
+                skin={skin}
+                beat={currentBeat}
+                player={activePlayer}
+                phase={stagePhase}
+                idleHint={stageIdleHint}
+                onBeatDone={handleBeatDone}
+                onSkip={skipPerformance}
+              />
+
+              <Card className="shadow-none">
+                <CardContent className="p-0">
+                  <DecisionPanel
+                    cast={cast}
+                    ended={ended}
+                    currentTurnSettled={currentTurnSettled}
+                    submittedDecision={submittedDecision}
+                    isGeneratingOptions={isGeneratingOptions}
+                    options={options}
+                    optionsError={optionsError}
+                    onRetryOptions={retryOptions}
+                    choiceDisabled={choiceDisabled}
+                    onChooseOption={(option) => void chooseOption(option)}
+                    isResolving={isResolving}
+                    reactions={reactions}
+                    isJudging={isJudging}
+                    judgeError={judgeError}
+                    onRetryJudge={retryJudge}
+                    isTurnComplete={isTurnComplete}
+                    turnsCount={turns.length}
+                    onStartNextRound={startNextRound}
+                    canCloseVoluntarily={canCloseVoluntarily}
+                    onCloseVoluntarily={closeVoluntarily}
+                    onGoFinale={goFinale}
+                    turnError={turnError}
+                    crisis={crisis}
+                    ultimatum={ultimatum}
+                    idleOption={idleOption}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            <WorldTabs
+              cast={cast}
+              activePlayer={activePlayer}
+              metrics={metrics}
+              lastDeltas={lastDeltas}
+              lastEntropy={lastEntropy}
+              lastCrisisPenalty={lastCrisisPenalty}
+              round={round}
+              turns={turns}
+              relations={relations}
+              reactions={reactions}
+              retorts={retorts}
+              submittedDecision={submittedDecision}
+              currentTurnSettled={currentTurnSettled}
+              isTurnComplete={isTurnComplete}
+              crisis={crisis}
+              ultimatum={ultimatum}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="messages" className="mt-0">
           <Card className="shadow-none">
             <CardContent className="p-0">
               <Timeline
@@ -748,56 +817,10 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
                 showOpening={showOpening}
                 onGoFinale={goFinale}
               />
-              <DecisionPanel
-                cast={cast}
-                ended={ended}
-                currentTurnSettled={currentTurnSettled}
-                submittedDecision={submittedDecision}
-                isGeneratingOptions={isGeneratingOptions}
-                options={options}
-                optionsError={optionsError}
-                onRetryOptions={retryOptions}
-                choiceDisabled={choiceDisabled}
-                onChooseOption={(option) => void chooseOption(option)}
-                isResolving={isResolving}
-                reactions={reactions}
-                isJudging={isJudging}
-                judgeError={judgeError}
-                onRetryJudge={retryJudge}
-                isTurnComplete={isTurnComplete}
-                turnsCount={turns.length}
-                onStartNextRound={startNextRound}
-                canCloseVoluntarily={canCloseVoluntarily}
-                onCloseVoluntarily={closeVoluntarily}
-                onGoFinale={goFinale}
-                turnError={turnError}
-                crisis={crisis}
-                ultimatum={ultimatum}
-                idleOption={idleOption}
-              />
             </CardContent>
           </Card>
-        </div>
-
-        <WorldTabs
-          cast={cast}
-          activePlayer={activePlayer}
-          metrics={metrics}
-          lastDeltas={lastDeltas}
-          lastEntropy={lastEntropy}
-          lastCrisisPenalty={lastCrisisPenalty}
-          round={round}
-          turns={turns}
-          relations={relations}
-          reactions={reactions}
-          retorts={retorts}
-          submittedDecision={submittedDecision}
-          currentTurnSettled={currentTurnSettled}
-          isTurnComplete={isTurnComplete}
-          crisis={crisis}
-          ultimatum={ultimatum}
-        />
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
