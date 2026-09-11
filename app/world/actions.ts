@@ -370,7 +370,8 @@ export async function generateOptionsAction(input: unknown): Promise<ActionResul
       maxOutputTokens: 2600,
     });
 
-    return { ok: true, data: roundOptionsSchema.parse(object) };
+    const data = roundOptionsSchema.parse(object);
+    return { ok: true, data: { ...data, options: data.options.slice(0, 4) } };
   } catch (error) {
     console.error("回合选项生成失败", error);
     return fail(
