@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { generateOptionsAction, judgeTurnAction } from "@/app/world/actions";
+import { judgeTurnAction } from "@/app/world/actions/judge";
+import { generateOptionsAction } from "@/app/world/actions/options";
 import { ThemeScene } from "@/components/pixel/theme-scene";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

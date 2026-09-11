@@ -18,7 +18,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { ZodType } from "zod";
 
-import { generateFinaleChapterAction, generateFinalePlanAction } from "@/app/world/actions";
+import { generateFinaleChapterAction, generateFinalePlanAction } from "@/app/world/actions/finale";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
