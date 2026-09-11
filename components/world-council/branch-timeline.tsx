@@ -81,6 +81,36 @@ export function BranchTimeline({
                       {turn.decision}
                     </p>
                   </div>
+                  {turn.branchOptions && turn.branchOptions.length > 1 ? (
+                    <div className="border-border ml-3 border-l pl-4">
+                      <p className="text-muted-foreground mb-2 text-xs">当时未选择的未来</p>
+                      <div className="grid gap-2 md:grid-cols-3">
+                        {turn.branchOptions
+                          .filter((option) => option.id !== turn.branchId)
+                          .map((option) => (
+                            <div
+                              key={option.id}
+                              className="border-border/80 bg-background/70 min-w-0 rounded-md border border-dashed p-3"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                                  {option.id.toUpperCase()}
+                                </span>
+                                <p className="min-w-0 flex-1 text-xs leading-5 font-medium">
+                                  {option.title}
+                                </p>
+                                <Badge variant="outline" className="shrink-0">
+                                  {option.risk}
+                                </Badge>
+                              </div>
+                              <p className="text-muted-foreground mt-2 line-clamp-3 text-xs leading-5">
+                                {option.desc}
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { worldCastSchema } from "@/lib/world-cast";
+import { decisionOptionSchema } from "@/lib/world-options";
 import {
   agentReactionSchema,
   ultimatumDraftSchema,
@@ -241,6 +242,8 @@ export const turnRecordSchema = z.object({
   branchId: z.string().min(1).max(20).optional(),
   /** 分支标题,用于在世界线时间线中回放,旧存档可以没有。 */
   branchTitle: z.string().min(1).max(100).optional(),
+  /** 当时出现过的全部候选未来,用于回放未选择的分支。 */
+  branchOptions: z.array(decisionOptionSchema).min(1).max(4).optional(),
   decision: z.string(),
   /** 第一轮:四个 Agent 各自表态 */
   reactions: z.array(turnReactionRecordSchema),

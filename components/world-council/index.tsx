@@ -466,6 +466,7 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
         round,
         branchId: submittedBranch?.id,
         branchTitle: submittedBranch?.title,
+        branchOptions: options?.options,
         decision: pendingJudgeRef.current?.decision ?? submittedDecision,
         reactions,
         retorts,
