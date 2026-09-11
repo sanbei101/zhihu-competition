@@ -100,6 +100,8 @@ async function simulateEntity(input: {
   entityId: string;
   followedEntityId?: string;
   forkChoiceNote?: string;
+  /** 玩家上一阶段的取舍,转成一行行短句喂进来 */
+  directiveNotes?: string[];
   signal?: AbortSignal;
 }): Promise<EntitySimulationOutcome> {
   const { session, entityId } = input;
@@ -109,12 +111,11 @@ async function simulateEntity(input: {
 
   // 这个主体上一阶段做过什么 —— 提示词靠它来避免"每轮重复同一套动作"
   const previousReports = session.snapshots
-    .flatMap((snapshot) => snapshot.reports)
-    .filter((report) => report.entityId === entityId);
-  const recentEvents = (session.snapshots.at(-1)?.events ?? []).map((event) => ({
-    title: event.title,
-    summary: event.summary,
-  }));
+    .at(-1)
+    ?.reports.filter((report) => report.entityId === entityId);
+  const recentEvents = (session.snapshots.at(-1)?.events ?? [])
+    .slice(0, 3)
+    .map((event) => ({ title: event.title, summary: event.summary }));
   const timeBefore = latestTimeLabel(session);
 
   try {
@@ -126,14 +127,17 @@ async function simulateEntity(input: {
         currentEra: session.state.currentEra,
         timeBeforeLabel: timeBefore.label,
         elapsedSinceStart: timeBefore.elapsed,
-        previousReports,
+        previousReports: previousReports ?? [],
         recentEvents,
         followed: input.followedEntityId === entityId,
         ...(input.forkChoiceNote ? { forkChoiceNote: input.forkChoiceNote } : {}),
+        ...(input.directiveNotes?.length ? { directives: input.directiveNotes } : {}),
       }),
       schema: entityReportDraftSchema,
       temperature: 0.85,
-      maxOutputTokens: 1600,
+      // 报告只有 intent + 3 条行动,700 绰绰有余 —— 预算卡在这里,
+      // 主体写得啰嗦时会被截断重试,而不是让整个时代多等十几秒
+      maxOutputTokens: 700,
       abortSignal: input.signal,
     });
 
@@ -161,7 +165,7 @@ export async function adjudicate(input: {
   followedEntityId?: string;
   forkChoiceNote?: string;
   /** 玩家上一阶段在事件卡上的取舍。它已是条件,不是提议 */
-  directives?: PlayerDirective[];
+  directives?: { title: string; label: string; note: string }[];
   signal?: AbortSignal;
 }): Promise<Adjudication> {
   const result = await generateStructured({
@@ -175,7 +179,9 @@ export async function adjudicate(input: {
     }),
     schema: adjudicationSchema,
     temperature: 0.75,
-    maxOutputTokens: 8000,
+    // 5 条事件 + 结论 + 状态词,3000 封顶。超过就说明模型写超长了,
+    // 与其多等,不如让它被截断后走结构化抢救
+    maxOutputTokens: 3000,
     abortSignal: input.signal,
   });
 
@@ -235,6 +241,13 @@ export async function* simulateEraStream(input: {
         entityId: entity.id,
         ...(input.followedEntityId ? { followedEntityId: input.followedEntityId } : {}),
         ...(note ? { forkChoiceNote: note } : {}),
+        ...(input.directives?.length
+          ? {
+              directiveNotes: input.directives.map(
+                (item) => `在「${item.cardTitle}」上选了「${item.choiceLabel}」:${item.note}`,
+              ),
+            }
+          : {}),
         ...(input.signal ? { signal: input.signal } : {}),
       }),
     ),
@@ -281,7 +294,15 @@ export async function* simulateEraStream(input: {
       reports,
       ...(input.followedEntityId ? { followedEntityId: input.followedEntityId } : {}),
       ...(note ? { forkChoiceNote: note } : {}),
-      ...(input.directives?.length ? { directives: input.directives } : {}),
+      ...(input.directives?.length
+        ? {
+            directives: input.directives.map((item) => ({
+              title: item.cardTitle,
+              label: item.choiceLabel,
+              note: item.note,
+            })),
+          }
+        : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   } catch (error) {
@@ -305,7 +326,6 @@ export async function* simulateEraStream(input: {
   });
 
   for (const event of snapshot.events) yield { type: "world-event", event };
-  for (const chain of snapshot.causalChains) yield { type: "causal-chain", chain };
   if (fork) yield { type: "fork-detected", fork };
 
   yield { type: "snapshot", snapshot };

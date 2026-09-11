@@ -1,7 +1,5 @@
 import type { ScenarioProfile } from "@/lib/scenario-profiles";
 import type {
-  CausalChain,
-  CausalLink,
   EntityRelation,
   EntitySimulationReport,
   EraSnapshot,
@@ -20,13 +18,13 @@ import type {
 import type { Adjudication, SeedGeneration } from "@/lib/world-sim-events";
 
 /**
- * World Simulation v2 的状态合并器。
+ * World Simulation v4 的状态合并器。
  *
  * 这是全部"确定性限制"的落点。模型负责叙事与判断,这里负责**不让它越界**:
  *   - 指标永远钳制在 0-100,单阶段变化有上限
  *   - 事件必须有真实存在的行动者,没有就补一个或丢弃
- *   - 引用了不存在主体的关系、事件、因果链,就地剪掉而不是整份失败
- *   - 时间尺度不给固定步长,完全由裁决器给,这里只做递增与标签校验
+ *   - 引用了不存在主体的关系、事件,就地剪掉而不是整份失败
+ *   - 每批牌的额度、特殊事件的优先级都在这里裁
  *
  * 全部是纯函数:同输入必得同输出,不读时间、不用随机。
  * 这样 SSR 与 CSR 才会一致,存档也才能可靠复现。
@@ -38,9 +36,7 @@ import type { Adjudication, SeedGeneration } from "@/lib/world-sim-events";
 const GLOBAL_DELTA_LIMIT = 12;
 /** 重大事件发生时放宽到的上限(severity 为 critical) */
 const GLOBAL_DELTA_LIMIT_CRITICAL = 20;
-/** 单阶段单个主体内部指标的涨跌上限 */
-const ENTITY_DELTA_LIMIT = 15;
-/** 单阶段最多带几张"有取舍"的牌。超过这个数玩家会开始闭眼点 */
+/** 一批最多几张"有取舍"的牌。超过这个数玩家会开始闭眼点 */
 const MAX_CHOICE_CARDS = 4;
 
 const METRIC_FLOOR = 0;
@@ -52,6 +48,8 @@ const METRIC_CEILING = 100;
  * schema 那边的上限给得很宽(只防"完全失控"),真正的裁剪在这里做。
  * 理由是确定性:裁剪发生在服务端、是纯函数,所以同一份模型输出永远得到同一个世界,
  * 而"多写了一条就整份作废"会让一次完全可用的推演因为排版问题丢掉。
+ *
+ * v4 把 events 从 8 砍到 5:一批 5 张、玩家只翻一张,8 张是纯浪费。
  */
 const DISPLAY = {
   affectedDomains: 6,
@@ -64,11 +62,8 @@ const DISPLAY = {
   constraints: 4,
   entityMetrics: 5,
   relations: 8,
-  actions: 5,
-  proposedChanges: 6,
-  events: 8,
-  chains: 4,
-  links: 6,
+  actions: 3,
+  events: 5,
   forkAlternatives: 3,
   choices: 3,
   effects: 4,
@@ -288,19 +283,16 @@ export function normalizeSeed(input: {
 
 /**
  * 把主体 Agent 的草稿整理成正式报告。
- *
- * entityId 由服务端注入,列表按展示预算裁剪 —— 模型多写了一条不该让整份报告作废。
+ * entityId 由服务端注入,行动列表按展示预算裁剪。
  */
 export function normalizeEntityReport(
-  draft: { intent: string; actions: string[]; proposedChanges: string[]; reasoningSummary: string },
+  draft: { intent: string; actions: string[] },
   entityId: string,
 ): EntitySimulationReport {
   return {
     entityId,
     intent: draft.intent,
     actions: take(draft.actions, DISPLAY.actions),
-    proposedChanges: take(draft.proposedChanges, DISPLAY.proposedChanges),
-    reasoningSummary: draft.reasoningSummary,
   };
 }
 
@@ -326,7 +318,7 @@ export function createSession(seed: WorldSeed): WorldSimSession {
   };
 
   return {
-    version: 3,
+    version: 4,
     scenarioId: seed.scenarioId,
     scenarioTitle: seed.scenarioTitle,
     scenarioUrl: seed.scenarioUrl,
@@ -357,7 +349,7 @@ function applyMetricDeltas(
     const bounded = clamp(Math.round(delta.delta), -limit, limit);
     const next = clampMetric(metric.value + bounded);
     const actual = next - metric.value;
-    if (actual !== 0) applied.push({ metricId: metric.id, delta: actual, reason: delta.reason });
+    if (actual !== 0) applied.push({ metricId: metric.id, delta: actual });
 
     return { ...metric, value: next, delta: actual };
   });
@@ -365,7 +357,13 @@ function applyMetricDeltas(
   return { metrics, applied };
 }
 
-/** 把裁决的主体结算写回主体清单 */
+/**
+ * 把裁决的主体结算写回主体清单。
+ *
+ * v4 起只结算状态词。主体的内部指标与关系不再逐阶段重算 ——
+ * 牌局里主体只以"一枚徽记 + 一个状态词"出现,重算它们是纯 token 开销。
+ * 如果日后要做主体详情页,再把 metricShifts 加回来,那是一个独立的增量改动。
+ */
 function applyEntityUpdates(
   entities: WorldEntity[],
   updates: Adjudication["entityUpdates"],
@@ -374,43 +372,8 @@ function applyEntityUpdates(
 
   return entities.map((entity) => {
     const update = byId.get(entity.id);
-    if (!update) {
-      return { ...entity, changedThisEra: false };
-    }
-
-    const shiftById = new Map(update.metricShifts.map((shift) => [shift.metricId, shift.delta]));
-    const metrics = entity.metrics.map((metric) => {
-      const shift = shiftById.get(metric.id);
-      if (shift === undefined) return metric;
-      return {
-        ...metric,
-        value: clampMetric(
-          metric.value + clamp(Math.round(shift), -ENTITY_DELTA_LIMIT, ENTITY_DELTA_LIMIT),
-        ),
-      };
-    });
-
-    const relationShiftById = new Map(
-      update.relationShifts.map((shift) => [shift.targetEntityId, shift]),
-    );
-    const relations = entity.relations.map((relation) => {
-      const shift = relationShiftById.get(relation.targetEntityId);
-      if (!shift) return relation;
-      return {
-        ...relation,
-        affinity: clamp(Math.round(shift.affinity), -100, 100),
-        posture: shift.posture ?? relation.posture,
-        note: shift.note ?? relation.note,
-      };
-    });
-
-    return {
-      ...entity,
-      metrics,
-      relations,
-      status: update.status,
-      changedThisEra: update.changed,
-    };
+    if (!update) return { ...entity, changedThisEra: false };
+    return { ...entity, status: update.status, changedThisEra: update.changed };
   });
 }
 
@@ -419,8 +382,8 @@ function applyEntityUpdates(
  *
  * 确定性限制集中在这里:
  *   - 事件行动者必须存在,断引用就地补全或丢弃
- *   - 因果链链接必须指向存在的主体与事件
  *   - 指标变化按是否有 critical 事件选择上限
+ *   - 每批牌的额度:特殊事件优先,常规事件补位
  *   - 分叉只有在真的有 2 条以上候选时才落库
  */
 export function applyAdjudication(input: {
@@ -451,12 +414,10 @@ export function applyAdjudication(input: {
 
   // 3. 事件:清洗行动者,并按展示预算裁掉多余的
   //
-  //    带 choices 的事件就是"牌"。一阶段最多发 4 张,超出的降级成纯叙事事件 ——
-  //    让玩家连点八张牌不是深度,是疲劳。
-  //
-  //    分配牌额时**特殊事件优先**:危机 / 回响 / 异象被一条常规事件挤掉,
-  //    是这个阶段最不能接受的事。真实事故:一次裁决里模型给了 crisis,
-  //    但因为排在四张常规牌之后被降级,最后留下一个"自称危机却没有选项"的孤儿事件。
+  //    带 choices 的事件就是"牌"。分配牌额时**特殊事件优先**:
+  //    危机 / 回响 / 异象被一条常规事件挤掉,是这个阶段最不能接受的事。
+  //    真实事故:一次裁决里模型给了 crisis,却因为排在四张常规牌之后被降级,
+  //    最后留下一个"自称危机却没有选项"的孤儿事件。
   const metricIds = new Set(session.state.globalMetrics.map((metric) => metric.id));
   const ordered = take(adjudication.events, DISPLAY.events);
 
@@ -486,35 +447,7 @@ export function applyAdjudication(input: {
     return Object.assign(built, normalizeEventExtras(event, metricIds, withBudget.has(index)));
   });
 
-  // 事件 id 会重新编号,所以因果链里模型给的 eventId 引用一律丢弃,改由顺序承接
-  const eventIds = new Set(events.map((event) => event.id));
-
-  // 4. 因果链:剪掉断链,至少要剩下两跳
-  const causalChains: CausalChain[] = take(adjudication.causalChains, DISPLAY.chains)
-    .map((chain, chainIndex) => {
-      const links = take(
-        chain.links.filter((link) => !link.entityId || entityIds.has(link.entityId)),
-        DISPLAY.links,
-      ).map((link, linkIndex) => {
-        const next: CausalLink = {
-          id: `link-${era}-${chainIndex + 1}-${linkIndex + 1}`,
-          cause: link.cause,
-          effect: link.effect,
-        };
-        if (link.entityId) next.entityId = link.entityId;
-        // 事件 id 会被重新编号,只有确实存在的那部分引用才保留
-        if (link.eventId && eventIds.has(link.eventId)) next.eventId = link.eventId;
-        return next;
-      });
-      return {
-        id: `chain-${era}-${chainIndex + 1}`,
-        title: chain.title,
-        links,
-      };
-    })
-    .filter((chain) => chain.links.length >= 2);
-
-  // 5. 分叉:只有真的有两条以上候选才成立
+  // 4. 分叉:只有真的有两条以上候选才成立
   let fork: WorldFork | null = null;
   if (adjudication.fork && adjudication.fork.alternatives.length >= 2) {
     const forkId = `fork-${era}`;
@@ -547,7 +480,6 @@ export function applyAdjudication(input: {
     spanLabel: adjudication.spanLabel,
     reports,
     events,
-    causalChains,
     conclusion: adjudication.conclusion,
     metricDeltas,
     ...(adjudication.stabilized !== undefined ? { stabilized: adjudication.stabilized } : {}),
@@ -645,7 +577,7 @@ export function applyForkChoice(
   };
 }
 
-/** 因果链描述:给分叉选择生成的说明文本,供下一阶段的主体 Agent 参照 */
+/** 分叉选择的说明文本,供下一阶段的主体 Agent 与裁决器参照 */
 export function forkChoiceNote(session: WorldSimSession, forkId: string): string | undefined {
   const fork = session.forks.find((item) => item.id === forkId);
   if (!fork?.selectedAlternativeId) return undefined;
@@ -654,4 +586,4 @@ export function forkChoiceNote(session: WorldSimSession, forkId: string): string
   return `「${alternative.title}」—— ${alternative.premise}`;
 }
 
-export { GLOBAL_DELTA_LIMIT, GLOBAL_DELTA_LIMIT_CRITICAL, ENTITY_DELTA_LIMIT };
+export { GLOBAL_DELTA_LIMIT, GLOBAL_DELTA_LIMIT_CRITICAL, MAX_CHOICE_CARDS };

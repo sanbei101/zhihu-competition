@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { errorCodeSchema } from "@/lib/app-error";
 import {
-  type CausalChain,
   type EntitySimulationReport,
   type EraSnapshot,
   type GlobalMetric,
@@ -45,17 +44,14 @@ const LOOSE = {
   constraints: 6,
   entityMetrics: 6,
   relations: 10,
-  actions: 8,
-  proposedChanges: 8,
+  actions: 5,
   metricShifts: 10,
   relationShifts: 10,
-  events: 10,
-  chains: 6,
-  links: 8,
+  events: 6,
   metricDeltas: 12,
   entityUpdates: 10,
   alternatives: 4,
-  choices: 5,
+  choices: 4,
   effects: 8,
 } as const;
 
@@ -209,26 +205,14 @@ export const worldEventSchema = z.object({
   special: specialEventKindSchema.optional(),
 });
 
-export const causalLinkSchema = z.object({
-  id: z.string().min(1),
-  cause: z.string().min(1),
-  entityId: z.string().optional(),
-  effect: z.string().min(1),
-  eventId: z.string().optional(),
-});
-
-export const causalChainSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  links: z.array(causalLinkSchema).max(LOOSE.links),
-});
-
+/**
+ * 主体提交的报告。v4 起只有意图与行动 —— proposedChanges 与 reasoningSummary
+ * 是给裁决器的中间推理材料,界面从不显示,却让六个并行调用各多吐几百 token。
+ */
 export const entitySimulationReportSchema = z.object({
   entityId: z.string().min(1),
   intent: z.string().min(1),
   actions: z.array(z.string().min(1)).max(LOOSE.actions),
-  proposedChanges: z.array(z.string().min(1)).max(LOOSE.proposedChanges),
-  reasoningSummary: z.string().min(1),
 });
 
 /**
@@ -240,7 +224,6 @@ export const entityReportDraftSchema = entitySimulationReportSchema.omit({ entit
 export const metricDeltaSchema = z.object({
   metricId: z.string().min(1),
   delta: freeNumber,
-  reason: z.string().min(1),
 });
 
 export const eraSnapshotSchema = z.object({
@@ -252,7 +235,6 @@ export const eraSnapshotSchema = z.object({
   spanLabel: z.string().min(1),
   reports: z.array(entitySimulationReportSchema).max(8),
   events: z.array(worldEventSchema).max(LOOSE.events),
-  causalChains: z.array(causalChainSchema).max(LOOSE.chains),
   conclusion: z.string().min(1),
   metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
   stabilized: z.boolean().optional(),
@@ -262,7 +244,6 @@ export const worldForkAlternativeSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   premise: z.string().min(1),
-  drivers: z.array(z.string().min(1)).max(5),
   expectedEffects: z.array(z.string().min(1)).max(5),
   plausibility: z.enum(["low", "medium", "high"]),
 });
@@ -313,7 +294,7 @@ export const playerDirectiveSchema = z.object({
 });
 
 export const worldSimSessionSchema = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   scenarioId: z.string().min(1),
   scenarioTitle: z.string().min(1),
   scenarioUrl: z.string(),
@@ -353,12 +334,20 @@ export const seedGenerationSchema = z.object({
   initialEvents: z.array(worldEventSchema.omit({ id: true, era: true })).max(7),
 });
 
-/** 裁决器的输出:一次时代推进的全部结果 */
+/**
+ * 裁决器的输出:一次时代推进的全部结果。
+ *
+ * v4 起刻意瘦身,这是对等待时间影响最大的改动:
+ *   - 因果链整个砍掉 —— 界面从不显示,却要模型吐几十句排比,是最大的 token 黑洞
+ *   - entityUpdates 只留状态词,主体内部指标与关系不再逐阶段重算
+ *     (世界主体在牌局里只以"一枚徽记 + 一个状态词"出现,重算它们是纯浪费)
+ *   - 摘要、narrator、选项 hint 全部限长
+ *   - 每批 5 张牌,玩家只翻一张 —— 8 张减到 5 张
+ */
 export const adjudicationSchema = z.object({
   timeAfter: timeStateSchema.omit({ era: true }),
   spanLabel: z.string().min(1),
   events: z.array(worldEventSchema.omit({ id: true, era: true })).max(LOOSE.events),
-  causalChains: z.array(causalChainSchema.omit({ id: true })).max(LOOSE.chains),
   conclusion: z.string().min(1),
   metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
   entityUpdates: z
@@ -367,20 +356,6 @@ export const adjudicationSchema = z.object({
         entityId: z.string().min(1),
         status: z.string().min(1),
         changed: z.boolean(),
-        summary: z.string().min(1),
-        metricShifts: z
-          .array(z.object({ metricId: z.string().min(1), delta: z.number() }))
-          .max(LOOSE.metricShifts),
-        relationShifts: z
-          .array(
-            z.object({
-              targetEntityId: z.string().min(1),
-              affinity: freeNumber,
-              posture: z.enum(["rival", "ally", "vassal", "trade", "isolated"]).optional(),
-              note: z.string().min(1).optional(),
-            }),
-          )
-          .max(LOOSE.relationShifts),
       }),
     )
     .max(LOOSE.entityUpdates),
@@ -478,7 +453,6 @@ export const worldSimulateEventSchema = z.discriminatedUnion("type", [
   }),
   z.object({ type: z.literal("adjudicating") }),
   z.object({ type: z.literal("world-event"), event: worldEventSchema }),
-  z.object({ type: z.literal("causal-chain"), chain: causalChainSchema }),
   z.object({ type: z.literal("fork-detected"), fork: worldForkSchema }),
   z.object({ type: z.literal("snapshot"), snapshot: eraSnapshotSchema }),
   z.object({
@@ -506,7 +480,6 @@ type _EventMatches = WorldEvent extends z.infer<typeof worldEventSchema> ? true 
 type _ReportMatches =
   EntitySimulationReport extends z.infer<typeof entitySimulationReportSchema> ? true : never;
 type _SnapshotMatches = EraSnapshot extends z.infer<typeof eraSnapshotSchema> ? true : never;
-type _ChainMatches = CausalChain extends z.infer<typeof causalChainSchema> ? true : never;
 type _EntityMatches = WorldEntity extends z.infer<typeof worldEntitySchema> ? true : never;
 type _MetricMatches = GlobalMetric extends z.infer<typeof globalMetricSchema> ? true : never;
 type _ForkAltMatches =
@@ -520,7 +493,6 @@ export type WorldSimProtocolCheck = [
   _EventMatches,
   _ReportMatches,
   _SnapshotMatches,
-  _ChainMatches,
   _EntityMatches,
   _MetricMatches,
   _ForkAltMatches,

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { CardHand } from "@/components/world-simulator/card-hand";
 import { EventCard } from "@/components/world-simulator/event-card";
 import { WitnessDialogue } from "@/components/world-simulator/witness-dialogue";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
@@ -12,32 +13,33 @@ import type { EventChoice, GlobalMetric, WitnessArchetype, WitnessLine } from "@
 /**
  * 牌桌。
  *
- * 一屏之内只有三样东西:左边那个说话的见证者、中间这一张牌、下面一行已经打过的牌。
- * 这是整套界面里唯一的交互区 —— 其余部分(舞台、指标条)都只负责让玩家知道自己站在哪。
+ * 一屏之内只有三样东西:左边那个说话的见证者、中间这一批背面朝上的牌、
+ * 以及翻开之后的那张正脸。
+ *
+ * 阶段状态机:
+ *   origin  原点卡正面朝上,它是前提不是赌注
+ *   pick    一批背面朝上,玩家挑一张
+ *   open    翻开了,正面朝上,带选项就做取舍,不带就"收下"
+ *   closed  阶段收束:结果 + 擦肩而过 + 结算
+ *   empty   从存档恢复时的空桌,只给上一阶段的结算
  */
+export type DeckStage = "origin" | "pick" | "open" | "closed" | "empty";
 
-/** 打完一阶段之后的空桌:阶段结论 + 净变化,不再单独发一张"小结卡" */
-function EmptyTable({ summary }: { summary: DeckSummary }) {
+export interface DeckSummary {
+  era: number;
+  conclusion: string;
+  deltas: CardDelta[];
+}
+
+/** 阶段结算。空桌与收束状态共用,不再单独发一张"小结卡" */
+function SummaryPanel({ summary }: { summary: DeckSummary }) {
   return (
     <Card className="animate-in fade-in w-full shadow-none duration-500">
-      <CardContent className="space-y-5 px-6 py-8 text-center">
-        <div className="relative mx-auto h-16 w-12">
-          {[0, 1, 2].map((index) => (
-            <div
-              key={index}
-              className={`bg-muted border-border absolute inset-0 rounded-sm border ${
-                index === 0
-                  ? "-translate-x-2 -rotate-6"
-                  : index === 1
-                    ? "translate-x-1.5 rotate-3"
-                    : "rotate-0"
-              }`}
-            />
-          ))}
-        </div>
-
+      <CardContent className="space-y-4 px-6 py-6 text-center">
         <div className="space-y-1">
-          <p className="font-mono text-[11px] tracking-widest">纪元 {summary.era} · 本阶段结算</p>
+          <p className="text-muted-foreground font-mono text-[10px] tracking-widest">
+            纪元 {summary.era} · 本阶段结算
+          </p>
           <p className="text-muted-foreground text-sm leading-7">{summary.conclusion}</p>
         </div>
 
@@ -58,101 +60,123 @@ function EmptyTable({ summary }: { summary: DeckSummary }) {
             ))}
           </div>
         ) : null}
-
-        <Separator />
-        <p className="text-muted-foreground text-xs leading-6">
-          世界停在这里。下一步由它自己走 —— 你只需要推进时间,再看它发出什么牌。
-        </p>
       </CardContent>
     </Card>
   );
-}
-
-export interface DeckSummary {
-  era: number;
-  conclusion: string;
-  deltas: CardDelta[];
 }
 
 export function WorldDeck({
   skin,
   archetype,
   witnessLine,
-  card,
-  metrics,
+  hand,
+  stage,
+  pickedId,
+  flippingId,
   resolvedChoiceId,
+  metrics,
+  onPick,
   onChoose,
-  onAction,
-  actionLabel,
-  onNext,
-  nextLabel,
+  cardAction,
   busy,
-  deckLeft,
   played,
   summary,
 }: {
   skin: ScenarioSkin;
   archetype: WitnessArchetype;
   witnessLine: WitnessLine | null;
-  card: WorldCard | null;
-  metrics: GlobalMetric[];
+  hand: WorldCard[];
+  stage: DeckStage;
+  pickedId: string | null;
+  flippingId: string | null;
   resolvedChoiceId: string | null;
+  metrics: GlobalMetric[];
+  onPick: (card: WorldCard) => void;
   onChoose: (choice: EventChoice) => void;
-  onAction: () => void;
-  actionLabel: string;
-  /** 结果态的出口。事件卡与分叉卡做完取舍后靠它翻页 */
-  onNext: () => void;
-  nextLabel: string;
+  /** 卡面底部那个唯一的主按钮(拉开世界线 / 收下这张牌 / 重新洗牌) */
+  cardAction: { label: string; onClick: () => void } | undefined;
   busy: boolean;
-  /** 本阶段还没打的牌数。为 0 时不显示牌堆 */
-  deckLeft: number;
-  played: { label: string; severity: WorldCard["severity"] }[];
+  played: { label: string; tier: WorldCard["tier"] }[];
   summary: DeckSummary | null;
 }) {
+  const picked = hand.find((card) => card.id === pickedId) ?? null;
+  /**
+   * 此刻正面朝上的那张牌。
+   *
+   * 注意判据里必须带上 pickedId —— 光有 stage 不够:origin 阶段如果 pickedId 是空的,
+   * 牌桌上就什么都不出现(曾经就是这个原因让原点卡整个消失)。
+   */
+  const opened =
+    picked && (stage === "origin" || stage === "open" || (stage === "closed" && resolvedChoiceId))
+      ? picked
+      : null;
+
+  const witness = <WitnessDialogue skin={skin} archetype={archetype} line={witnessLine} />;
+
+  const faceUp = opened ? (
+    <div className="w-full max-w-xl">
+      <EventCard
+        card={opened}
+        metrics={metrics}
+        resolvedChoiceId={resolvedChoiceId}
+        onChoose={onChoose}
+        action={cardAction}
+        busy={busy}
+      />
+    </div>
+  ) : null;
+
   return (
-    <section className="relative space-y-4">
-      {/* 牌堆指示 */}
-      <div className="text-muted-foreground absolute -top-1 right-0 flex items-center gap-2 font-mono text-[10px] tracking-wider">
-        {deckLeft > 0 ? (
-          <>
-            <span>本阶段 · 剩 {deckLeft} 张</span>
-            <span className="relative inline-block h-8 w-6">
-              {Array.from({ length: Math.min(3, deckLeft) }).map((_, index) => (
-                <span
-                  key={index}
-                  className="bg-muted border-border absolute inset-0 block rounded-sm border"
-                  style={{ transform: `translate(${index * 2}px, ${-index * 1.5}px)` }}
-                />
-              ))}
-            </span>
-          </>
-        ) : null}
-      </div>
-
-      {/* 见证者 + 牌 */}
-      <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:justify-center">
-        <WitnessDialogue skin={skin} archetype={archetype} line={witnessLine} />
-
-        <div className="w-full max-w-xl">
-          {card ? (
-            <EventCard
-              card={card}
-              metrics={metrics}
-              resolvedChoiceId={resolvedChoiceId}
-              onChoose={onChoose}
-              onAction={onAction}
-              actionLabel={actionLabel}
-              onNext={onNext}
-              nextLabel={nextLabel}
-              busy={busy}
+    <section className="relative space-y-6">
+      {/* 盲抽:见证者站在手牌左边督战 —— 这正是最需要他在旁边说话的时候 */}
+      {stage === "pick" ? (
+        <div className="flex flex-col items-center gap-5 lg:flex-row lg:items-start lg:justify-center lg:gap-8">
+          {witness}
+          <div className="w-full min-w-0 lg:max-w-2xl">
+            <CardHand
+              cards={hand}
+              pickedId={null}
+              flipping={flippingId}
+              closed={false}
+              onPick={onPick}
             />
-          ) : summary ? (
-            <EmptyTable summary={summary} />
-          ) : null}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* 已经打过的牌 */}
+      {/* 翻开之后:手牌定格成一行(其余变"擦肩而过"),见证者与这张牌并排 */}
+      {stage === "open" || stage === "closed" ? (
+        <div className="space-y-6">
+          <CardHand
+            cards={hand}
+            pickedId={pickedId}
+            flipping={flippingId}
+            closed={stage === "closed"}
+            onPick={onPick}
+          />
+          <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:justify-center">
+            {witness}
+            {faceUp}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 原点卡 / 空桌:见证者与那张唯一的正面牌 */}
+      {stage === "origin" || stage === "empty" ? (
+        <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start lg:justify-center">
+          {witness}
+          {faceUp}
+        </div>
+      ) : null}
+
+      {/* 收束 / 空桌的结算 */}
+      {stage === "closed" || stage === "empty" ? (
+        summary ? (
+          <SummaryPanel summary={summary} />
+        ) : null
+      ) : null}
+
+      {/* 已经做过的取舍 */}
       {played.length ? (
         <div className="flex flex-wrap justify-center gap-2">
           {played.slice(-8).map((item, index) => (
@@ -161,6 +185,15 @@ export function WorldDeck({
             </Badge>
           ))}
         </div>
+      ) : null}
+
+      {stage === "empty" && !summary ? (
+        <>
+          <Separator />
+          <p className="text-muted-foreground text-center text-xs leading-6">
+            世界停在这里。推进时间,看它发出什么牌。
+          </p>
+        </>
       ) : null}
     </section>
   );

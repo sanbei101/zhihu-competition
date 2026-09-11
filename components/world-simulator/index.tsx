@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { MetricStrip } from "@/components/world-simulator/metric-strip";
-import { WorldDeck, type DeckSummary } from "@/components/world-simulator/world-deck";
+import {
+  WorldDeck,
+  type DeckStage,
+  type DeckSummary,
+} from "@/components/world-simulator/world-deck";
 import { WorldStage } from "@/components/world-simulator/world-stage";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import type { WorldCard } from "@/lib/world-cards";
@@ -22,22 +26,24 @@ import {
  * 世界线牌局的壳。
  *
  * 一屏四层,从上到下:
- *   舞台(我在哪) → 标题行(这是什么) → 牌桌(发生了什么、我可以怎么取舍) → 指标条(世界怎么样)
+ *   舞台(我在哪) → 标题行(这是什么) → 牌桌(盲抽 + 翻牌 + 取舍) → 指标条(世界怎么样)
  *
- * 这个组件是纯展示:会话、手牌、光标、进度、见证者的话全部由 WorldRunner 注入。
- * 好处是它完全不关心数据从哪来 —— 换数据源不需要动它一行。
+ * 这个组件是纯展示:会话、手牌、翻牌状态、进度、见证者的话全部由 WorldRunner 注入。
  */
 export function WorldSimulator({
   session,
   skin,
-  cards,
-  cursor,
+  hand,
+  stage,
+  pickedId,
+  flippingId,
   resolvedChoiceId,
   played,
   summary,
   witnessLine,
+  onPick,
   onChoose,
-  onCardAction,
+  onCardClose,
   onAdvance,
   advanceLabel,
   advanceDisabled,
@@ -51,16 +57,18 @@ export function WorldSimulator({
 }: {
   session: WorldSimSession;
   skin: ScenarioSkin;
-  cards: WorldCard[];
-  cursor: number;
+  hand: WorldCard[];
+  stage: DeckStage;
+  pickedId: string | null;
+  flippingId: string | null;
   resolvedChoiceId: string | null;
-  played: { label: string; severity: WorldCard["severity"] }[];
-  /** 空桌时展示的阶段结算。手上有牌时为 null */
+  played: { label: string; tier: WorldCard["tier"] }[];
   summary: DeckSummary | null;
   witnessLine: WitnessLine | null;
-  onChoose: (card: WorldCard, choice: EventChoice) => void;
-  /** 原点卡 / 结算卡的单一动作。事件卡的推进不走这里 */
-  onCardAction: (card: WorldCard) => void;
+  onPick: (card: WorldCard) => void;
+  onChoose: (choice: EventChoice) => void;
+  /** 收下这张牌 —— 翻开的是一张没有取舍的白卡时的唯一出口 */
+  onCardClose: () => void;
   onAdvance: () => void;
   advanceLabel: string;
   advanceDisabled: boolean;
@@ -72,15 +80,22 @@ export function WorldSimulator({
   onBack: () => void;
   onReset: () => void;
 }) {
-  const card = cards[cursor] ?? null;
-  const isLastCard = cursor >= cards.length - 1;
   const archetype = witnessArchetypeFor(session.seed.themeId);
+  const picked = hand.find((card) => card.id === pickedId) ?? null;
 
-  const actionLabel = (() => {
-    if (!card) return "继续";
-    if (card.kind === "origin") return "拉开这条世界线";
-    if (card.kind === "settle") return "重新洗一次牌";
-    return isLastCard ? "回到牌桌" : "下一张";
+  /**
+   * 卡面底部唯一的那个主按钮。一个状态至多一个出口:
+   *   origin                拉开这条世界线
+   *   open + 白卡(无选项)   收下这张牌
+   *   open + 有选项          不给按钮 —— 选项本身就是出口
+   *   closed / pick / empty  不给按钮 —— 出口是下面的"推进时间"
+   */
+  const cardAction = (() => {
+    if (stage === "origin") return { label: "拉开这条世界线", onClick: onAdvance };
+    if (stage === "open" && picked && picked.choices.length === 0) {
+      return { label: "收下这张牌", onClick: onCardClose };
+    }
+    return undefined;
   })();
 
   return (
@@ -124,22 +139,16 @@ export function WorldSimulator({
         skin={skin}
         archetype={archetype}
         witnessLine={witnessLine}
-        card={card}
-        metrics={session.state.globalMetrics}
+        hand={hand}
+        stage={stage}
+        pickedId={pickedId}
+        flippingId={flippingId}
         resolvedChoiceId={resolvedChoiceId}
-        onChoose={(choice) => {
-          if (card) onChoose(card, choice);
-        }}
-        onAction={() => {
-          if (card) onCardAction(card);
-        }}
-        onNext={() => {
-          if (card) onCardAction(card);
-        }}
-        nextLabel={actionLabel}
-        actionLabel={actionLabel}
+        metrics={session.state.globalMetrics}
+        onPick={onPick}
+        onChoose={onChoose}
+        cardAction={cardAction}
         busy={busy}
-        deckLeft={cards.length - cursor}
         played={played}
         summary={summary}
       />

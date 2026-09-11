@@ -230,6 +230,48 @@ export const specialEventLabels: Record<SpecialEventKind, string> = {
   anomaly: "异象",
 };
 
+/**
+ * 卡牌稀有度,六档。
+ *
+ * 命名刻意用颜色而不是 N/R/SR —— 颜色是玩家一眼就能读的语言,
+ * 字母等级只作为辅助标注(SSR 这类)挂在 UI 上。
+ *
+ * 与事件属性的映射是**确定性**的(见 world-cards.ts 的 tierFor):
+ *   白/绿/蓝/红 走 severity 的常规谱系
+ *   金 只给 echo  —— 它是玩家自己的选择在远处结出的果,天然稀有
+ *   彩 只给 anomaly —— 规则之外的东西,配得上彩虹色
+ */
+export type CardTier = "white" | "green" | "blue" | "red" | "gold" | "prism";
+
+export const cardTierLabels: Record<CardTier, string> = {
+  white: "白",
+  green: "绿",
+  blue: "蓝",
+  red: "红",
+  gold: "金",
+  prism: "彩",
+};
+
+/** 字母等级,挂在稀有度角标上,配合颜色一起读 */
+export const cardTierGrades: Record<CardTier, string> = {
+  white: "N",
+  green: "R",
+  blue: "SR",
+  red: "SSR",
+  gold: "UR",
+  prism: "UR+",
+};
+
+/** 一批牌里稀有度的排序权重,白最常见、彩最稀有 */
+export const CARD_TIER_ORDER: readonly CardTier[] = [
+  "white",
+  "green",
+  "blue",
+  "red",
+  "gold",
+  "prism",
+];
+
 /** 世界事件:由主体行动合并冲突后产生的全球级变化 */
 export interface WorldEvent {
   id: string;
@@ -306,39 +348,19 @@ export interface WorldWitness {
 }
 
 /**
- * 跨主体因果链。这是"不是几个人在聊天"的关键证据:
- * 一条链把若干主体和事件串成 -> 的序列。plan.md §8.2 的例子:
- * 贸易改道 -> 城市扩张 -> 粮价上涨 -> 地方自治运动
+ * 主体提交的模拟报告。
+ *
+ * v4 起刻意砍到只剩两件事:它想做什么、具体做了什么。
+ * 原先的 proposedChanges 与 reasoningSummary 纯粹是给裁决器的中间推理材料,
+ * 界面从不显示,却让六个并行调用各多吐几百 token —— 等待时间大部分耗在这。
+ * 裁决器拿到"意图 + 行动"已经足够判断成败,它自己会推导后果。
  */
-export interface CausalChain {
-  id: string;
-  /** 首尾概述,展示在链条标题上 */
-  title: string;
-  links: CausalLink[];
-}
-
-export interface CausalLink {
-  id: string;
-  /** 起因:某个主体的行动或自然变化 */
-  cause: string;
-  /** 归属主体,可为空 —— 自然过程没有行动者 */
-  entityId?: string;
-  effect: string;
-  /** 下一跳由哪个事件承接,链条据此串起来 */
-  eventId?: string;
-}
-
-/** 主体提交的模拟报告。Agent 只能提议变化,不能直接改世界状态 */
 export interface EntitySimulationReport {
   entityId: string;
-  /** 本阶段它想做什么 */
+  /** 本阶段它想做什么,一句话 */
   intent: string;
-  /** 它具体采取的行动 */
+  /** 它具体采取的行动,最多三条 */
   actions: string[];
-  /** 提议的状态变化,由服务端裁决是否采纳 */
-  proposedChanges: string[];
-  /** 它的自我陈述。不是对话,是推演摘要 */
-  reasoningSummary: string;
 }
 
 /** 一个时间阶段的快照。不可变记录,世界状态只是主线指针 */
@@ -353,11 +375,10 @@ export interface EraSnapshot {
   spanLabel: string;
   reports: EntitySimulationReport[];
   events: WorldEvent[];
-  causalChains: CausalChain[];
   /** 阶段结论:一句能解释这段历史的话 */
   conclusion: string;
   /** 本阶段各全局指标的变化 */
-  metricDeltas: { metricId: string; delta: number; reason: string }[];
+  metricDeltas: { metricId: string; delta: number }[];
   /** 裁决器判定这个世界已经收敛(矛盾解决或彻底崩坏),UI 据此发出结算卡 */
   stabilized?: boolean;
 }
@@ -367,7 +388,6 @@ export interface WorldForkAlternative {
   id: string;
   title: string;
   premise: string;
-  drivers: string[];
   expectedEffects: string[];
   plausibility: "low" | "medium" | "high";
 }
@@ -449,7 +469,7 @@ export interface WorldState {
 
 /** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 + 玩家取舍 */
 export interface WorldSimSession {
-  version: 3;
+  version: 4;
   scenarioId: string;
   scenarioTitle: string;
   scenarioUrl: string;
