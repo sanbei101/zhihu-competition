@@ -1,4 +1,4 @@
-import { WorldCouncilSession } from "@/components/world-council";
+import { WorldCouncilSession } from "@/components/world-council/session";
 import { findScenario } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 

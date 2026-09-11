@@ -10,7 +10,6 @@ import { ThemeScene } from "@/components/pixel/theme-scene";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { DecisionPanel } from "@/components/world-council/decision-panel";
 import { SeatsPanel, type AgentStatus } from "@/components/world-council/seats-panel";
@@ -20,26 +19,20 @@ import {
   type StagePhase,
 } from "@/components/world-council/speech-stage";
 import { Timeline } from "@/components/world-council/timeline";
+import { collectWorldTurn } from "@/components/world-council/turn-stream";
 import { WorldTabs } from "@/components/world-council/world-tabs";
 import { WorldIntro } from "@/components/world-intro";
 import { userErrorMessage } from "@/lib/app-error";
-import { readNdjsonStream } from "@/lib/ndjson-stream";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import {
   MIN_ROUND_TO_CLOSE,
   actForRound,
   buildVoluntaryEnding,
-  describeCrisis,
-  describeRelations,
-  describeUltimatum,
   endingLabels,
   entropyForRound,
-  entropyNoteForRound,
   pressureLabels,
   pressureLevel,
-  summarizeTurnsForPrompt,
-  worldGameSessionSchema,
   type AgentRelation,
   type AppliedDeltas,
   type JudgeResult,
@@ -57,7 +50,7 @@ import {
   type DecisionOption,
   type RoundOptions,
 } from "@/lib/world-options";
-import { type WorldTurnEvent, worldTurnEventSchema } from "@/lib/world-turn";
+import type { WorldTurnEvent } from "@/lib/world-turn";
 
 interface WorldCouncilProps {
   initial: WorldGameSession;
@@ -66,7 +59,7 @@ interface WorldCouncilProps {
   skin: ScenarioSkin;
 }
 
-function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
+export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
   const router = useRouter();
   const cast: WorldCast = initial.cast;
   const player = cast.playerCharacters.find((character) => character.id === initial.playerId);
@@ -560,90 +553,47 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
     pendingVerdictRef.current = null;
     setHasPendingVerdict(false);
 
-    const collected: TurnReactionRecord[] = [];
-    const retortRecords: RetortRecord[] = [];
-    const expectedAgents = new Set<string>();
-    const expectedRetorts = new Set<string>();
-    const completedAgents = new Set<string>();
-    const completedRetorts = new Set<string>();
-    let streamCompleted = false;
-    let streamError = "";
-
     function applyEvent(turnEvent: WorldTurnEvent) {
       if (turnEvent.type === "agent-start") {
-        expectedAgents.add(turnEvent.agentId);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
       } else if (turnEvent.type === "agent-reaction") {
         const record = { agentId: turnEvent.agentId, reaction: turnEvent.reaction };
-        collected.push(record);
-        completedAgents.add(turnEvent.agentId);
         setReactions((current) => [...current, record]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "retort-start") {
-        expectedRetorts.add(turnEvent.agentId);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "thinking" }));
       } else if (turnEvent.type === "agent-retort") {
-        const record = {
-          agentId: turnEvent.agentId,
-          againstId: turnEvent.againstId,
-          reaction: turnEvent.reaction,
-        };
-        retortRecords.push(record);
-        completedRetorts.add(turnEvent.agentId);
-        setRetorts((current) => [...current, record]);
+        setRetorts((current) => [
+          ...current,
+          {
+            agentId: turnEvent.agentId,
+            againstId: turnEvent.againstId,
+            reaction: turnEvent.reaction,
+          },
+        ]);
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "done" }));
       } else if (turnEvent.type === "agent-error") {
         setAgentStatuses((statuses) => ({ ...statuses, [turnEvent.agentId]: "error" }));
-        streamError = userErrorMessage(turnEvent.error);
-      } else if (turnEvent.type === "error") {
-        streamError = userErrorMessage(turnEvent.error);
-      } else if (turnEvent.type === "complete") {
-        streamCompleted = true;
       }
     }
 
+    let collected: Awaited<ReturnType<typeof collectWorldTurn>> | null = null;
     try {
-      const response = await fetch("/api/world-turn", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      collected = await collectWorldTurn(
+        {
           cast,
           playerId: activePlayer.id,
           round,
           situation,
           metrics,
-          historySummary: summarizeTurnsForPrompt(turns, 4000),
-          relationsSummary: describeRelations(relations),
-          crisisSummary: describeCrisis(crisis),
-          ultimatumSummary: describeUltimatum(ultimatum),
-          entropyNote: entropyNoteForRound(round),
+          turns,
+          relations,
+          crisis,
+          ultimatum,
           decision: content,
-        }),
-      });
-
-      if (!response.ok) {
-        let message = `回合推演失败(${response.status})`;
-        try {
-          const body: unknown = await response.json();
-          if (typeof body === "object" && body !== null && "error" in body) {
-            message = String(body.error);
-          }
-        } catch {
-          // 服务端返回的不是 JSON,保留默认提示
-        }
-        throw new Error(message);
-      }
-      await readNdjsonStream(response, worldTurnEventSchema, applyEvent);
-
-      if (streamError) throw new Error(streamError);
-      if (!streamCompleted) throw new Error("回合响应未正常结束,请重试");
-      if (
-        expectedAgents.size !== cast.agentCharacters.length ||
-        completedAgents.size !== expectedAgents.size ||
-        expectedRetorts.size !== completedRetorts.size
-      ) {
-        throw new Error("部分角色回应失败,本回合无法继续");
-      }
+        },
+        applyEvent,
+      );
     } catch (error) {
       console.error("回合响应流失败", error);
       const message = error instanceof Error ? error.message : "回合推演失败";
@@ -655,9 +605,10 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
       return;
     }
 
+    if (!collected) return;
     setIsResolving(false);
     // 流式回应收齐后自动进入冲突裁决
-    await runJudge(content, collected, retortRecords, situation);
+    await runJudge(content, collected.reactions, collected.retorts, situation);
   }
 
   // hook 全部调用完之后才允许提前返回,避免条件调用 hook
@@ -829,70 +780,5 @@ function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilProps) {
         />
       </div>
     </div>
-  );
-}
-
-export function WorldCouncilSession({ worldId, skin }: { worldId: string; skin: ScenarioSkin }) {
-  const router = useRouter();
-  const [session, setSession] = useState<WorldGameSession | null>();
-  const key = worldCouncilStorageKey(worldId);
-
-  useEffect(() => {
-    const storedSession = sessionStorage.getItem(key);
-
-    if (!storedSession) {
-      setSession(null);
-      return;
-    }
-
-    try {
-      const raw: unknown = JSON.parse(storedSession);
-      const parsed = worldGameSessionSchema.safeParse(raw);
-      setSession(parsed.success && parsed.data.scenarioId === worldId ? parsed.data : null);
-    } catch (error) {
-      console.error("对局会话恢复失败", error);
-      sessionStorage.removeItem(key);
-      setSession(null);
-    }
-  }, [key, worldId]);
-
-  if (session === undefined) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-        <Skeleton className="h-80" />
-        <Skeleton className="h-160" />
-        <Skeleton className="h-80" />
-      </div>
-    );
-  }
-
-  const player = session?.cast.playerCharacters.find(
-    (character) => character.id === session.playerId,
-  );
-
-  if (!session || !player) {
-    return (
-      <Card className="mx-auto max-w-lg shadow-none">
-        <CardHeader>
-          <CardTitle>对局尚未建立</CardTitle>
-          <p className="text-muted-foreground text-sm leading-6">
-            请先返回世界线页面生成阵容并选择角色。
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Button
-            nativeButton={false}
-            render={<Link href={`/world/${encodeURIComponent(worldId)}`} />}
-          >
-            返回世界线
-            <ArrowLeft data-icon="inline-end" />
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <WorldCouncil initial={session} worldId={worldId} onBack={() => router.back()} skin={skin} />
   );
 }
