@@ -171,6 +171,10 @@ export const worldlineSessionSchema = z.object({
 /** 生成阶段的编年段:台词允许只给 name 与 line */
 const segmentDraftSchema = worldlineSegmentSchema.extend({
   voices: z.array(voiceDraftSchema),
+  mark: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.enum(["crisis", "echo"]).optional(),
+  ),
 });
 
 /** 种子生成:前提 + 主体 + 开局编年。模型无权决定主题与题目 */
