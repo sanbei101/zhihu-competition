@@ -106,7 +106,16 @@ const session = {
     },
   ],
   forks: [],
-  branches: [{ id: "branch-main", label: "主线", parentBranchId: null, forkId: null, active: true, summary: "" }],
+  branches: [
+    {
+      id: "branch-main",
+      label: "主线",
+      parentBranchId: null,
+      forkId: null,
+      active: true,
+      summary: "",
+    },
+  ],
   state: {
     currentEra: 1,
     currentBranchId: "branch-main",

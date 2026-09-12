@@ -1,6 +1,6 @@
 "use client";
 
-import { TIER_RIBBON, TIER_TEXT } from "@/components/world-simulator/card-tier";
+import { TIER_GLOW, TIER_RIBBON, TIER_TEXT } from "@/components/world-simulator/card-tier";
 import { cn } from "@/lib/utils";
 import { cardTierGrades, cardTierLabels, tierHistogram } from "@/lib/world-cards";
 import type { WorldCard } from "@/lib/world-cards";
@@ -50,6 +50,7 @@ export function CardHand({
           const isPicked = pickedId === card.id;
           const isFlipping = flipping === card.id;
           const dimmed = (pickedId !== null && !isPicked) || closed;
+          const flipped = isPicked && !isFlipping;
 
           return (
             <button
@@ -57,7 +58,7 @@ export function CardHand({
               type="button"
               disabled={pickedId !== null || closed}
               onClick={() => onPick(card)}
-              aria-label={`第 ${index + 1} 张,背面朝上`}
+              aria-label={flipped ? `已翻开:${card.title}` : `第 ${index + 1} 张,背面朝上`}
               style={{ animationDelay: `${index * 70}ms` }}
               className={cn(
                 "animate-card-deal group relative h-28 w-20 overflow-hidden rounded-md border transition-all duration-300 sm:h-36 sm:w-24",
@@ -65,26 +66,53 @@ export function CardHand({
                 // 皮肤字段**不是** Tailwind 色令牌 —— Tailwind v4 遇到未定义的 --color-*
                 // 既不报错也不产出 CSS,卡背会整块塌成透明。
                 "bg-card border-border",
-                !dimmed && "hover:-translate-y-1.5 hover:border-primary cursor-pointer",
+                !isPicked &&
+                  !dimmed &&
+                  "hover:-translate-y-1.5 hover:border-primary cursor-pointer",
                 dimmed && "opacity-25 saturate-0",
+                flipped && TIER_GLOW[card.tier],
                 isFlipping && "animate-card-flip",
               )}
             >
-              {/* 卡背花纹 */}
-              <span className="absolute inset-1.5 rounded-sm opacity-70 [background:repeating-linear-gradient(45deg,var(--accent)_0_3px,transparent_3px_7px)]" />
-              {/* 中央问号 */}
-              <span className="absolute inset-0 grid place-items-center">
-                <span className="text-primary font-mono text-2xl opacity-45 sm:text-3xl">?</span>
-              </span>
-              {/* 序号 */}
-              <span className="text-muted-foreground absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] opacity-60">
-                {String.fromCharCode(65 + index)}
-              </span>
-              {!dimmed && !isFlipping ? (
-                <span className="text-primary-foreground bg-primary absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] opacity-0 transition-opacity group-hover:opacity-100">
-                  翻开
-                </span>
-              ) : null}
+              {flipped ? (
+                <div className="absolute inset-0 flex flex-col text-left">
+                  <div className={`h-1 w-full ${TIER_RIBBON[card.tier]}`} />
+                  <div className="flex items-center gap-1 px-1.5 pt-1">
+                    <span className={cn("font-mono text-[9px] leading-none", TIER_TEXT[card.tier])}>
+                      {cardTierLabels[card.tier]}
+                    </span>
+                    <span className="text-muted-foreground truncate font-mono text-[9px] leading-none">
+                      {card.tag}
+                    </span>
+                  </div>
+                  <p className="text-foreground line-clamp-3 px-1.5 pt-1 text-[11px] leading-4 font-medium">
+                    {card.title}
+                  </p>
+                  <span className="text-primary mt-auto px-1.5 pb-1 font-mono text-[8px] tracking-wider">
+                    已翻开
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* 卡背花纹 */}
+                  <span className="absolute inset-1.5 rounded-sm opacity-70 [background:repeating-linear-gradient(45deg,var(--accent)_0_3px,transparent_3px_7px)]" />
+                  {/* 中央问号 */}
+                  <span className="absolute inset-0 grid place-items-center">
+                    <span className="text-primary font-mono text-2xl opacity-45 sm:text-3xl">
+                      ?
+                    </span>
+                  </span>
+                  {/* 序号 */}
+                  <span className="text-muted-foreground absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] opacity-60">
+                    {String.fromCharCode(65 + index)}
+                  </span>
+                  {!dimmed && !isFlipping ? (
+                    <span className="text-primary-foreground bg-primary absolute inset-x-0 bottom-0 py-0.5 text-center text-[9px] opacity-0 transition-opacity group-hover:opacity-100">
+                      翻开
+                    </span>
+                  ) : null}
+                </>
+              )}
             </button>
           );
         })}
