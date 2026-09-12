@@ -4,26 +4,20 @@ import { Loader2, MoveRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import type { GlobalMetric } from "@/lib/world-sim";
 
 /**
- * 底部指标条。
+ * 底部的唯一动作条。
  *
- * 只有四个数字和四道细线,外加唯一的那个"推进时间"按钮。
- * 刻意没有任何说明文字 —— 指标的含义交给卡牌与见证者去讲,
- * 这里只需要让玩家一眼扫到"世界的哪根弦紧了"。
- *
- * 推进按钮是全屏唯一的"空桌动作":手上没牌的时候,它是唯一能点的东西。
+ * 只有一个按钮和推演进度 —— 世界怎么样,交给卡牌与编年史去讲,
+ * 这里只负责让玩家随时能把时间往前推。
  */
-export function MetricStrip({
-  metrics,
+export function AdvanceBar({
   onAdvance,
   advanceLabel,
   advanceDisabled,
   busy,
   progress,
 }: {
-  metrics: GlobalMetric[];
   onAdvance: () => void;
   advanceLabel: string;
   advanceDisabled: boolean;
@@ -32,35 +26,8 @@ export function MetricStrip({
   progress: { label: string; done: number; total: number } | null;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-5">
-      <div className="grid flex-1 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
-        {metrics.map((metric) => (
-          <div key={metric.id} className="min-w-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-muted-foreground truncate text-xs">{metric.label}</span>
-              <span className="ml-auto font-mono text-sm tabular-nums">{metric.value}</span>
-              {metric.delta ? (
-                <span
-                  className={`font-mono text-[11px] ${
-                    metric.delta > 0 ? "text-chart-2" : "text-destructive"
-                  }`}
-                >
-                  {metric.delta > 0 ? "+" : ""}
-                  {metric.delta}
-                </span>
-              ) : null}
-            </div>
-            <div className="bg-muted mt-1.5 h-1 overflow-hidden rounded-full">
-              <div
-                className="bg-chart-1 h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${Math.max(0, Math.min(100, metric.value))}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex shrink-0 flex-col gap-2 sm:w-56">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-5">
+      <div className="flex shrink-0 flex-col gap-2 sm:w-64">
         {progress ? (
           <div className="space-y-1.5">
             <p className="text-muted-foreground truncate font-mono text-[10px] tracking-wider">
