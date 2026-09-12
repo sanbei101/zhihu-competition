@@ -2,7 +2,7 @@
 
 import { TIER_GLOW, TIER_RIBBON, TIER_TEXT } from "@/components/world-simulator/card-tier";
 import { cn } from "@/lib/utils";
-import { cardTierGrades, cardTierLabels, tierHistogram } from "@/lib/world-cards";
+import { cardTierGrades, cardTierLabels, PICKS_PER_HAND, tierHistogram } from "@/lib/world-cards";
 import type { WorldCard } from "@/lib/world-cards";
 
 /**
@@ -11,18 +11,18 @@ import type { WorldCard } from "@/lib/world-cards";
  * 玩家看到的只有背面与本批的稀有度预告 —— 知道里面有一张红卡,但不知道在哪。
  * 这份"知道有、不知道在哪"就是整个抽卡环节的全部张力。
  *
- * 挑中一张后,它原地翻过去,其余的沉下去变成"擦肩而过"的一行字。
+ * 每批翻 PICKS_PER_HAND 张:翻开的原地亮出正面,其余的沉下去变成"擦肩而过"。
  */
 export function CardHand({
   cards,
-  pickedId,
+  pickedIds,
   flipping,
   closed,
   onPick,
 }: {
   cards: WorldCard[];
-  /** 已翻开的那张。非空时其余的牌变暗、不可点 */
-  pickedId: string | null;
+  /** 已翻开的那几张。非空时其余的牌变暗、不可点 */
+  pickedIds: string[];
   /** 正在播翻牌动画的那张(此刻还看不到正面) */
   flipping: string | null;
   /** 本阶段已经收束,手牌定格成"擦肩而过" */
@@ -47,16 +47,17 @@ export function CardHand({
 
       <div className="flex flex-wrap items-stretch justify-center gap-2 sm:gap-3">
         {cards.map((card, index) => {
-          const isPicked = pickedId === card.id;
+          const isPicked = pickedIds.includes(card.id);
           const isFlipping = flipping === card.id;
-          const dimmed = (pickedId !== null && !isPicked) || closed;
+          const exhausted = pickedIds.length >= PICKS_PER_HAND;
+          const dimmed = (exhausted && !isPicked) || closed;
           const flipped = isPicked && !isFlipping;
 
           return (
             <button
               key={card.id}
               type="button"
-              disabled={pickedId !== null || closed}
+              disabled={closed || isPicked || exhausted}
               onClick={() => onPick(card)}
               aria-label={flipped ? `已翻开:${card.title}` : `第 ${index + 1} 张,背面朝上`}
               style={{ animationDelay: `${index * 70}ms` }}
@@ -68,6 +69,7 @@ export function CardHand({
                 "bg-card border-border",
                 !isPicked &&
                   !dimmed &&
+                  !exhausted &&
                   "hover:-translate-y-1.5 hover:border-primary cursor-pointer",
                 dimmed && "opacity-25 saturate-0",
                 flipped && TIER_GLOW[card.tier],
@@ -119,9 +121,9 @@ export function CardHand({
       </div>
 
       {/* 擦肩而过:没被翻开的那些,在阶段收束后亮出标题 */}
-      {closed && pickedId
+      {closed && pickedIds.length > 0
         ? (() => {
-            const missed = cards.filter((card) => card.id !== pickedId);
+            const missed = cards.filter((card) => !pickedIds.includes(card.id));
             if (!missed.length) return null;
             return (
               <div className="mt-5">

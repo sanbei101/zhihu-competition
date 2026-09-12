@@ -19,7 +19,7 @@ import { CARD_TIER_ORDER, cardTierGrades, cardTierLabels, entityKindLabels } fro
  * 世界模型(lib/world-sim.ts)描述的是"世界发生了什么";
  * 这里负责把它翻译成"玩家面前会出现哪几张牌"。
  *
- * v4 起的规则:一批发 5 张、**全部背面朝上**,玩家只能翻一张。
+ * v4 起的规则:一批发 5 张、**全部背面朝上**,玩家翻其中 2 张。
  * 没翻到的牌不是不存在 —— 世界照样往前走了,只是你没能盯住它们。
  * 这是"观察者"设定的游戏化:你的注意力是稀缺资源,而稀有度是抽卡的赌注。
  *
@@ -62,6 +62,9 @@ export interface WorldCard {
 
 /** 一批的规模。5 张是读得完的上限,也是抽卡手感的下限 */
 export const HAND_SIZE = 5;
+
+/** 一批里玩家最多翻开的张数。5 张牌翻 2 张,既给选择,又留遗憾 */
+export const PICKS_PER_HAND = 2;
 
 /**
  * 事件的属性 -> 稀有度。**确定性映射**,模型不给稀有度,它只给事实:

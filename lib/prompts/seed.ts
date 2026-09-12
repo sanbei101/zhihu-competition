@@ -11,7 +11,7 @@
 import type { ScenarioProfile } from "@/lib/scenario-profiles";
 import { entityKindLabels, timeScaleLabels } from "@/lib/world-sim";
 
-import { WORLD_FORMAT_RULES } from "./shared";
+import { WORLD_FORMAT_RULES, PLAIN_TEXT } from "./shared";
 
 export const SEED_INSTRUCTIONS =
   `你是一名严格的历史与社会演化推演引擎。给定一道知乎"如果……会怎样"的假设题,你要构建这个反事实世界的初始条件。
@@ -75,8 +75,12 @@ export const SEED_INSTRUCTIONS =
 - role:一句话说清它是谁、为什么它看得见这一切,如"在赤壁江面划了三十年船,这一仗之后他哪儿也没去"。
 - openingLine:世界还没往前走的时候,它说的第一句话。不超过 45 字,要像人随口说的,
   不要像旁白,不要预告结局。它可以让玩家立刻感觉到"这个世界现在是什么气氛"。
+  好的例子:"江上静下来了,这一仗打完,谁也不提回家的事。"
+  坏的例子:"历史的洪流在此刻悄然转向,一个时代正缓缓落下帷幕。"
 
-不要续写历史,不要给出结局,不要写任何"若干年后"的内容。你只负责把起跑线摆好。` + WORLD_FORMAT_RULES;
+不要续写历史,不要给出结局,不要写任何"若干年后"的内容。你只负责把起跑线摆好。` +
+  PLAIN_TEXT +
+  WORLD_FORMAT_RULES;
 
 export function buildSeedPrompt(input: {
   scenarioId: string;

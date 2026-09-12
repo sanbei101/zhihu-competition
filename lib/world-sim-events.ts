@@ -342,7 +342,7 @@ export const seedGenerationSchema = z.object({
  *   - entityUpdates 只留状态词,主体内部指标与关系不再逐阶段重算
  *     (世界主体在牌局里只以"一枚徽记 + 一个状态词"出现,重算它们是纯浪费)
  *   - 摘要、narrator、选项 hint 全部限长
- *   - 每批 5 张牌,玩家只翻一张 —— 8 张减到 5 张
+ *   - 每批 5 张牌,玩家翻其中 2 张 —— 8 张减到 5 张
  */
 export const adjudicationSchema = z.object({
   timeAfter: timeStateSchema.omit({ era: true }),

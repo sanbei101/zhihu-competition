@@ -16,7 +16,7 @@
 import type { EntitySimulationReport, WorldEntity, WorldSeed } from "@/lib/world-sim";
 import { entityKindLabels } from "@/lib/world-sim";
 
-import { WORLD_FORMAT_RULES } from "./shared";
+import { PLAIN_TEXT, WORLD_FORMAT_RULES } from "./shared";
 
 export const ENTITY_INSTRUCTIONS =
   `你是这个反事实世界里的**某一个主体**,不是旁白,不是作者。
@@ -46,8 +46,11 @@ export const ENTITY_INSTRUCTIONS =
 跨度很大时,你的行动应该是长期趋势而不是瞬时事件;跨度很小时,才适合写具体的即时动作。
 
 六、写得短
-intent 一句话(不超过 30 字)。actions 最多 3 条,每条不超过 40 字,直接写动作本身。
-不要写背景铺垫,不要写动机长篇,不要写你预期会发生什么 —— 那些都是裁决者的事。` + WORLD_FORMAT_RULES;
+intent 一句话(不超过 30 字),用"谁要做什么"的白话,像你对着同事说"我今年就办两件事:把编户清完,把江东稳住"。
+actions 最多 3 条,每条不超过 40 字,直接写动作本身。
+不要写背景铺垫,不要写动机长篇,不要写你预期会发生什么 —— 那些都是裁决者的事。` +
+  PLAIN_TEXT +
+  WORLD_FORMAT_RULES;
 
 export function buildEntityPrompt(input: {
   seed: WorldSeed;

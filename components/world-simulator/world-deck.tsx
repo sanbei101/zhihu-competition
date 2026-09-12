@@ -71,7 +71,8 @@ export function WorldDeck({
   witnessLine,
   hand,
   stage,
-  pickedId,
+  pickedIds,
+  activeCardId,
   flippingId,
   resolvedChoiceId,
   metrics,
@@ -87,7 +88,10 @@ export function WorldDeck({
   witnessLine: WitnessLine | null;
   hand: WorldCard[];
   stage: DeckStage;
-  pickedId: string | null;
+  /** 本阶段已翻开的全部牌(可能是 1 张或 2 张) */
+  pickedIds: string[];
+  /** 当前正面朝上、正在做取舍的那张牌 */
+  activeCardId: string | null;
   flippingId: string | null;
   resolvedChoiceId: string | null;
   metrics: GlobalMetric[];
@@ -99,17 +103,15 @@ export function WorldDeck({
   played: { label: string; tier: WorldCard["tier"] }[];
   summary: DeckSummary | null;
 }) {
-  const picked = hand.find((card) => card.id === pickedId) ?? null;
+  const picked = hand.find((card) => card.id === activeCardId) ?? null;
   /**
    * 此刻正面朝上的那张牌。
    *
-   * 注意判据里必须带上 pickedId —— 光有 stage 不够:origin 阶段如果 pickedId 是空的,
+   * 注意判据里必须带上 activeCardId —— 光有 stage 不够:origin 阶段如果它空了,
    * 牌桌上就什么都不出现(曾经就是这个原因让原点卡整个消失)。
    */
   const opened =
-    picked && (stage === "origin" || stage === "open" || (stage === "closed" && resolvedChoiceId))
-      ? picked
-      : null;
+    picked && (stage === "origin" || stage === "open" || stage === "closed") ? picked : null;
 
   const witness = <WitnessDialogue skin={skin} archetype={archetype} line={witnessLine} />;
 
@@ -135,7 +137,7 @@ export function WorldDeck({
           <div className="w-full min-w-0 lg:max-w-2xl">
             <CardHand
               cards={hand}
-              pickedId={null}
+              pickedIds={pickedIds}
               flipping={flippingId}
               closed={false}
               onPick={onPick}
@@ -149,7 +151,7 @@ export function WorldDeck({
         <div className="space-y-6">
           <CardHand
             cards={hand}
-            pickedId={pickedId}
+            pickedIds={pickedIds}
             flipping={flippingId}
             closed={stage === "closed"}
             onPick={onPick}

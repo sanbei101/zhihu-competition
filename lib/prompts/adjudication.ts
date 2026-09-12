@@ -17,7 +17,7 @@
 
 import type { EntitySimulationReport, WorldSimSession } from "@/lib/world-sim";
 
-import { WITNESS_VOICE, WORLD_DISCIPLINE } from "./shared";
+import { PLAIN_TEXT, WITNESS_VOICE, WORLD_DISCIPLINE } from "./shared";
 
 export const ADJUDICATION_INSTRUCTIONS = `你是这个世界的历史裁决者。若干主体刚刚各自提交了它们想做的事,现在由你决定真实历史走向哪里。
 
@@ -48,6 +48,7 @@ timeAfter 要给出一对**确实在移动**的时间:
 
 第五步 生成事件(一批 5 张)
 产出恰好 5 条事件。这是玩家本阶段能翻到的全部牌,少了牌桌太空,多了玩家读不完。
+玩家会翻开其中 2 张 —— 剩下的照样发生,只是他没看见,所以每一条都值得写好。
 事件必须有明确的行动者(actorEntityIds 不能为空);自然过程用 scope="natural",但也要归到受影响的主体上。
 **想清楚因果,但不要写因果链** —— 第五条事件应当是前三条事件的下游,
 这种承接关系体现在内容里,不需要单独输出。
@@ -61,6 +62,7 @@ timeAfter 要给出一对**确实在移动**的时间:
   tone 取 bold/cautious/cunning/mercy;effects 给 2-4 条对全局指标的量级提示,
   metricId 必须来自【当前全局指标】。effects 只是预估,不是承诺。
 - **选项之间不能有明显更优的那个。** 如果其中一个各方面都更好,那就不是取舍,是提示。
+- hint 用大白话,像一句提醒:写"粮是有了,怨也攒下了",不写"此政策或可缓解短期财政压力,但长期社会成本高企"。
 
 第七步 安排特殊事件
 大多数事件是世界按部就班走出来的。特殊事件是三类"不按部就班"的东西。
@@ -103,12 +105,13 @@ conclusion 不超过 90 字,要能解释这一段历史,并点出**代价**:谁�
 - 不要为了好看把所有事件都写成 severe:日常事件就该是白与绿,
   没有它们做铺垫,红卡就没有分量。
 
-关于输出长度(这是玩家等待时间的主要来源,请严格执行):
+关于输出长度与语言(这是玩家等待时间与阅读体验的主要来源,请严格执行):
 - summary 不超过 60 字,只写"发生了什么",不写前因后果
 - narrator 不超过 45 字
 - choices[].hint 不超过 20 字
 - conclusion 不超过 90 字
 - 不要在任何字段里重复别处已有的信息
+${PLAIN_TEXT}
 
 全局纪律:
 ${WORLD_DISCIPLINE}

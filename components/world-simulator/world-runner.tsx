@@ -14,6 +14,7 @@ import {
   hasSettled,
   metricDeltas,
   originCard,
+  PICKS_PER_HAND,
   settleCard,
   type WorldCard,
 } from "@/lib/world-cards";
@@ -89,6 +90,10 @@ const EMPTY_SEED_PROGRESS: SeedProgressState = {
 interface AdvanceProgress {
   phase: "idle" | "entities" | "adjudicating";
   startedIds: string[];
+  /** 已上报的主体意图,供"世界演算中"面板逐条亮出 */
+  intents: { entityId: string; intent: string }[];
+  /** 裁决阶段流出的世界事件,供"世界演算中"面板滚动展示 */
+  worldEvents: string[];
   reports: number;
   errors: string[];
 }
@@ -96,6 +101,8 @@ interface AdvanceProgress {
 const IDLE_ADVANCE: AdvanceProgress = {
   phase: "idle",
   startedIds: [],
+  intents: [],
+  worldEvents: [],
   reports: 0,
   errors: [],
 };
@@ -117,6 +124,7 @@ function witnessLineFor(
   stage: DeckStage,
   picked: WorldCard | null,
   busy: boolean,
+  pickedCount: number,
 ): WitnessLine | null {
   const name = session.seed.witness.name;
 
@@ -124,10 +132,15 @@ function witnessLineFor(
     return { speaker: name, line: "别催。这个世界要自己走完这一步,谁也快不了它。" };
   }
   if (stage === "pick") {
-    return {
-      speaker: name,
-      line: "牌都扣着呢,你只能盯住一张。挑一张翻开吧 —— 手气也是历史的一部分。",
-    };
+    return pickedCount === 0
+      ? {
+          speaker: name,
+          line: "牌都扣着呢,你能盯住两张。先挑一张 —— 手气也是历史的一部分。",
+        }
+      : {
+          speaker: name,
+          line: "还能再翻一张。剩下的这一次,挑你最放不下的。",
+        };
   }
   if (stage === "closed") {
     return { speaker: name, line: "这一阶段就到这儿。要接着往下走,就得放手让它自己走。" };
@@ -157,10 +170,14 @@ export function WorldRunner({
   const [seedProgress, setSeedProgress] = useState<SeedProgressState>(EMPTY_SEED_PROGRESS);
   const [hand, setHand] = useState<WorldCard[]>([]);
   const [stage, setStage] = useState<DeckStage>("empty");
-  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
+  /** 当前正面朝上、正在做取舍的那张牌 */
+  const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [flippingId, setFlippingId] = useState<string | null>(null);
   const [resolvedChoiceId, setResolvedChoiceId] = useState<string | null>(null);
-  const [directive, setDirective] = useState<PlayerDirective | null>(null);
+  /** 已经做完取舍的牌。满了 PICKS_PER_HAND 张,阶段才收束 */
+  const [settledIds, setSettledIds] = useState<string[]>([]);
+  const [directives, setDirectives] = useState<PlayerDirective[]>([]);
   const [pendingFork, setPendingFork] = useState<{ forkId: string; alternativeId: string } | null>(
     null,
   );
@@ -251,12 +268,14 @@ export function WorldRunner({
       setSession(next);
       setHand([origin]);
       setStage("origin");
-      // 原点卡是唯一一张开局就正面朝上的牌:pickedId 必须钉死,
+      // 原点卡是唯一一张开局就正面朝上的牌:activeCardId 必须钉死,
       // 否则牌桌的 (origin|open) && picked 判据落空,整张牌根本不渲染。
-      setPickedId(origin.id);
+      setPickedIds([origin.id]);
+      setActiveCardId(origin.id);
       setFlippingId(null);
       setResolvedChoiceId(null);
-      setDirective(null);
+      setSettledIds([origin.id]);
+      setDirectives([]);
       setPendingFork(null);
       saveWorldSimSession(scenarioId, next);
       setNotice("世界已经搭好。原点卡就摆在桌上 —— 拉开它,这条世界线才会开始走。");
@@ -280,10 +299,12 @@ export function WorldRunner({
       // 恢复时不重发牌:直接给上一阶段的结算,避免已有的取舍被重做一次
       setHand([]);
       setStage("empty");
-      setPickedId(null);
+      setPickedIds([]);
+      setActiveCardId(null);
       setFlippingId(null);
       setResolvedChoiceId(null);
-      setDirective(null);
+      setSettledIds([]);
+      setDirectives([]);
       setPendingFork(null);
       setFollowedEntityId(
         stored.session.state.entities.find((entity) => entity.changedThisEra)?.id ??
@@ -306,7 +327,14 @@ export function WorldRunner({
     if (!current || busyRef.current) return;
 
     setNotice("");
-    setAdvance({ phase: "entities", startedIds: [], reports: 0, errors: [] });
+    setAdvance({
+      phase: "entities",
+      startedIds: [],
+      intents: [],
+      worldEvents: [],
+      reports: 0,
+      errors: [],
+    });
 
     try {
       const response = await fetch("/api/world-simulate", {
@@ -316,7 +344,7 @@ export function WorldRunner({
           session: current,
           ...(followedEntityId ? { followedEntityId } : {}),
           ...(pendingFork ? { forkChoice: pendingFork } : {}),
-          ...(directive ? { directives: [directive] } : {}),
+          ...(directives.length ? { directives } : {}),
         }),
       });
 
@@ -344,13 +372,29 @@ export function WorldRunner({
             }));
             break;
           case "entity-report":
-            setAdvance((prev) => ({ ...prev, reports: prev.reports + 1 }));
+            setAdvance((prev) => ({
+              ...prev,
+              reports: prev.reports + 1,
+              intents: [
+                ...prev.intents,
+                { entityId: event.report.entityId, intent: event.report.intent },
+              ],
+            }));
             break;
           case "entity-error":
-            setAdvance((prev) => ({ ...prev, errors: [...prev.errors, event.error.message] }));
+            setAdvance((prev) => ({
+              ...prev,
+              errors: [...prev.errors, event.error.message],
+            }));
             break;
           case "adjudicating":
             setAdvance((prev) => ({ ...prev, phase: "adjudicating" }));
+            break;
+          case "world-event":
+            setAdvance((prev) => ({
+              ...prev,
+              worldEvents: [...prev.worldEvents, event.event.summary],
+            }));
             break;
           case "complete":
             finished = event.session;
@@ -359,7 +403,6 @@ export function WorldRunner({
             streamError = userErrorMessage(event.error);
             break;
           case "simulation-start":
-          case "world-event":
           case "fork-detected":
           case "snapshot":
           case "state":
@@ -371,10 +414,12 @@ export function WorldRunner({
 
       const next: WorldSimSession = finished;
       setSession(next);
-      setPickedId(null);
+      setPickedIds([]);
+      setActiveCardId(null);
       setFlippingId(null);
       setResolvedChoiceId(null);
-      setDirective(null);
+      setSettledIds([]);
+      setDirectives([]);
       setPendingFork(null);
       setAdvance(IDLE_ADVANCE);
       saveWorldSimSession(scenarioId, next);
@@ -383,7 +428,9 @@ export function WorldRunner({
       if (hasSettled(next)) {
         const settle = settleCard(next);
         setHand([settle]);
-        setPickedId(settle.id);
+        setPickedIds([settle.id]);
+        setActiveCardId(settle.id);
+        setSettledIds([settle.id]);
         setStage("open");
         setNotice("这个世界的故事讲完了。结算卡已经翻开。");
         return;
@@ -393,14 +440,14 @@ export function WorldRunner({
       setHand(dealHand({ session: next, snapshot: latest!, fork: null }));
       setStage("pick");
       setNotice(
-        `世界又往前走了一段(${latest?.spanLabel ?? ""}),发出了 ${next.snapshots.at(-1)?.events.length ?? 0} 张牌。你只能翻开一张。`,
+        `世界又往前走了一段(${latest?.spanLabel ?? ""}),发出了 ${next.snapshots.at(-1)?.events.length ?? 0} 张牌。你能翻开其中 ${PICKS_PER_HAND} 张。`,
       );
     } catch (error) {
       console.error("时代推演失败", error);
       setAdvance(IDLE_ADVANCE);
       setNotice(error instanceof Error ? error.message : "时代推演失败,请重试");
     }
-  }, [directive, followedEntityId, pendingFork, scenarioId]);
+  }, [directives, followedEntityId, pendingFork, scenarioId]);
 
   // ==================== 盲抽与取舍 ====================
 
@@ -408,49 +455,85 @@ export function WorldRunner({
   const pick = useCallback(
     (card: WorldCard) => {
       if (stage !== "pick" || busy || flippingId) return;
+      if (pickedIds.includes(card.id) || pickedIds.length >= PICKS_PER_HAND) return;
       setFlippingId(card.id);
       setTimeout(() => {
         setFlippingId(null);
-        setPickedId(card.id);
+        setActiveCardId(card.id);
+        setPickedIds((prev) => [...prev, card.id]);
+        setResolvedChoiceId(null);
         setStage("open");
       }, FLIP_MS);
     },
-    [busy, flippingId, stage],
+    [busy, flippingId, pickedIds, stage],
+  );
+
+  /**
+   * 结掉一张牌的取舍。
+   *
+   * 还差一张没翻、且手上仍有没翻的牌时,回 pick 继续挑第二张;
+   * 否则本阶段收束。分叉是阶段的终结者,选完直接收束。
+   */
+  const finalizeCard = useCallback(
+    (card: WorldCard, choice: EventChoice | null) => {
+      if (choice) setResolvedChoiceId(choice.id);
+
+      const fork = card.kind === "fork" ? card.fork : null;
+      if (fork && choice) {
+        setPendingFork({ forkId: fork.id, alternativeId: choice.id });
+        setStage("closed");
+        return;
+      }
+
+      if (choice) {
+        setDirectives((prev) => [
+          ...prev,
+          {
+            cardId: card.id,
+            cardTitle: card.title,
+            choiceId: choice.id,
+            choiceLabel: choice.label,
+            note: choice.hint,
+          },
+        ]);
+      }
+
+      const nextSettled = [...settledIds, card.id];
+      setSettledIds(nextSettled);
+      const remaining = hand.filter((item) => !pickedIds.includes(item.id));
+      setStage(nextSettled.length < PICKS_PER_HAND && remaining.length > 0 ? "pick" : "closed");
+    },
+    [hand, pickedIds, settledIds],
   );
 
   /** 在翻开的牌上做取舍。这是本阶段唯一的一次 */
-  const choose = useCallback((card: WorldCard, choice: EventChoice) => {
-    setResolvedChoiceId(choice.id);
-    setStage("closed");
+  const choose = useCallback(
+    (card: WorldCard, choice: EventChoice) => {
+      if (stage !== "open" || busy) return;
+      finalizeCard(card, choice);
+    },
+    [busy, finalizeCard, stage],
+  );
 
-    if (card.kind === "fork" && card.fork) {
-      setPendingFork({ forkId: card.fork.id, alternativeId: choice.id });
-      return;
-    }
-
-    // 取舍不改写已经发生的事,而是成为下一阶段的既有条件 ——
-    // 这是观察者真正拥有的那点权力。
-    setDirective({
-      cardId: card.id,
-      cardTitle: card.title,
-      choiceId: choice.id,
-      choiceLabel: choice.label,
-      note: choice.hint,
-    });
-  }, []);
-
-  /** 收下一张没有取舍的白卡:读完,合上,继续 */
-  const closeCard = useCallback(() => setStage("closed"), []);
+  /** 收下一张没有取舍的白卡:读完,合上,继续挑下一张 */
+  const closeCard = useCallback(() => {
+    if (stage !== "open") return;
+    const card = hand.find((item) => item.id === activeCardId);
+    if (!card) return;
+    finalizeCard(card, null);
+  }, [activeCardId, finalizeCard, hand, stage]);
 
   const resetSession = useCallback(() => {
     clearWorldSimSession(scenarioId);
     setSession(null);
     setHand([]);
     setStage("empty");
-    setPickedId(null);
+    setPickedIds([]);
+    setActiveCardId(null);
     setFlippingId(null);
     setResolvedChoiceId(null);
-    setDirective(null);
+    setSettledIds([]);
+    setDirectives([]);
     setPendingFork(null);
     setAdvance(IDLE_ADVANCE);
     setFollowedEntityId(null);
@@ -480,7 +563,7 @@ export function WorldRunner({
     );
   }
 
-  const picked = hand.find((card) => card.id === pickedId) ?? null;
+  const picked = hand.find((card) => card.id === activeCardId) ?? null;
   // origin 也算可推进:原点卡上的按钮是主出口,底部按钮是同一出口的兜底。
   // 两个出口指向同一个动作,不会制造分叉 —— 但卡片万一没渲染出来,局面不会死。
   const canAdvance = (stage === "origin" || stage === "closed" || stage === "empty") && !busy;
@@ -493,12 +576,27 @@ export function WorldRunner({
       skin={skin}
       hand={hand}
       stage={stage}
-      pickedId={pickedId}
+      pickedIds={pickedIds}
+      activeCardId={activeCardId}
       flippingId={flippingId}
       resolvedChoiceId={resolvedChoiceId}
-      played={directive ? [{ label: directive.choiceLabel, tier: picked?.tier ?? "white" }] : []}
+      simView={
+        busy
+          ? {
+              phase: advance.phase,
+              startedIds: advance.startedIds,
+              intents: advance.intents,
+              worldEvents: advance.worldEvents,
+              errors: advance.errors,
+            }
+          : null
+      }
+      played={directives.map((item) => ({
+        label: item.choiceLabel,
+        tier: (hand.find((card) => card.id === item.cardId)?.tier ?? "white") as WorldCard["tier"],
+      }))}
       summary={stage === "closed" || stage === "empty" ? summaryFor(session) : null}
-      witnessLine={witnessLineFor(session, stage, picked, busy)}
+      witnessLine={witnessLineFor(session, stage, picked, busy, pickedIds.length)}
       onPick={pick}
       onChoose={(choice) => {
         if (picked) choose(picked, choice);
@@ -511,7 +609,9 @@ export function WorldRunner({
           : stage === "origin"
             ? "先拉开这条世界线"
             : stage === "pick"
-              ? "先翻开一张牌"
+              ? pickedIds.length === 0
+                ? "先翻开两张牌"
+                : "再翻开一张牌"
               : stage === "open"
                 ? "先做完这张牌的取舍"
                 : `推进时间 · 纪元 ${session.state.currentEra + 1}`

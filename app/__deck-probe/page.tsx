@@ -139,7 +139,8 @@ function Probe({ stage, pickedId }: { stage: DeckStage; pickedId: string | null 
         witnessLine={null}
         hand={stage === "origin" ? [origin] : hand}
         stage={stage}
-        pickedId={pickedId}
+        pickedIds={pickedId ? [pickedId] : []}
+        activeCardId={pickedId}
         flippingId={null}
         resolvedChoiceId={null}
         metrics={session.state.globalMetrics}

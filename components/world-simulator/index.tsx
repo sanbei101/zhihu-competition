@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { MetricStrip } from "@/components/world-simulator/metric-strip";
 import {
+  SimulationView,
+  type SimulationViewState,
+} from "@/components/world-simulator/simulation-view";
+import {
   WorldDeck,
   type DeckStage,
   type DeckSummary,
@@ -35,7 +39,9 @@ export function WorldSimulator({
   skin,
   hand,
   stage,
-  pickedId,
+  pickedIds,
+  activeCardId,
+  simView,
   flippingId,
   resolvedChoiceId,
   played,
@@ -59,7 +65,12 @@ export function WorldSimulator({
   skin: ScenarioSkin;
   hand: WorldCard[];
   stage: DeckStage;
-  pickedId: string | null;
+  /** 本阶段已翻开的全部牌(可能是 1 张或 2 张) */
+  pickedIds: string[];
+  /** 当前正面朝上、正在做取舍的那张牌 */
+  activeCardId: string | null;
+  /** 非空时牌桌替换成「世界演算室」Gen UI */
+  simView: SimulationViewState | null;
   flippingId: string | null;
   resolvedChoiceId: string | null;
   played: { label: string; tier: WorldCard["tier"] }[];
@@ -81,7 +92,7 @@ export function WorldSimulator({
   onReset: () => void;
 }) {
   const archetype = witnessArchetypeFor(session.seed.themeId);
-  const picked = hand.find((card) => card.id === pickedId) ?? null;
+  const picked = hand.find((card) => card.id === activeCardId) ?? null;
 
   /**
    * 卡面底部唯一的那个主按钮。一个状态至多一个出口:
@@ -135,23 +146,35 @@ export function WorldSimulator({
 
       {notice ? <p className="text-muted-foreground text-xs leading-6">{notice}</p> : null}
 
-      <WorldDeck
-        skin={skin}
-        archetype={archetype}
-        witnessLine={witnessLine}
-        hand={hand}
-        stage={stage}
-        pickedId={pickedId}
-        flippingId={flippingId}
-        resolvedChoiceId={resolvedChoiceId}
-        metrics={session.state.globalMetrics}
-        onPick={onPick}
-        onChoose={onChoose}
-        cardAction={cardAction}
-        busy={busy}
-        played={played}
-        summary={summary}
-      />
+      {simView ? (
+        <SimulationView
+          entities={session.state.entities}
+          phase={simView.phase}
+          startedIds={simView.startedIds}
+          intents={simView.intents}
+          worldEvents={simView.worldEvents}
+          errors={simView.errors}
+        />
+      ) : (
+        <WorldDeck
+          skin={skin}
+          archetype={archetype}
+          witnessLine={witnessLine}
+          hand={hand}
+          stage={stage}
+          pickedIds={pickedIds}
+          activeCardId={activeCardId}
+          flippingId={flippingId}
+          resolvedChoiceId={resolvedChoiceId}
+          metrics={session.state.globalMetrics}
+          onPick={onPick}
+          onChoose={onChoose}
+          cardAction={cardAction}
+          busy={busy}
+          played={played}
+          summary={summary}
+        />
+      )}
 
       <Separator />
 
