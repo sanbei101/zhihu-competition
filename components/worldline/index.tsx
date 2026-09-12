@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StageBackdrop } from "@/components/worldline/backdrop";
 import { EventBoard } from "@/components/worldline/board";
+import { EpicProclamationBanner, type ProclamationData } from "@/components/worldline/proclamation";
 import { WorldlineMarkSvg } from "@/components/worldline/sprites";
 import { WorldArea, type ActiveVoice } from "@/components/worldline/stage";
 import { WorldlineEvolutionTree } from "@/components/worldline/tree";
@@ -32,6 +33,7 @@ export type ObservatoryPhase = "boot" | "deal" | "idle" | "react" | "done";
 
 export interface ObservatoryView {
   scenarioTitle: string;
+  themeId?: string;
   premiseStatement: string;
   domains: string[];
   scaleLabel: string;
@@ -107,6 +109,8 @@ export function Observatory({
   scrollerRef,
   onAdvance,
   onReset,
+  proclamation,
+  onDismissProclamation,
 }: {
   view: ObservatoryView;
   skin: ScenarioSkin;
@@ -116,6 +120,8 @@ export function Observatory({
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   onAdvance: () => void;
   onReset: () => void;
+  proclamation?: ProclamationData | null;
+  onDismissProclamation?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<string>("observatory");
   const eraNo = Math.max(1, view.timeline.length);
@@ -123,6 +129,11 @@ export function Observatory({
 
   return (
     <div className="observatory">
+      <EpicProclamationBanner
+        proclamation={proclamation ?? null}
+        skin={skin}
+        onDismiss={onDismissProclamation ?? (() => {})}
+      />
       <div className="shell">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="obs-tabs-container">
           <header className="bar">

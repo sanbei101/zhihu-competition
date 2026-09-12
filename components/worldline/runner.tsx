@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Observatory, type ObservatoryPhase, type ObservatoryView } from "@/components/worldline";
+import type { ProclamationData } from "@/components/worldline/proclamation";
 import type { ActiveVoice } from "@/components/worldline/stage";
 import { errorEnvelopeSchema, userErrorMessage } from "@/lib/app-error";
 import { readNdjsonStream } from "@/lib/ndjson-stream";
@@ -17,6 +18,7 @@ import {
   type WorldlineSession,
   type WorldlineVoice,
 } from "@/lib/worldline";
+import { getEpicQuote, inferMilestoneFromWave } from "@/lib/worldline-epics";
 import { worldlineSeedEventSchema, worldlineWaveEventSchema } from "@/lib/worldline-events";
 import { applyWave, createSession, eventSegment, reactionSegment } from "@/lib/worldline-reducer";
 import { clearWorldline, loadWorldline, saveWorldline } from "@/lib/worldline-storage";
@@ -94,6 +96,7 @@ export function WorldlineRunner({
   const [litIds, setLitIds] = useState<string[]>([]);
   const [witnessLine, setWitnessLine] = useState("桌上会落五件事。等它们落定,世界才开始动。");
   const [notice, setNotice] = useState("");
+  const [proclamation, setProclamation] = useState<ProclamationData | null>(null);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
   const seedStarted = useRef(false);
@@ -270,6 +273,24 @@ export function WorldlineRunner({
               waveAccum.current = wave;
               setReactionsReady(true);
               setSession((prev) => (prev ? applyWave({ session: prev, wave }).session : prev));
+
+              // 触发本纪元史诗宣言横幅
+              const eraCount = (base.waves.length ?? 0) + 1;
+              const milestone = inferMilestoneFromWave({
+                eraNo: eraCount,
+                hasCrisis: wave.some((e) => e.tone === "bad"),
+                tone: wave[0]?.tone,
+              });
+              const waveEpic = getEpicQuote({
+                themeId,
+                milestone,
+                index: eraCount - 1,
+              });
+              setProclamation({
+                id: `wave-${eraCount}-${Date.now()}`,
+                ...waveEpic,
+                durationMs: 7000,
+              });
               break;
             }
             case "error":
@@ -364,10 +385,17 @@ export function WorldlineRunner({
         }
       });
 
-      if (!built) throw new Error("世界构建流没有返回完整种子");
-
+      if (!built) {
+        throw new Error("未能生成世界线会话种子");
+      }
       const next: WorldlineSession = built;
       setSession(next);
+      const genesisEpic = getEpicQuote({ themeId, milestone: "genesis" });
+      setProclamation({
+        id: `genesis-${Date.now()}`,
+        ...genesisEpic,
+        durationMs: 7500,
+      });
       /**
        * 开场那几句台词来自最新的一段 —— 玩家先看见有人站在那儿说话,
        * 再看见世界从他身后长出来。顺序反过来就没有"有人陪着"的感觉了。
@@ -542,6 +570,7 @@ export function WorldlineRunner({
 
   const view: ObservatoryView = {
     scenarioTitle: session?.scenarioTitle ?? scenarioTitle,
+    themeId,
     premiseStatement,
     domains: session?.seed.premise.domains ?? boot.premise?.domains ?? [],
     scaleLabel: session?.seed.scaleLabel ?? boot.scaleLabel,
@@ -573,6 +602,8 @@ export function WorldlineRunner({
       scrollerRef={scrollerRef}
       onAdvance={advance}
       onReset={rebuild}
+      proclamation={proclamation}
+      onDismissProclamation={() => setProclamation(null)}
     />
   );
 }

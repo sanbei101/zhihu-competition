@@ -9,6 +9,7 @@ import {
   Minus,
   Plus,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import {
   type CSSProperties,
@@ -31,6 +32,7 @@ import {
   type WorldlineBeing,
   eventToneLabels,
 } from "@/lib/worldline";
+import { getEpicQuote, inferMilestoneFromWave } from "@/lib/worldline-epics";
 
 import type { ObservatoryView } from "./index";
 
@@ -66,6 +68,13 @@ export interface TreeEventBranch {
   aftermath?: string;
   isLive: boolean;
   branches: TreeReactionBranch[];
+  epicMilestone?: {
+    quote: string;
+    subtext: string;
+    tag: string;
+    icon: string;
+    color: string;
+  };
 }
 
 export interface TreeData {
@@ -114,6 +123,17 @@ function buildTreeData(view: ObservatoryView): TreeData {
       });
     }
 
+    const milestone = inferMilestoneFromWave({
+      eraNo: idx + 1,
+      tone: seg.mark === "crisis" ? "bad" : "good",
+      hasCrisis: seg.mark === "crisis",
+    });
+    const epicMilestone = getEpicQuote({
+      themeId: view.themeId ?? "cosmic",
+      milestone,
+      index: idx,
+    });
+
     events.push({
       id: `opening-${idx}-${seg.at}`,
       eraNo: idx + 1,
@@ -125,6 +145,7 @@ function buildTreeData(view: ObservatoryView): TreeData {
       aftermath: seg.aftermath,
       isLive: idx === openingSegments.length - 1 && view.events.length === 0,
       branches: childBranches,
+      epicMilestone,
     });
   });
 
@@ -150,15 +171,28 @@ function buildTreeData(view: ObservatoryView): TreeData {
       };
     });
 
+    const eraCount = openingSegments.length + evIdx + 1;
+    const milestone = inferMilestoneFromWave({
+      eraNo: eraCount,
+      tone: ev.tone,
+      hasCrisis: ev.tone === "bad",
+    });
+    const epicMilestone = getEpicQuote({
+      themeId: view.themeId ?? "cosmic",
+      milestone,
+      index: evIdx,
+    });
+
     events.push({
       id: ev.id,
-      eraNo: openingSegments.length + evIdx + 1,
+      eraNo: eraCount,
       at: ev.at,
       title: ev.title,
       tone: ev.tone,
       involves: ev.involves,
       isLive: isPlaying,
       branches,
+      epicMilestone,
     });
   });
 
@@ -201,6 +235,13 @@ export function WorldlineEvolutionTree({
     desc: string;
     voices?: TreeVoiceItem[];
     involves?: string[];
+    epicMilestone?: {
+      quote: string;
+      subtext: string;
+      tag: string;
+      icon: string;
+      color: string;
+    };
   } | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "linear">("tree");
   const [zoom, setZoom] = useState(1);
@@ -446,6 +487,11 @@ export function WorldlineEvolutionTree({
                       sub: treeData.root.scaleLabel,
                       desc: treeData.root.statement,
                       involves: view.beings.map((b) => b.name),
+                      epicMilestone: getEpicQuote({
+                        themeId: view.themeId ?? "cosmic",
+                        milestone: "genesis",
+                        index: 0,
+                      }),
                     })
                   }
                 >
@@ -501,6 +547,7 @@ export function WorldlineEvolutionTree({
                             involves: ev.involves.map(
                               (id) => view.beings.find((b) => b.id === id)?.name ?? id,
                             ),
+                            epicMilestone: ev.epicMilestone,
                           })
                         }
                       >
@@ -536,6 +583,14 @@ export function WorldlineEvolutionTree({
                         </div>
 
                         <p className="event-title">{ev.title}</p>
+
+                        {ev.epicMilestone && (
+                          <div className="event-epic-badge">
+                            <span>{ev.epicMilestone.icon}</span>
+                            <span>{ev.epicMilestone.tag}</span>
+                            <Sparkles className="size-2.5 text-amber-400" />
+                          </div>
+                        )}
 
                         <div className="event-involves">
                           {ev.involves.map((id) => {
@@ -647,6 +702,17 @@ export function WorldlineEvolutionTree({
                 ✕
               </button>
             </div>
+            {selectedNode.epicMilestone && (
+              <div className="drawer-epic-quote-block">
+                <div className="deq-badge">
+                  <span>{selectedNode.epicMilestone.icon}</span>
+                  <span>{selectedNode.epicMilestone.tag}</span>
+                  <Sparkles className="size-3 text-amber-400 opacity-80" />
+                </div>
+                <p className="deq-quote">“{selectedNode.epicMilestone.quote}”</p>
+                <p className="deq-sub">—— {selectedNode.epicMilestone.subtext}</p>
+              </div>
+            )}
             <p className="drawer-desc">{selectedNode.desc}</p>
             {selectedNode.involves && selectedNode.involves.length > 0 && (
               <div className="drawer-section">
