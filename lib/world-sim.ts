@@ -469,7 +469,7 @@ export interface WorldState {
 
 /** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 + 玩家取舍 */
 export interface WorldSimSession {
-  version: 4;
+  version: 5;
   scenarioId: string;
   scenarioTitle: string;
   scenarioUrl: string;

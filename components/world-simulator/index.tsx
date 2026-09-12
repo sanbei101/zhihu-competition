@@ -103,8 +103,11 @@ export function WorldSimulator({
    */
   const cardAction = (() => {
     if (stage === "origin") return { label: "拉开这条世界线", onClick: onAdvance };
-    if (stage === "open" && picked && picked.choices.length === 0) {
-      return { label: "收下这张牌", onClick: onCardClose };
+    if (stage === "open" && picked) {
+      return {
+        label: picked.kind === "settle" ? "收藏这条世界线" : "收下这张牌",
+        onClick: onCardClose,
+      };
     }
     return undefined;
   })();
@@ -152,7 +155,7 @@ export function WorldSimulator({
           phase={simView.phase}
           startedIds={simView.startedIds}
           intents={simView.intents}
-          worldEvents={simView.worldEvents}
+          beats={simView.beats}
           errors={simView.errors}
         />
       ) : (

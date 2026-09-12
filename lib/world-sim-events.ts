@@ -294,7 +294,7 @@ export const playerDirectiveSchema = z.object({
 });
 
 export const worldSimSessionSchema = z.object({
-  version: z.literal(4),
+  version: z.literal(5),
   scenarioId: z.string().min(1),
   scenarioTitle: z.string().min(1),
   scenarioUrl: z.string(),
@@ -335,21 +335,34 @@ export const seedGenerationSchema = z.object({
 });
 
 /**
- * 裁决器的输出:一次时代推进的全部结果。
+ * 裁决器的一段连续历史。一次裁决就是一条由 3-5 段 beats 拼成的完整时间线,
+ * 玩家在这整段里只做一次取舍,不再每轮停下。
  *
- * v4 起刻意瘦身,这是对等待时间影响最大的改动:
- *   - 因果链整个砍掉 —— 界面从不显示,却要模型吐几十句排比,是最大的 token 黑洞
- *   - entityUpdates 只留状态词,主体内部指标与关系不再逐阶段重算
- *     (世界主体在牌局里只以"一枚徽记 + 一个状态词"出现,重算它们是纯浪费)
- *   - 摘要、narrator、选项 hint 全部限长
- *   - 每批 5 张牌,玩家翻其中 2 张 —— 8 张减到 5 张
+ * 这一段就是旧版"一个时代"的产物,只是被裁成几段、让 UI 能像看长剧一样逐段播放:
+ * 事件、结论、指标变化都归到它们各自发生的段落里。
  */
-export const adjudicationSchema = z.object({
-  timeAfter: timeStateSchema.omit({ era: true }),
+export const adjudicationBeatSchema = z.object({
+  /** 本段推进了多久,如"世界推进了 30 年" */
   spanLabel: z.string().min(1),
-  events: z.array(worldEventSchema.omit({ id: true, era: true })).max(LOOSE.events),
+  timeAfter: timeStateSchema.omit({ era: true }),
+  events: z.array(worldEventSchema.omit({ id: true, era: true })).max(4),
   conclusion: z.string().min(1),
   metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
+});
+
+/**
+ * 裁决器的输出:一整段级联历史。
+ *
+ * v5 起的结构性变化:
+ *   - 一次裁决产出 3-5 段 beats,不再是一次一个时代 —— 玩家选完卡后,
+ *     AI 把这条世界线连续往前推 5 段,期间不再打断他
+ *   - entityUpdates 只做最终结算:主体只在每大阶段的开头博弈一次,
+ *     中间段落的状态由裁决器沿着时间轴自然演变
+ *   - 因果链、内部指标与关系的逐段重算都砍掉了(见 v4 注释),token 省给"演得长"
+ */
+export const adjudicationSchema = z.object({
+  /** 3-5 段,每段一段可以单独展示的历史 */
+  beats: z.array(adjudicationBeatSchema).min(1).max(6),
   entityUpdates: z
     .array(
       z.object({
@@ -368,7 +381,7 @@ export const adjudicationSchema = z.object({
     })
     .nullable()
     .optional(),
-  /** 本阶段是否已经收敛到稳态,提示 UI 可以收尾 */
+  /** 本大阶段是否已经收敛到稳态,提示 UI 可以收尾 */
   stabilized: z.boolean().optional(),
 });
 
@@ -452,6 +465,12 @@ export const worldSimulateEventSchema = z.discriminatedUnion("type", [
     error: streamErrorSchema,
   }),
   z.object({ type: z.literal("adjudicating") }),
+  z.object({
+    type: z.literal("beat-start"),
+    era: z.number().int().min(0),
+    spanLabel: z.string().min(1),
+    timeLabel: z.string().min(1),
+  }),
   z.object({ type: z.literal("world-event"), event: worldEventSchema }),
   z.object({ type: z.literal("fork-detected"), fork: worldForkSchema }),
   z.object({ type: z.literal("snapshot"), snapshot: eraSnapshotSchema }),

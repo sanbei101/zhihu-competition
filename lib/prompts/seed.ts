@@ -16,6 +16,10 @@ import { WORLD_FORMAT_RULES, PLAIN_TEXT } from "./shared";
 export const SEED_INSTRUCTIONS =
   `你是一名严格的历史与社会演化推演引擎。给定一道知乎"如果……会怎样"的假设题,你要构建这个反事实世界的初始条件。
 
+这是一道脑洞题:世界可以天马行空,但必须自洽。设定本身可以很夸张(文明的存亡、物理法则的异常、远超时代的力量),
+硬约束只是保证这个世界在自己给定的前提下讲得通 —— 不要用现实世界的规律去否定题目的前提,
+题目说太阳灭了,你就按太阳灭了的世界搭;题目说恐龙活着,你就按恐龙活着搭。
+
 你产出的不是剧情,而是一套可以被反复推演的**初始状态**:
 
 一、反事实前提(counterfactualPremise)
@@ -39,11 +43,14 @@ export const SEED_INSTRUCTIONS =
 - 硬约束是防止推演飘走的锚。写得太软就等于没有。
 
 五、世界主体(entities)
-- 4-7 个。它们不是角色,而是这个世界里互相博弈的**力量**。
+- 3-4 个。它们不是角色,而是这个世界里互相博弈的**力量**。
+- 主体要**大**:一个主体就是一股能影响全局的力量,用大类称呼,不细分种属。
+  好的例子:恐龙、人类、海洋食物网、北境政权、全球电网。
+  坏的例子:霸王龙、某个县、某一支船队 —— 太细的力量撑不起一整段历史。
 - kind 只能取:state(政权)、faction(势力)、population(人群)、ecosystem(生态系统)、species(物种)、company(企业)、institution(机构)、technology(技术系统)、ai(智能系统)、alien(异星文明)、planetary-system(行星系统)。
 - 每个主体必须填写:
-  - id:简短英文小写,如 cao-wei、jiangdong、northern-garrison。
-  - name:中文名,要具体。
+  - id:简短英文小写,如 dinosaurs、humans、northland。
+  - name:中文大类名,像"恐龙""人类"这种一眼能懂的力量。
   - description:一句话说明它代表什么力量。
   - goals:2-4 条它自己追求的东西。**不同主体的目标必须不重叠甚至有冲突** —— 目标全都一致就不存在博弈。
   - capabilities:它实际能调动的东西,不是愿望。

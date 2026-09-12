@@ -20,7 +20,6 @@ import {
 } from "@/lib/world-cards";
 import type {
   CounterfactualPremise,
-  EventChoice,
   GlobalMetric,
   HardRule,
   PlayerDirective,
@@ -29,6 +28,7 @@ import type {
   WorldEntity,
   WorldSeed,
   WorldSimSession,
+  WorldEvent,
   WitnessLine,
 } from "@/lib/world-sim";
 import { worldSeedEventSchema, worldSimulateEventSchema } from "@/lib/world-sim-events";
@@ -86,14 +86,28 @@ const EMPTY_SEED_PROGRESS: SeedProgressState = {
   error: "",
 };
 
+/** 一段连续历史。裁决器一次吐 3-5 段,UI 在"世界演算室"里逐段播放 */
+interface AdvanceBeat {
+  era: number;
+  spanLabel: string;
+  timeLabel: string;
+  events: {
+    title: string;
+    severity: WorldEvent["severity"];
+    scope: WorldEvent["scope"];
+    summary: string;
+    narrator: WitnessLine | null;
+  }[];
+}
+
 /** 推进过程中的实时进度。牌局界面里只在底部指标条上占一行 */
 interface AdvanceProgress {
   phase: "idle" | "entities" | "adjudicating";
   startedIds: string[];
   /** 已上报的主体意图,供"世界演算中"面板逐条亮出 */
   intents: { entityId: string; intent: string }[];
-  /** 裁决阶段流出的世界事件,供"世界演算中"面板滚动展示 */
-  worldEvents: string[];
+  /** 裁决阶段流出的一段段历史,供"世界演算中"面板逐段滚动展示 */
+  beats: AdvanceBeat[];
   reports: number;
   errors: string[];
 }
@@ -102,7 +116,7 @@ const IDLE_ADVANCE: AdvanceProgress = {
   phase: "idle",
   startedIds: [],
   intents: [],
-  worldEvents: [],
+  beats: [],
   reports: 0,
   errors: [],
 };
@@ -129,7 +143,7 @@ function witnessLineFor(
   const name = session.seed.witness.name;
 
   if (busy) {
-    return { speaker: name, line: "别催。这个世界要自己走完这一步,谁也快不了它。" };
+    return { speaker: name, line: "别催。这一大段要一口气走完,谁也快不了它。" };
   }
   if (stage === "pick") {
     return pickedCount === 0
@@ -143,7 +157,7 @@ function witnessLineFor(
         };
   }
   if (stage === "closed") {
-    return { speaker: name, line: "这一阶段就到这儿。要接着往下走,就得放手让它自己走。" };
+    return { speaker: name, line: "看够了就合上吧 —— 你不选,它也照样往前走。" };
   }
   if (picked?.narrator) return picked.narrator;
   if (stage === "empty") {
@@ -331,7 +345,7 @@ export function WorldRunner({
       phase: "entities",
       startedIds: [],
       intents: [],
-      worldEvents: [],
+      beats: [],
       reports: 0,
       errors: [],
     });
@@ -390,11 +404,41 @@ export function WorldRunner({
           case "adjudicating":
             setAdvance((prev) => ({ ...prev, phase: "adjudicating" }));
             break;
-          case "world-event":
+          case "beat-start":
             setAdvance((prev) => ({
               ...prev,
-              worldEvents: [...prev.worldEvents, event.event.summary],
+              phase: "adjudicating",
+              beats: [
+                ...prev.beats,
+                {
+                  era: event.era,
+                  spanLabel: event.spanLabel,
+                  timeLabel: event.timeLabel,
+                  events: [],
+                },
+              ],
             }));
+            break;
+          case "world-event":
+            setAdvance((prev) => {
+              const beats = [...prev.beats];
+              const last = beats.at(-1);
+              if (!last) return prev;
+              beats[beats.length - 1] = {
+                ...last,
+                events: [
+                  ...last.events,
+                  {
+                    title: event.event.title,
+                    severity: event.event.severity,
+                    scope: event.event.scope,
+                    summary: event.event.summary,
+                    narrator: event.event.narrator ?? null,
+                  },
+                ],
+              };
+              return { ...prev, beats };
+            });
             break;
           case "complete":
             finished = event.session;
@@ -413,6 +457,11 @@ export function WorldRunner({
       if (!finished) throw new Error(streamError || "推演流没有返回完整会话");
 
       const next: WorldSimSession = finished;
+      // 只挑本轮新长出来的快照发牌 —— 历史不会重复发
+      const fresh = next.snapshots.slice(current.snapshots.length);
+      const newFork =
+        next.forks.find((fork) => !current.forks.some((old) => old.id === fork.id)) ?? null;
+
       setSession(next);
       setPickedIds([]);
       setActiveCardId(null);
@@ -436,11 +485,11 @@ export function WorldRunner({
         return;
       }
 
-      const latest = next.snapshots.at(-1);
-      setHand(dealHand({ session: next, snapshot: latest!, fork: null }));
+      const nextHand = dealHand({ session: next, snapshots: fresh, fork: newFork });
+      setHand(nextHand);
       setStage("pick");
       setNotice(
-        `世界又往前走了一段(${latest?.spanLabel ?? ""}),发出了 ${next.snapshots.at(-1)?.events.length ?? 0} 张牌。你能翻开其中 ${PICKS_PER_HAND} 张。`,
+        `世界一口气走了 ${fresh.length} 段历史,发出 ${nextHand.length} 张牌。你能翻开其中 ${PICKS_PER_HAND} 张。`,
       );
     } catch (error) {
       console.error("时代推演失败", error);
@@ -462,42 +511,21 @@ export function WorldRunner({
         setActiveCardId(card.id);
         setPickedIds((prev) => [...prev, card.id]);
         setResolvedChoiceId(null);
-        setStage("open");
+        setStage(pickedIds.length + 1 >= PICKS_PER_HAND ? "closed" : "pick");
       }, FLIP_MS);
     },
     [busy, flippingId, pickedIds, stage],
   );
 
   /**
-   * 结掉一张牌的取舍。
+   * 合上一张牌。
    *
+   * 翻开的牌不做取舍 —— 玩家是这条世界线的观众,不是上帝。
    * 还差一张没翻、且手上仍有没翻的牌时,回 pick 继续挑第二张;
-   * 否则本阶段收束。分叉是阶段的终结者,选完直接收束。
+   * 否则本阶段收束,世界自动往下走。
    */
   const finalizeCard = useCallback(
-    (card: WorldCard, choice: EventChoice | null) => {
-      if (choice) setResolvedChoiceId(choice.id);
-
-      const fork = card.kind === "fork" ? card.fork : null;
-      if (fork && choice) {
-        setPendingFork({ forkId: fork.id, alternativeId: choice.id });
-        setStage("closed");
-        return;
-      }
-
-      if (choice) {
-        setDirectives((prev) => [
-          ...prev,
-          {
-            cardId: card.id,
-            cardTitle: card.title,
-            choiceId: choice.id,
-            choiceLabel: choice.label,
-            note: choice.hint,
-          },
-        ]);
-      }
-
+    (card: WorldCard) => {
       const nextSettled = [...settledIds, card.id];
       setSettledIds(nextSettled);
       const remaining = hand.filter((item) => !pickedIds.includes(item.id));
@@ -506,22 +534,22 @@ export function WorldRunner({
     [hand, pickedIds, settledIds],
   );
 
-  /** 在翻开的牌上做取舍。这是本阶段唯一的一次 */
-  const choose = useCallback(
-    (card: WorldCard, choice: EventChoice) => {
-      if (stage !== "open" || busy) return;
-      finalizeCard(card, choice);
-    },
-    [busy, finalizeCard, stage],
-  );
-
-  /** 收下一张没有取舍的白卡:读完,合上,继续挑下一张 */
+  /** 收下一张牌:读完,合上,继续挑下一张(或收束) */
   const closeCard = useCallback(() => {
     if (stage !== "open") return;
     const card = hand.find((item) => item.id === activeCardId);
     if (!card) return;
-    finalizeCard(card, null);
+    finalizeCard(card);
   }, [activeCardId, finalizeCard, hand, stage]);
+
+  // 收束后世界自动往下走:玩家刚合上牌,它自己就继续推演了。
+  // 已经收敛(stabilized)的世界除外 —— 那是整条世界线的终点,停下来等玩家收藏。
+  useEffect(() => {
+    if (stage !== "closed" || busy) return;
+    if (!sessionRef.current || hasSettled(sessionRef.current)) return;
+    const timer = setTimeout(() => void advanceEra(), 1500);
+    return () => clearTimeout(timer);
+  }, [advanceEra, busy, stage]);
 
   const resetSession = useCallback(() => {
     clearWorldSimSession(scenarioId);
@@ -566,7 +594,10 @@ export function WorldRunner({
   const picked = hand.find((card) => card.id === activeCardId) ?? null;
   // origin 也算可推进:原点卡上的按钮是主出口,底部按钮是同一出口的兜底。
   // 两个出口指向同一个动作,不会制造分叉 —— 但卡片万一没渲染出来,局面不会死。
-  const canAdvance = (stage === "origin" || stage === "closed" || stage === "empty") && !busy;
+  const canAdvance =
+    (stage === "origin" || stage === "closed" || stage === "empty") &&
+    !busy &&
+    !hasSettled(session);
   const total = session.state.entities.length;
   const done = advance.reports + advance.errors.length;
 
@@ -586,7 +617,7 @@ export function WorldRunner({
               phase: advance.phase,
               startedIds: advance.startedIds,
               intents: advance.intents,
-              worldEvents: advance.worldEvents,
+              beats: advance.beats,
               errors: advance.errors,
             }
           : null
@@ -598,23 +629,19 @@ export function WorldRunner({
       summary={stage === "closed" || stage === "empty" ? summaryFor(session) : null}
       witnessLine={witnessLineFor(session, stage, picked, busy, pickedIds.length)}
       onPick={pick}
-      onChoose={(choice) => {
-        if (picked) choose(picked, choice);
-      }}
+      onChoose={() => {}}
       onCardClose={closeCard}
       onAdvance={() => void advanceEra()}
       advanceLabel={
         busy
           ? "世界正在自己往前走"
           : stage === "origin"
-            ? "先拉开这条世界线"
+            ? "拉开这条世界线"
             : stage === "pick"
               ? pickedIds.length === 0
-                ? "先翻开两张牌"
+                ? "翻开两张牌"
                 : "再翻开一张牌"
-              : stage === "open"
-                ? "先做完这张牌的取舍"
-                : `推进时间 · 纪元 ${session.state.currentEra + 1}`
+              : "让世界自己走一段"
       }
       advanceDisabled={!canAdvance}
       progress={
@@ -622,7 +649,7 @@ export function WorldRunner({
           ? {
               label:
                 advance.phase === "adjudicating"
-                  ? "历史正在合并这些冲突"
+                  ? "历史在连续成形"
                   : `${done}/${total} 个主体已经各自盘算完`,
               done: advance.phase === "adjudicating" ? total : done,
               total,

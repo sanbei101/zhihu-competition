@@ -79,18 +79,20 @@ export function CardHand({
               {flipped ? (
                 <div className="absolute inset-0 flex flex-col text-left">
                   <div className={`h-1 w-full ${TIER_RIBBON[card.tier]}`} />
-                  <div className="flex items-center gap-1 px-1.5 pt-1">
-                    <span className={cn("font-mono text-[9px] leading-none", TIER_TEXT[card.tier])}>
+                  <div className="flex items-center gap-1 px-1.5 pt-1.5">
+                    <span
+                      className={cn("font-mono text-[10px] leading-none", TIER_TEXT[card.tier])}
+                    >
                       {cardTierLabels[card.tier]}
                     </span>
-                    <span className="text-muted-foreground truncate font-mono text-[9px] leading-none">
+                    <span className="text-muted-foreground truncate font-mono text-[10px] leading-none">
                       {card.tag}
                     </span>
                   </div>
-                  <p className="text-foreground line-clamp-3 px-1.5 pt-1 text-[11px] leading-4 font-medium">
+                  <p className="text-foreground line-clamp-4 px-1.5 pt-1.5 text-xs leading-5 font-medium">
                     {card.title}
                   </p>
-                  <span className="text-primary mt-auto px-1.5 pb-1 font-mono text-[8px] tracking-wider">
+                  <span className="text-primary mt-auto px-1.5 py-1 font-mono text-[9px] tracking-wider">
                     已翻开
                   </span>
                 </div>

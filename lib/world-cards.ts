@@ -147,22 +147,49 @@ function severityTag(severity: WorldEvent["severity"]): string {
   return "日常";
 }
 
+/** 一手牌里最多几张带取舍的卡。超过会让人闭眼点;剩下的降成纯叙事垫步 */
+const MAX_CHOICE_CARDS = 3;
+
 /**
- * 发一手牌:把一次裁决投影成本阶段的盲抽手牌。
+ * 发一手牌:把一大阶段的连续推演投影成本阶段的盲抽手牌。
  *
- * **全部事件都进手牌**,不只是带取舍的那些 —— 没有可干预点的事件
- * 翻开来就是一段纯叙事(一张白卡),这也是抽卡的一部分:
- * 不是每张牌都值得你停下,但你只有翻开来才知道。
+ * 一次裁决会产出 3-5 段快照,事件池是它们全部事件的合集 —— 玩家只能翻其中
+ * 2 张,所以**带取舍的事件优先**,其次按稀有度,保证翻到的牌里一定有值得
+ * 停下来想的事。没翻到的牌不是不存在 —— 世界照样往前走了,只是你没能盯住它们。
  */
 export function dealHand(input: {
   session: WorldSimSession;
-  snapshot: EraSnapshot;
+  snapshots: EraSnapshot[];
   fork: WorldFork | null;
 }): WorldCard[] {
-  const { session, snapshot, fork } = input;
+  const { session, snapshots, fork } = input;
   const entities = session.state.entities;
 
-  const cards: WorldCard[] = snapshot.events.slice(0, HAND_SIZE).map((event) => ({
+  const severityWeight: Record<WorldEvent["severity"], number> = {
+    critical: 0,
+    severe: 1,
+    notable: 2,
+    info: 3,
+  };
+
+  // 稀有度优先(echo/anomaly 最稀有),同稀有度带取舍的在前
+  const eventWeight = (event: WorldEvent): number => {
+    const base =
+      event.special === "echo"
+        ? -1
+        : event.special === "anomaly"
+          ? 0
+          : severityWeight[event.severity] + 1;
+    const hasChoices = (event.choices ?? []).length >= 2 ? 0.5 : 0;
+    return base - hasChoices;
+  };
+
+  const pool = snapshots
+    .flatMap((snapshot) => snapshot.events.map((event) => ({ event, era: snapshot.era })))
+    .sort((a, b) => eventWeight(a.event) - eventWeight(b.event))
+    .slice(0, HAND_SIZE);
+
+  const cards: WorldCard[] = pool.map(({ event }) => ({
     id: `card-${event.id}`,
     kind: "event",
     era: event.era,
@@ -177,6 +204,19 @@ export function dealHand(input: {
     fork: null,
     deltas: [],
   }));
+
+  // 带取舍的牌超过额度,把排在末尾的降成纯叙事(优先级最低的几张),
+  // 否则一手牌全是选择题,玩家会闭眼点。被降级的都是排序在末尾的
+  // 低稀有度卡(special 卡权重最高、必然落在额度内),所以这里只需清 choices。
+  let choicesBudget = MAX_CHOICE_CARDS;
+  for (const card of cards) {
+    if (card.choices.length < 2) continue;
+    if (choicesBudget > 0) {
+      choicesBudget -= 1;
+    } else {
+      card.choices = [];
+    }
+  }
 
   // 世界线分岔也是手牌里的一张 —— 而且是最彩的那张。
   // 它藏在背面,和其余几张一起被赌;翻到它,这一阶段就走上了另一条世界线。
@@ -198,22 +238,23 @@ export function dealHand(input: {
     });
   }
 
-  // 兜底:一次裁决一条事件都没给出来时,把结论包成一张牌。
+  // 兜底:一段历史一条事件都没给出来时,把最后一段的结论包成一张牌。
   // 没有它,这个阶段玩家连可翻的东西都没有。
   if (cards.length === 0) {
+    const lastSnapshot = snapshots.at(-1);
     const witness = session.seed.witness;
     cards.push({
-      id: `card-attention-${snapshot.id}`,
+      id: `card-attention-${lastSnapshot?.id ?? "empty"}`,
       kind: "attention",
-      era: snapshot.era,
+      era: lastSnapshot?.era ?? session.state.currentEra,
       tag: "见证者之问",
       tier: "green",
       title: `${witness.name}问：这一阶段发生了什么?`,
-      body: snapshot.conclusion,
+      body: lastSnapshot?.conclusion ?? "这个世界安静得反常。",
       actors: [],
       narrator: {
         speaker: witness.name,
-        line: "这一阶段安静得反常。连一件值得记下的事都没有,这本身就是一件事。",
+        line: "这一段历史安静得反常。连一件值得记下的事都没有,这本身就是一件事。",
       },
       special: null,
       choices: [],
@@ -244,7 +285,6 @@ export { cardTierGrades, cardTierLabels };
  */
 export function settleCard(session: WorldSimSession): WorldCard {
   const eras = session.snapshots.length;
-  const directives = session.directives.length;
 
   return {
     id: "card-settle",
@@ -253,7 +293,7 @@ export function settleCard(session: WorldSimSession): WorldCard {
     tag: "结算",
     tier: "gold",
     title: "这条世界线,可以发出去了",
-    body: `你陪着这个世界走了 ${eras} 个阶段,在 ${directives} 个节点上替它做过取舍。这些都会被整理成一篇能直接发到知乎的推演长文。`,
+    body: `你陪着这个世界走了 ${eras} 个阶段,看着它从原点到今天。这条世界线会被整理成一篇能直接发到知乎的推演长文。`,
     actors: [],
     narrator: {
       speaker: session.seed.witness.name,

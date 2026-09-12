@@ -50,7 +50,7 @@ const seed = {
 };
 
 const session = {
-  version: 4,
+  version: 5,
   scenarioId: seed.scenarioId,
   scenarioTitle: seed.scenarioTitle,
   scenarioUrl: seed.scenarioUrl,
@@ -127,7 +127,7 @@ const session = {
 } as unknown as WorldSimSession;
 
 const snapshot = session.snapshots[0]!;
-const hand = dealHand({ session, snapshot, fork: null });
+const hand = dealHand({ session, snapshots: [snapshot], fork: null });
 const origin = originCard(seed);
 
 function Probe({ stage, pickedId }: { stage: DeckStage; pickedId: string | null }) {

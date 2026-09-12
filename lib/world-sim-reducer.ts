@@ -38,6 +38,12 @@ const GLOBAL_DELTA_LIMIT = 12;
 const GLOBAL_DELTA_LIMIT_CRITICAL = 20;
 /** 一批最多几张"有取舍"的牌。超过这个数玩家会开始闭眼点 */
 const MAX_CHOICE_CARDS = 4;
+/**
+ * 世界至少走满多少个纪元才认可"收敛"。一次级联推演约 3-5 个纪元,
+ * 这个值保证玩家能玩 2 个大阶段以上才可能看到结算卡 ——
+ * 模型很容易在第一大段就把世界判成"彻底崩坏",直接终结,那是最差的体验。
+ */
+const MIN_STABILIZED_ERAS = 8;
 
 const METRIC_FLOOR = 0;
 const METRIC_CEILING = 100;
@@ -318,7 +324,7 @@ export function createSession(seed: WorldSeed): WorldSimSession {
   };
 
   return {
-    version: 4,
+    version: 5,
     scenarioId: seed.scenarioId,
     scenarioTitle: seed.scenarioTitle,
     scenarioUrl: seed.scenarioUrl,
@@ -336,11 +342,11 @@ export function createSession(seed: WorldSeed): WorldSimSession {
 /** 重新计算指标:加上裁决给的变化,钳制在量纲内,标记 delta 供 UI 显示涨跌 */
 function applyMetricDeltas(
   current: GlobalMetric[],
-  deltas: Adjudication["metricDeltas"],
+  deltas: { metricId: string; delta: number }[],
   limit: number,
-): { metrics: GlobalMetric[]; applied: Adjudication["metricDeltas"] } {
+): { metrics: GlobalMetric[]; applied: { metricId: string; delta: number }[] } {
   const byId = new Map(deltas.map((delta) => [delta.metricId, delta]));
-  const applied: Adjudication["metricDeltas"] = [];
+  const applied: { metricId: string; delta: number }[] = [];
 
   const metrics = current.map((metric) => {
     const delta = byId.get(metric.id);
@@ -378,12 +384,15 @@ function applyEntityUpdates(
 }
 
 /**
- * 把一次裁决合并进会话,产出新的会话与本次快照。
+ * 把一次裁决合并进会话,产出新的会话与本次大阶段的全部快照。
+ *
+ * 级联裁决:一次裁决自带 3-5 段 beats,每段被拆成一个独立快照(era 递增)。
+ * 主体只在大阶段开头博弈一次(报告只挂进第一段),中间段落由裁决器沿时间轴演变。
+ * 事件、指标变化各自归到它们发生的段落,发牌时从整段的快照池里挑。
  *
  * 确定性限制集中在这里:
  *   - 事件行动者必须存在,断引用就地补全或丢弃
- *   - 指标变化按是否有 critical 事件选择上限
- *   - 每批牌的额度:特殊事件优先,常规事件补位
+ *   - 指标变化按是否有 critical 事件选择上限,逐段累计
  *   - 分叉只有在真的有 2 条以上候选时才落库
  */
 export function applyAdjudication(input: {
@@ -392,60 +401,78 @@ export function applyAdjudication(input: {
   adjudication: Adjudication;
   /** 玩家上一阶段在事件卡上做的取舍,原样记进会话 */
   directives?: PlayerDirective[];
-}): { session: WorldSimSession; snapshot: EraSnapshot; fork: WorldFork | null } {
+}): { session: WorldSimSession; snapshots: EraSnapshot[]; fork: WorldFork | null } {
   const { session, reports, adjudication } = input;
-  const era = session.state.currentEra + 1;
   const branchId = session.state.currentBranchId;
   const entityIds = new Set(session.state.entities.map((entity) => entity.id));
 
-  const hasCritical = adjudication.events.some((event) => event.severity === "critical");
+  const hasCritical = adjudication.beats.some((beat) =>
+    beat.events.some((event) => event.severity === "critical"),
+  );
   const globalLimit = hasCritical ? GLOBAL_DELTA_LIMIT_CRITICAL : GLOBAL_DELTA_LIMIT;
 
-  // 1. 指标
-  const { metrics: globalMetrics, applied: metricDeltas } = applyMetricDeltas(
-    session.state.globalMetrics,
-    adjudication.metricDeltas,
-    globalLimit,
-  );
+  // 指标沿段落逐步累计
+  let era = session.state.currentEra;
+  let metrics = session.state.globalMetrics;
+  let timeBefore = latestTimeLabel(session);
+  const snapshots: EraSnapshot[] = [];
 
-  // 2. 主体结算
-  const entities = applyEntityUpdates(session.state.entities, adjudication.entityUpdates);
-  const fallbackActor = entities[0]?.id;
+  for (const [index, beat] of adjudication.beats.entries()) {
+    era += 1;
 
-  // 3. 事件:清洗行动者,并按展示预算裁掉多余的
-  //
-  //    带 choices 的事件就是"牌"。分配牌额时**特殊事件优先**:
-  //    危机 / 回响 / 异象被一条常规事件挤掉,是这个阶段最不能接受的事。
-  //    真实事故:一次裁决里模型给了 crisis,却因为排在四张常规牌之后被降级,
-  //    最后留下一个"自称危机却没有选项"的孤儿事件。
-  const metricIds = new Set(session.state.globalMetrics.map((metric) => metric.id));
-  const ordered = take(adjudication.events, DISPLAY.events);
+    const { metrics: nextMetrics, applied: metricDeltas } = applyMetricDeltas(
+      metrics,
+      beat.metricDeltas,
+      globalLimit,
+    );
+    metrics = nextMetrics;
 
-  const candidates = ordered
-    .map((event, index) => ({ event, index }))
-    .filter((item) => (item.event.choices ?? []).length >= 2);
-  const withBudget = new Set(
-    [
-      ...candidates.filter((item) => item.event.special),
-      ...candidates.filter((item) => !item.event.special),
-    ]
-      .slice(0, MAX_CHOICE_CARDS)
-      .map((item) => item.index),
-  );
+    const fallbackActor = session.state.entities[0]?.id;
+    const metricIds = new Set(metrics.map((metric) => metric.id));
+    const events: WorldEvent[] = beat.events.map((event, eventIndex) => {
+      const actors = [...new Set(event.actorEntityIds.filter((actor) => entityIds.has(actor)))];
+      const built: WorldEvent = {
+        id: `evt-${era}-${eventIndex + 1}`,
+        era,
+        title: event.title,
+        scope: event.scope,
+        severity: event.severity,
+        actorEntityIds: actors.length ? actors : fallbackActor ? [fallbackActor] : [],
+        summary: event.summary,
+      };
+      // 段内所有事件都允许带取舍,真正的牌额由发牌时从整段池子里挑
+      return Object.assign(built, normalizeEventExtras(event, metricIds, true));
+    });
 
-  const events: WorldEvent[] = ordered.map((event, index) => {
-    const actors = [...new Set(event.actorEntityIds.filter((actor) => entityIds.has(actor)))];
-    const built: WorldEvent = {
-      id: `evt-${era}-${index + 1}`,
+    snapshots.push({
+      id: `snap-${era}`,
       era,
-      title: event.title,
-      scope: event.scope,
-      severity: event.severity,
-      actorEntityIds: actors.length ? actors : fallbackActor ? [fallbackActor] : [],
-      summary: event.summary,
-    };
-    return Object.assign(built, normalizeEventExtras(event, metricIds, withBudget.has(index)));
-  });
+      branchId,
+      timeBefore,
+      timeAfter: {
+        era,
+        label: movingTimeLabel(timeBefore, beat.timeAfter),
+        elapsed: beat.timeAfter.elapsed,
+      },
+      spanLabel: beat.spanLabel,
+      reports: index === 0 ? reports : [],
+      events,
+      conclusion: beat.conclusion,
+      metricDeltas,
+    });
+
+    timeBefore = snapshots.at(-1)!.timeAfter;
+  }
+
+  // 收敛标记挂在最后一段上,hasSettled 据此发结算卡。
+  // 模型倾向于过早宣告世界崩坏:太阳熄灭第一回合就说"长夜定局"。
+  // 世界还没走满 MIN_STABILIZED_ERAS 个纪元时,即使模型报了 stabilized 也不认 ——
+  // 结算卡是整条世界线的终场,不该在开场就出现。
+  const last = snapshots.at(-1)!;
+  const totalEras = session.state.currentEra + snapshots.length;
+  if (adjudication.stabilized === true && totalEras >= MIN_STABILIZED_ERAS) {
+    last.stabilized = true;
+  }
 
   // 4. 分叉:只有真的有两条以上候选才成立
   let fork: WorldFork | null = null;
@@ -453,7 +480,7 @@ export function applyAdjudication(input: {
     const forkId = `fork-${era}`;
     fork = {
       id: forkId,
-      snapshotId: `snap-${era}`,
+      snapshotId: last.id,
       era,
       title: adjudication.fork.title,
       cause: adjudication.fork.cause,
@@ -465,25 +492,8 @@ export function applyAdjudication(input: {
     };
   }
 
-  const timeBefore = latestTimeLabel(session);
-
-  const snapshot: EraSnapshot = {
-    id: `snap-${era}`,
-    era,
-    branchId,
-    timeBefore,
-    timeAfter: {
-      era,
-      label: movingTimeLabel(timeBefore, adjudication.timeAfter),
-      elapsed: adjudication.timeAfter.elapsed,
-    },
-    spanLabel: adjudication.spanLabel,
-    reports,
-    events,
-    conclusion: adjudication.conclusion,
-    metricDeltas,
-    ...(adjudication.stabilized !== undefined ? { stabilized: adjudication.stabilized } : {}),
-  };
+  // 主体只结算一次:最终状态词
+  const entities = applyEntityUpdates(session.state.entities, adjudication.entityUpdates);
 
   const forks = fork ? [...session.forks, fork] : session.forks;
   const branches = fork
@@ -497,15 +507,15 @@ export function applyAdjudication(input: {
   const nextState: WorldState = {
     currentEra: era,
     currentBranchId: branchId,
-    globalMetrics,
+    globalMetrics: metrics,
     entities,
-    latestSnapshotId: snapshot.id,
+    latestSnapshotId: last.id,
   };
 
   return {
     session: {
       ...session,
-      snapshots: [...session.snapshots, snapshot],
+      snapshots: [...session.snapshots, ...snapshots],
       forks,
       branches,
       state: nextState,
@@ -513,7 +523,7 @@ export function applyAdjudication(input: {
         ? [...session.directives, ...input.directives]
         : session.directives,
     },
-    snapshot,
+    snapshots,
     fork,
   };
 }

@@ -67,9 +67,9 @@ export async function generateSeed(context: SeedContext, signal?: AbortSignal): 
     schema: seedGenerationSchema,
     // 种子要稳:这里不要创意,要的是合乎时代条件的推演
     temperature: 0.55,
-    // 预算给足。种子要一次性吐出 4-7 个主体 × 各自的目标/能力/约束/指标/关系,
+    // 预算给足。种子要一次性吐出 3-4 个大主体 × 各自的目标/能力/约束/指标/关系,
     // 预算卡太紧会截断成不合法 JSON,而截断的代价是整次调用白烧。
-    maxOutputTokens: 8000,
+    maxOutputTokens: 6000,
     abortSignal: signal,
   });
 
@@ -179,9 +179,9 @@ export async function adjudicate(input: {
     }),
     schema: adjudicationSchema,
     temperature: 0.75,
-    // 5 条事件 + 结论 + 状态词,3000 封顶。超过就说明模型写超长了,
-    // 与其多等,不如让它被截断后走结构化抢救
-    maxOutputTokens: 3000,
+    // 一整段级联历史(3-5 段 beats × 事件与结论),4500 封顶。
+    // 超过就说明模型写超长了,与其多等,不如让它被截断后走结构化抢救
+    maxOutputTokens: 4500,
     abortSignal: input.signal,
   });
 
@@ -316,7 +316,7 @@ export async function* simulateEraStream(input: {
 
   const {
     session: next,
-    snapshot,
+    snapshots,
     fork,
   } = applyAdjudication({
     session,
@@ -325,10 +325,20 @@ export async function* simulateEraStream(input: {
     ...(input.directives?.length ? { directives: input.directives } : {}),
   });
 
-  for (const event of snapshot.events) yield { type: "world-event", event };
+  // 逐段吐出来:beat-start 标记一段历史的开始,随后是这一段的全部事件。
+  // 客户端据此把"世界演算室"切成一条时间线,而不是一锅粥。
+  for (const snapshot of snapshots) {
+    yield {
+      type: "beat-start",
+      era: snapshot.era,
+      spanLabel: snapshot.spanLabel,
+      timeLabel: snapshot.timeAfter.label,
+    };
+    for (const event of snapshot.events) yield { type: "world-event", event };
+  }
   if (fork) yield { type: "fork-detected", fork };
 
-  yield { type: "snapshot", snapshot };
+  yield { type: "snapshot", snapshot: snapshots.at(-1)! };
   yield { type: "state", state: next.state };
   yield { type: "complete", session: next };
 }

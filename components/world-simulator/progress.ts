@@ -29,7 +29,7 @@ export function seedProgressPercent(input: {
   if (input.hardRules.length) earned += WEIGHTS.rules;
   if (input.entities.length) {
     // 主体是最大一块,按已收到数量占预期数量的比例给分
-    const expected = Math.max(4, Math.min(7, input.entities.length));
+    const expected = Math.max(3, Math.min(4, input.entities.length));
     earned += Math.round(WEIGHTS.entities * Math.min(1, input.entities.length / expected) || 0);
   }
   if (input.globalMetrics.length) earned += WEIGHTS.metrics;

@@ -159,44 +159,67 @@ export function EventCard({
         </CardContent>
       ) : null}
 
-      {/* ---------- 分叉:两条候选未来 ---------- */}
+      {/* ---------- 分叉:只读展示两条候选未来 ---------- */}
       {isFork && !resolved ? (
         <CardContent className="space-y-3">
-          {card.fork?.alternatives.map((alternative) => (
-            <Button
-              key={alternative.id}
-              variant="outline"
-              disabled={busy}
-              onClick={() =>
-                onChoose({
-                  id: alternative.id,
-                  label: alternative.title,
-                  hint: alternative.premise,
-                  tone: "bold",
-                  effects: [],
-                })
-              }
-              className="h-auto w-full flex-col items-start gap-2 px-4 py-3 text-left whitespace-normal"
-            >
-              <span className="flex w-full flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold">{alternative.title}</span>
-                <Badge variant="outline" className="font-mono text-[10px]">
-                  {plausibilityLabels[alternative.plausibility]}
-                </Badge>
-              </span>
-              <span className="text-muted-foreground text-xs leading-6">{alternative.premise}</span>
-              <span className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                {alternative.expectedEffects.map((effect) => (
-                  <span key={effect}>→ {effect}</span>
-                ))}
-              </span>
-            </Button>
-          ))}
+          {action ? (
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-xs leading-6">
+                这条世界线在这里岔开了 —— 两条路都有人会走,历史会自己选。
+              </p>
+              {card.fork?.alternatives.map((alternative) => (
+                <div key={alternative.id} className="bg-muted/40 rounded-sm border px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">{alternative.title}</p>
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      {plausibilityLabels[alternative.plausibility]}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs leading-6">
+                    {alternative.premise}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            card.fork?.alternatives.map((alternative) => (
+              <Button
+                key={alternative.id}
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  onChoose({
+                    id: alternative.id,
+                    label: alternative.title,
+                    hint: alternative.premise,
+                    tone: "bold",
+                    effects: [],
+                  })
+                }
+                className="h-auto w-full flex-col items-start gap-2 px-4 py-3 text-left whitespace-normal"
+              >
+                <span className="flex w-full flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold">{alternative.title}</span>
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    {plausibilityLabels[alternative.plausibility]}
+                  </Badge>
+                </span>
+                <span className="text-muted-foreground text-xs leading-6">
+                  {alternative.premise}
+                </span>
+                <span className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                  {alternative.expectedEffects.map((effect) => (
+                    <span key={effect}>→ {effect}</span>
+                  ))}
+                </span>
+              </Button>
+            ))
+          )}
         </CardContent>
       ) : null}
 
-      {/* ---------- 事件卡:可干预点 ---------- */}
-      {!isFork && !resolved && !isSingleAction ? (
+      {/* ---------- 事件卡:有 action 时只读展示,不给选项按钮 ---------- */}
+      {!isFork && !resolved && !isSingleAction && !action ? (
         <CardContent className="space-y-2">
           {card.choices.map((choice, index) => (
             <Button
@@ -226,8 +249,8 @@ export function EventCard({
         </CardContent>
       ) : null}
 
-      {/* ---------- 主按钮:原点卡/结算卡的推进,或无选项卡的"收下" ---------- */}
-      {(isSingleAction || (!isFork && !resolved && card.choices.length === 0)) && action ? (
+      {/* ---------- 主按钮:唯一的出口。牌在 open 阶段都有它,不再要求做取舍 ---------- */}
+      {action && !resolved ? (
         <CardContent className="space-y-3">
           <Button className="w-full" disabled={busy} onClick={action.onClick}>
             <Sparkles data-icon="inline-start" />
