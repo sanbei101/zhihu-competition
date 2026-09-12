@@ -11,3 +11,4 @@ export { DISCIPLINE, NARRATION, STAGE_VOICE } from "./shared";
 export { SEED_INSTRUCTIONS, buildSeedPrompt } from "./seed";
 export { WAVE_INSTRUCTIONS, buildWavePrompt } from "./wave";
 export { REACTION_INSTRUCTIONS, buildReactionPrompt } from "./reaction";
+export { SETTLE_INSTRUCTIONS, buildSettlePrompt } from "./settle";

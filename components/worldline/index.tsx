@@ -1,12 +1,13 @@
 "use client";
 
-import { Eye, GitFork, RotateCcw } from "lucide-react";
+import { Eye, GitFork, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StageBackdrop } from "@/components/worldline/backdrop";
 import { EventBoard } from "@/components/worldline/board";
 import { EpicProclamationBanner, type ProclamationData } from "@/components/worldline/proclamation";
+import { WorldlineSettlementModal } from "@/components/worldline/settlement";
 import { WorldlineMarkSvg } from "@/components/worldline/sprites";
 import { WorldArea, type ActiveVoice } from "@/components/worldline/stage";
 import { WorldlineEvolutionTree } from "@/components/worldline/tree";
@@ -16,6 +17,7 @@ import type {
   WorldlineBeing,
   WorldlineEvent,
   WorldlineSegment,
+  WorldlineSession,
 } from "@/lib/worldline";
 
 /**
@@ -64,26 +66,40 @@ export interface ObservatoryView {
    * 否则玩家会按下一个没有内容的"看世界的反应"。
    */
   reactionsReady: boolean;
+  /** 世界线是否已达成终局或已收束 */
+  isConcluded: boolean;
+  /** 是否满足手动收束条件 (如完成 >= 2 波且当前波次已结束) */
+  canManualSettle: boolean;
+  /** 当前推进到第几波 */
+  waveCount: number;
+  /** 最大波次限制 */
+  maxWaves: number;
 }
 
 function advanceLabel(view: ObservatoryView): string {
+  if (view.isConcluded) return "查看历史终局报告 · 载入史册";
   if (view.phase === "idle" && !view.reactionsReady) return "世界正在准备它的反应";
   return {
     boot: "世界正在铺开",
     deal: "事件正在落下来",
     idle: "看世界的反应 →",
     react: "世界正在做出反应",
-    done: "下一波事件 →",
+    done:
+      view.waveCount >= view.maxWaves
+        ? "收束世界线 · 终局结算 →"
+        : `下一波事件 (${view.waveCount}/${view.maxWaves}) →`,
   }[view.phase];
 }
 
 /** boot / deal / react 三个相位按钮是禁用的 —— 世界正忙,催不动它 */
 function advanceDisabled(view: ObservatoryView): boolean {
+  if (view.isConcluded) return false;
   if (view.phase === "idle") return !view.reactionsReady;
   return view.phase !== "done";
 }
 
 function phaseNote(view: ObservatoryView): string {
+  if (view.isConcluded) return "世界线已收敛至终局新常态 · 历史已载入史册";
   if (view.notice) return view.notice;
   switch (view.phase) {
     case "boot":
@@ -97,7 +113,9 @@ function phaseNote(view: ObservatoryView): string {
     case "react":
       return "世界正在逐条作出反应,有的要等很多年";
     case "done":
-      return "这一波走完了 · 世界在等你发下一波";
+      return view.waveCount >= view.maxWaves
+        ? "推演已达终局临界点 · 可收束世界线"
+        : "这一波走完了 · 世界在等你发下一波";
   }
 }
 
@@ -111,6 +129,10 @@ export function Observatory({
   onReset,
   proclamation,
   onDismissProclamation,
+  onSettle,
+  isSettleModalOpen,
+  onCloseSettleModal,
+  session,
 }: {
   view: ObservatoryView;
   skin: ScenarioSkin;
@@ -122,6 +144,10 @@ export function Observatory({
   onReset: () => void;
   proclamation?: ProclamationData | null;
   onDismissProclamation?: () => void;
+  onSettle?: () => void;
+  isSettleModalOpen?: boolean;
+  onCloseSettleModal?: () => void;
+  session?: WorldlineSession | null;
 }) {
   const [activeTab, setActiveTab] = useState<string>("observatory");
   const eraNo = Math.max(1, view.timeline.length);
@@ -179,6 +205,17 @@ export function Observatory({
                 尺度 <b>{view.scaleLabel}</b>
               </span>
               <span className="chip accent chip-era">纪元 {eraNo}</span>
+              {view.isConcluded && (
+                <button
+                  type="button"
+                  className="chip chip-concluded"
+                  onClick={onSettle}
+                  title="查看知乎体深度推演回答与终局报告"
+                >
+                  <Sparkles className="size-3 text-amber-400" />
+                  <b>终局报告</b>
+                </button>
+              )}
               <button
                 type="button"
                 className="btn ghost reset-btn-desktop hidden sm:inline-flex"
@@ -224,7 +261,11 @@ export function Observatory({
             <footer className="foot mobile-sticky">
               <div className="foot-progress grow">
                 <div className="track">
-                  <i style={{ width: "18%" }} />
+                  <i
+                    style={{
+                      width: `${Math.min(100, Math.round((view.waveCount / view.maxWaves) * 100))}%`,
+                    }}
+                  />
                 </div>
                 <p className="note">{phaseNote(view)}</p>
               </div>
@@ -236,14 +277,28 @@ export function Observatory({
                   反应 <b>{view.reactionDone}</b>/<b>{view.reactionTotal}</b>
                 </span>
               </div>
-              <button
-                type="button"
-                className="btn advance-btn"
-                onClick={onAdvance}
-                disabled={advanceDisabled(view)}
-              >
-                {advanceLabel(view)}
-              </button>
+              <div className="foot-actions flex items-center gap-2">
+                {view.canManualSettle && !view.isConcluded && onSettle && (
+                  <button
+                    type="button"
+                    className="btn settle-outline-btn"
+                    onClick={onSettle}
+                    disabled={view.busy}
+                    title="世界线已走向成熟，可随时提前收束并生成知乎体深度回答"
+                  >
+                    <Sparkles className="size-3.5 text-amber-400" />
+                    收束世界线 · 载入史册
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`btn advance-btn ${view.isConcluded ? "btn-concluded-gold" : ""}`}
+                  onClick={view.isConcluded ? onSettle : onAdvance}
+                  disabled={advanceDisabled(view)}
+                >
+                  {advanceLabel(view)}
+                </button>
+              </div>
             </footer>
           </TabsContent>
 
@@ -258,6 +313,14 @@ export function Observatory({
           </TabsContent>
         </Tabs>
       </div>
+
+      <WorldlineSettlementModal
+        isOpen={Boolean(isSettleModalOpen)}
+        onClose={onCloseSettleModal ?? (() => {})}
+        session={session ?? null}
+        skin={skin}
+        onReset={onReset}
+      />
     </div>
   );
 }

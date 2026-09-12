@@ -222,6 +222,10 @@ export const worldlineWaveRequestSchema = z.object({
   replaceIndex: z.number().int().min(0).optional(),
 });
 
+export const worldlineSettleRequestSchema = z.object({
+  session: worldlineSessionSchema,
+});
+
 // ==================== 流事件 ====================
 
 const streamErrorSchema = z.object({

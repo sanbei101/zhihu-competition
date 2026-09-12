@@ -69,6 +69,8 @@ const EMPTY_BOOT: BootState = {
   error: "",
 };
 
+const MAX_WAVES = 5;
+
 export function WorldlineRunner({
   scenarioId,
   scenarioTitle,
@@ -97,6 +99,10 @@ export function WorldlineRunner({
   const [witnessLine, setWitnessLine] = useState("桌上会落五件事。等它们落定,世界才开始动。");
   const [notice, setNotice] = useState("");
   const [proclamation, setProclamation] = useState<ProclamationData | null>(null);
+
+  /** 终局收束与知乎长文结算状态 */
+  const [isConcluded, setIsConcluded] = useState(false);
+  const [settleModalOpen, setSettleModalOpen] = useState(false);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
   const seedStarted = useRef(false);
@@ -433,7 +439,12 @@ export function WorldlineRunner({
       setReactionTotal(total);
       setReactionsReady(true);
       setPhase("done");
-      setWitnessLine("这一波反应走完了。想看下一波,就再发一次。");
+      if (restored.waves.length >= MAX_WAVES) {
+        setIsConcluded(true);
+        setWitnessLine("世界线演化已达终局。随时可查看知乎体深度长文回答。");
+      } else {
+        setWitnessLine("这一波反应走完了。想看下一波,就再发一次。");
+      }
       setNotice(
         `已从本地存档接上(${new Date(stored.savedAt).toLocaleString("zh-CN", { hour12: false })})`,
       );
@@ -526,27 +537,71 @@ export function WorldlineRunner({
             setReactionDone(done);
             if (done === queue.length) {
               setPhase("done");
-              setWitnessLine("这一波反应走完了。想看下一波,就再发一次。");
+              const currentWaves = session?.waves.length ?? 0;
+              if (currentWaves >= MAX_WAVES) {
+                setIsConcluded(true);
+                setWitnessLine("世界线演化完成，已收敛至新常态。历史正等待你的结案陈词。");
+                const culminationEpic = getEpicQuote({ themeId, milestone: "culmination" });
+                setProclamation({
+                  id: `culmination-${Date.now()}`,
+                  ...culminationEpic,
+                  durationMs: 8000,
+                });
+              } else {
+                setWitnessLine("这一波反应走完了。想看下一波,就再发一次。");
+              }
             }
           }, REACTION_SETTLE_MS);
         },
         500 + order * REACTION_STEP_MS,
       );
     });
-  }, [appendTimeline, clearTimers, deck, later, nameOf, phase, reactionsReady, speak]);
+  }, [
+    appendTimeline,
+    clearTimers,
+    deck,
+    later,
+    nameOf,
+    phase,
+    reactionsReady,
+    session?.waves.length,
+    speak,
+    themeId,
+  ]);
+
+  const handleSettle = useCallback(() => {
+    setIsConcluded(true);
+    setSettleModalOpen(true);
+    const culminationEpic = getEpicQuote({ themeId, milestone: "culmination" });
+    setProclamation({
+      id: `culmination-${Date.now()}`,
+      ...culminationEpic,
+      durationMs: 8000,
+    });
+  }, [themeId]);
 
   const advance = useCallback(() => {
+    if (isConcluded) {
+      setSettleModalOpen(true);
+      return;
+    }
     if (phase === "idle" && reactionsReady) {
       playReactions();
       return;
     }
     if (phase === "done" && session) {
+      if ((session.waves.length ?? 0) >= MAX_WAVES) {
+        handleSettle();
+        return;
+      }
       void startWave(session);
     }
-  }, [phase, playReactions, reactionsReady, session, startWave]);
+  }, [handleSettle, isConcluded, phase, playReactions, reactionsReady, session, startWave]);
 
   const rebuild = useCallback(() => {
     clearWorldline(scenarioId);
+    setIsConcluded(false);
+    setSettleModalOpen(false);
     void buildWorld();
   }, [buildWorld, scenarioId]);
 
@@ -567,6 +622,9 @@ export function WorldlineRunner({
       ? Math.max(0, waveAccum.current.length - deck.length)
       : Math.max(0, WAVE_SIZE - deck.length)
     : 0;
+
+  const waveCount = session?.waves.length ?? 0;
+  const canManualSettle = waveCount >= 2 && phase === "done";
 
   const view: ObservatoryView = {
     scenarioTitle: session?.scenarioTitle ?? scenarioTitle,
@@ -591,6 +649,10 @@ export function WorldlineRunner({
     busy: phase === "boot" || phase === "deal" || phase === "react",
     loading: !session,
     reactionsReady,
+    isConcluded,
+    canManualSettle,
+    waveCount,
+    maxWaves: MAX_WAVES,
   };
 
   return (
@@ -604,6 +666,10 @@ export function WorldlineRunner({
       onReset={rebuild}
       proclamation={proclamation}
       onDismissProclamation={() => setProclamation(null)}
+      onSettle={handleSettle}
+      isSettleModalOpen={settleModalOpen}
+      onCloseSettleModal={() => setSettleModalOpen(false)}
+      session={session}
     />
   );
 }

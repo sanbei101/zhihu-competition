@@ -39,7 +39,10 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      let isClosed = false;
+
       const send = (payload: unknown) => {
+        if (isClosed || request.signal.aborted) return;
         const parsed = worldlineWaveEventSchema.safeParse(payload);
         if (!parsed.success) {
           console.error("波次事件结构不合法", parsed.error);
@@ -48,11 +51,16 @@ export async function POST(request: Request) {
         try {
           controller.enqueue(encoder.encode(`${JSON.stringify(parsed.data)}\n`));
         } catch (error) {
-          console.error("波次事件写入失败", error);
+          isClosed = true;
+          if (!request.signal.aborted) {
+            console.error("波次事件写入失败", error);
+          }
         }
       };
 
       const close = () => {
+        if (isClosed) return;
+        isClosed = true;
         try {
           controller.close();
         } catch {
@@ -66,20 +74,23 @@ export async function POST(request: Request) {
           ...(replaceIndex !== undefined ? { replaceIndex } : {}),
           signal: request.signal,
         })) {
+          if (isClosed || request.signal.aborted) break;
           send(event);
         }
       };
 
       void run().then(close, (error) => {
+        if (request.signal.aborted || isClosed) return;
         console.error("波次推演流异常", error);
-        if (!request.signal.aborted) {
-          send({
-            type: "error",
-            error: publicError("STREAM_FAILURE", "这一波推演失败,请重试", true),
-          });
-        }
+        send({
+          type: "error",
+          error: publicError("STREAM_FAILURE", "这一波推演失败,请重试", true),
+        });
         close();
       });
+    },
+    cancel() {
+      // 客户端主动断开连接
     },
   });
 

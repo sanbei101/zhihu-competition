@@ -396,6 +396,14 @@ export function WorldlineEvolutionTree({
               <span>{treeData.events.length} 纪元</span>
               <span className="divider">·</span>
               <span>{totalBranches} 分支</span>
+              {view.isConcluded && (
+                <>
+                  <span className="divider">·</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-amber-400">
+                    <Sparkles className="size-2.5" /> 已定型
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -510,7 +518,9 @@ export function WorldlineEvolutionTree({
                       </span>
                     ))}
                   </div>
-                  <div className="root-meta">世界线自然演化根节点</div>
+                  <div className="root-meta">
+                    {view.isConcluded ? "世界线已完成演变 · 历史定型碑石" : "世界线自然演化根节点"}
+                  </div>
                 </div>
               </div>
 

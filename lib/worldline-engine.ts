@@ -169,6 +169,7 @@ async function generateReactions(input: {
       known: new Set(session.seed.beings.map((being) => being.id)),
     });
   } catch (error) {
+    if (input.signal?.aborted) return [];
     console.error(`事件「${event.title}」的反应生成失败`, error);
     return [];
   }
@@ -211,6 +212,7 @@ export async function* generateWaveStream(input: {
       known: new Set(session.seed.beings.map((being) => being.id)),
     });
   } catch (error) {
+    if (input.signal?.aborted) return;
     console.error("事件波次生成失败", error);
     yield {
       type: "error",
@@ -231,7 +233,10 @@ export async function* generateWaveStream(input: {
     return;
   }
 
-  for (const event of events) yield { type: "wave-event", event };
+  for (const event of events) {
+    if (input.signal?.aborted) return;
+    yield { type: "wave-event", event };
+  }
 
   const tasks = events.map(async (event): Promise<WorldlineWaveEvent> => ({
     type: "wave-reactions",
@@ -243,7 +248,10 @@ export async function* generateWaveStream(input: {
     }),
   }));
 
-  for await (const payload of asCompleted(tasks)) yield payload;
+  for await (const payload of asCompleted(tasks)) {
+    if (input.signal?.aborted) return;
+    yield payload;
+  }
 
   yield { type: "wave-complete", waveIndex: index };
 }

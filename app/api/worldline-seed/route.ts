@@ -40,7 +40,10 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      let isClosed = false;
+
       const send = (payload: unknown) => {
+        if (isClosed || request.signal.aborted) return;
         const parsed = worldlineSeedEventSchema.safeParse(payload);
         if (!parsed.success) {
           console.error("世界线种子事件结构不合法", parsed.error);
@@ -49,11 +52,16 @@ export async function POST(request: Request) {
         try {
           controller.enqueue(encoder.encode(`${JSON.stringify(parsed.data)}\n`));
         } catch (error) {
-          console.error("世界线种子事件写入失败", error);
+          isClosed = true;
+          if (!request.signal.aborted) {
+            console.error("世界线种子事件写入失败", error);
+          }
         }
       };
 
       const close = () => {
+        if (isClosed) return;
+        isClosed = true;
         try {
           controller.close();
         } catch {
@@ -66,6 +74,7 @@ export async function POST(request: Request) {
           { scenarioId, scenarioTitle: title, scenarioUrl, themeId },
           request.signal,
         )) {
+          if (isClosed || request.signal.aborted) break;
           send(event);
           // 种子出口再自检一次:能组装成合法会话才算数。
           // 真正的存档由客户端写进 localStorage。
@@ -74,15 +83,17 @@ export async function POST(request: Request) {
       };
 
       void run().then(close, (error) => {
+        if (request.signal.aborted || isClosed) return;
         console.error("世界线种子流异常", error);
-        if (!request.signal.aborted) {
-          send({
-            type: "error",
-            error: publicError("STREAM_FAILURE", "世界构建失败,请重试", true),
-          });
-        }
+        send({
+          type: "error",
+          error: publicError("STREAM_FAILURE", "世界构建失败,请重试", true),
+        });
         close();
       });
+    },
+    cancel() {
+      // 客户端主动断开连接
     },
   });
 
