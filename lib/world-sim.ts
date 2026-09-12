@@ -373,6 +373,11 @@ export interface EraSnapshot {
   timeAfter: TimeState;
   /** 本阶段推进的时长描述,如 "推进 18 年" */
   spanLabel: string;
+  /**
+   * 世界旁白。这一段历史最重量级那件事的一句话,上帝视角、冷、只砸事实。
+   * 它不参与发牌,是常驻编年史的条目 —— 玩家回看这条世界线时,读的就是这一串 headline。
+   */
+  headline: string;
   reports: EntitySimulationReport[];
   events: WorldEvent[];
   /** 阶段结论:一句能解释这段历史的话 */
@@ -469,7 +474,7 @@ export interface WorldState {
 
 /** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 + 玩家取舍 */
 export interface WorldSimSession {
-  version: 5;
+  version: 6;
   scenarioId: string;
   scenarioTitle: string;
   scenarioUrl: string;

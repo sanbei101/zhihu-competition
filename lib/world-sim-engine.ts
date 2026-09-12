@@ -333,6 +333,7 @@ export async function* simulateEraStream(input: {
       era: snapshot.era,
       spanLabel: snapshot.spanLabel,
       timeLabel: snapshot.timeAfter.label,
+      headline: snapshot.headline,
     };
     for (const event of snapshot.events) yield { type: "world-event", event };
   }

@@ -11,6 +11,7 @@ import {
   SimulationView,
   type SimulationViewState,
 } from "@/components/world-simulator/simulation-view";
+import { WorldChronicle } from "@/components/world-simulator/world-chronicle";
 import {
   WorldDeck,
   type DeckStage,
@@ -148,6 +149,8 @@ export function WorldSimulator({
       </div>
 
       {notice ? <p className="text-muted-foreground text-xs leading-6">{notice}</p> : null}
+
+      <WorldChronicle snapshots={session.snapshots} streaming={simView?.beats ?? []} busy={busy} />
 
       {simView ? (
         <SimulationView

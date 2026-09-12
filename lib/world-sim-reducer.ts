@@ -324,7 +324,7 @@ export function createSession(seed: WorldSeed): WorldSimSession {
   };
 
   return {
-    version: 5,
+    version: 6,
     scenarioId: seed.scenarioId,
     scenarioTitle: seed.scenarioTitle,
     scenarioUrl: seed.scenarioUrl,
@@ -455,6 +455,7 @@ export function applyAdjudication(input: {
         elapsed: beat.timeAfter.elapsed,
       },
       spanLabel: beat.spanLabel,
+      headline: beat.headline,
       reports: index === 0 ? reports : [],
       events,
       conclusion: beat.conclusion,

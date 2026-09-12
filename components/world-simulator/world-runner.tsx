@@ -91,6 +91,7 @@ interface AdvanceBeat {
   era: number;
   spanLabel: string;
   timeLabel: string;
+  headline: string;
   events: {
     title: string;
     severity: WorldEvent["severity"];
@@ -414,6 +415,7 @@ export function WorldRunner({
                   era: event.era,
                   spanLabel: event.spanLabel,
                   timeLabel: event.timeLabel,
+                  headline: event.headline,
                   events: [],
                 },
               ],

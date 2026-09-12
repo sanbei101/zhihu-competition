@@ -233,6 +233,7 @@ export const eraSnapshotSchema = z.object({
   timeBefore: timeStateSchema,
   timeAfter: timeStateSchema,
   spanLabel: z.string().min(1),
+  headline: z.string().min(1),
   reports: z.array(entitySimulationReportSchema).max(8),
   events: z.array(worldEventSchema).max(LOOSE.events),
   conclusion: z.string().min(1),
@@ -294,7 +295,7 @@ export const playerDirectiveSchema = z.object({
 });
 
 export const worldSimSessionSchema = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
   scenarioId: z.string().min(1),
   scenarioTitle: z.string().min(1),
   scenarioUrl: z.string(),
@@ -345,6 +346,8 @@ export const adjudicationBeatSchema = z.object({
   /** 本段推进了多久,如"世界推进了 30 年" */
   spanLabel: z.string().min(1),
   timeAfter: timeStateSchema.omit({ era: true }),
+  /** 世界旁白:这一段最重量级那件事的一句话。常驻编年史的条目 */
+  headline: z.string().min(1),
   events: z.array(worldEventSchema.omit({ id: true, era: true })).max(4),
   conclusion: z.string().min(1),
   metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
@@ -470,6 +473,8 @@ export const worldSimulateEventSchema = z.discriminatedUnion("type", [
     era: z.number().int().min(0),
     spanLabel: z.string().min(1),
     timeLabel: z.string().min(1),
+    /** 世界旁白。裁决器逐段吐出来,客户端据此实时滚入编年史 */
+    headline: z.string().min(1),
   }),
   z.object({ type: z.literal("world-event"), event: worldEventSchema }),
   z.object({ type: z.literal("fork-detected"), fork: worldForkSchema }),

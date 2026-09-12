@@ -18,6 +18,7 @@ export interface SimulationViewBeat {
   era: number;
   spanLabel: string;
   timeLabel: string;
+  headline: string;
   events: {
     title: string;
     severity: WorldEvent["severity"];
