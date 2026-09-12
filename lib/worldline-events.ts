@@ -118,16 +118,16 @@ export const worldlineReactionSchema = z.object({
   by: z.string().min(1),
   delay: z.string().min(1),
   text: z.string().min(1),
-  voices: z.array(voiceSchema).max(LOOSE.voices),
+  voices: z.array(voiceSchema),
 });
 
 export const worldlineEventSchema = z.object({
   id: z.string().min(1),
   tone: eventToneSchema,
   at: z.string().min(1),
-  involves: z.array(z.string().min(1)).max(LOOSE.involves),
+  involves: z.array(z.string().min(1)),
   title: z.string().min(1),
-  reactions: z.array(worldlineReactionSchema).max(LOOSE.reactions),
+  reactions: z.array(worldlineReactionSchema),
 });
 
 export const worldlineSegmentSchema = z.object({
@@ -135,8 +135,8 @@ export const worldlineSegmentSchema = z.object({
   at: z.string().min(1),
   headline: z.string().min(1),
   aftermath: z.string(),
-  involves: z.array(z.string().min(1)).max(LOOSE.involves),
-  voices: z.array(voiceSchema).max(LOOSE.voices),
+  involves: z.array(z.string().min(1)),
+  voices: z.array(voiceSchema),
   mark: z.enum(["crisis", "echo"]).optional(),
 });
 
@@ -170,7 +170,7 @@ export const worldlineSessionSchema = z.object({
 
 /** 生成阶段的编年段:台词允许只给 name 与 line */
 const segmentDraftSchema = worldlineSegmentSchema.extend({
-  voices: z.array(voiceDraftSchema).max(LOOSE.voices),
+  voices: z.array(voiceDraftSchema),
 });
 
 /** 种子生成:前提 + 主体 + 开局编年。模型无权决定主题与题目 */
@@ -179,19 +179,13 @@ export const seedGenerationSchema = z.object({
   scaleLabel: z.string().min(1),
   witnessName: z.string().min(1),
   witnessRole: z.string().min(1),
-  beings: z
-    .array(worldlineBeingSchema.omit({ touched: true }))
-    .min(1)
-    .max(LOOSE.names),
-  opening: z.array(segmentDraftSchema).min(1).max(LOOSE.segments),
+  beings: z.array(worldlineBeingSchema.omit({ touched: true })).min(1),
+  opening: z.array(segmentDraftSchema).min(1),
 });
 
 /** 一波事件:五件大事,此刻先不带反应 */
 export const waveGenerationSchema = z.object({
-  events: z
-    .array(worldlineEventSchema.omit({ id: true, reactions: true }))
-    .min(1)
-    .max(LOOSE.events),
+  events: z.array(worldlineEventSchema.omit({ id: true, reactions: true })).min(1),
 });
 
 /**
@@ -201,16 +195,14 @@ export const waveGenerationSchema = z.object({
  * 没有谁是总导演,几个主体各自对同一件事做出反应,冲突由此自然产生。
  */
 export const reactionGenerationSchema = z.object({
-  reactions: z
-    .array(
-      z.object({
-        byEntityId: z.string().min(1),
-        delay: z.string().min(1),
-        text: z.string().min(1),
-        voices: z.array(voiceDraftSchema).max(LOOSE.voices),
-      }),
-    )
-    .max(LOOSE.reactions),
+  reactions: z.array(
+    z.object({
+      byEntityId: z.string().min(1),
+      delay: z.string().min(1),
+      text: z.string().min(1),
+      voices: z.array(voiceDraftSchema),
+    }),
+  ),
 });
 
 // ==================== 请求 schema ====================

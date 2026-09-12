@@ -245,15 +245,65 @@ export function extractJsonObject(text: string | undefined): unknown {
 }
 
 interface SchemaLike<T> {
-  safeParse?: (input: unknown) => { success: boolean; data?: T };
+  safeParse?: (input: unknown) => { success: boolean; data?: T; error?: unknown };
+}
+
+function trimOversizedArrays(obj: unknown, error: unknown): boolean {
+  if (!isRecord(obj)) return false;
+  const issues = extractZodIssues(error);
+  if (!issues || issues.length === 0) return false;
+
+  let modified = false;
+  for (const issue of issues) {
+    const path = issue.path;
+    if (!path || path.length === 0) continue;
+
+    let maxLimit: number | undefined = issue.maximum;
+    if (maxLimit === undefined && typeof issue.message === "string") {
+      const match = issue.message.match(/<=?\s*(\d+)/);
+      if (match) maxLimit = Number.parseInt(match[1], 10);
+    }
+
+    if (maxLimit !== undefined && maxLimit >= 0) {
+      let current: Record<string, unknown> = obj;
+      for (let i = 0; i < path.length - 1; i++) {
+        const seg = path[i];
+        if (isRecord(current[seg])) {
+          current = current[seg] as Record<string, unknown>;
+        } else {
+          break;
+        }
+      }
+      const lastKey = path[path.length - 1];
+      const val = current[lastKey];
+      if (Array.isArray(val) && val.length > maxLimit) {
+        current[lastKey] = val.slice(0, maxLimit);
+        modified = true;
+      }
+    }
+  }
+
+  return modified;
 }
 
 /** 用传入的 schema 校验挖出来的对象。项目里传的都是 zod schema,只需要 safeParse。 */
-function parseWithSchema<T>(schema: FlexibleSchema<T>, value: unknown): T | undefined {
+function parseWithSchema<T>(
+  schema: FlexibleSchema<T>,
+  value: unknown,
+  fallbackError?: unknown,
+): T | undefined {
   const candidate = schema as SchemaLike<T>;
   if (typeof candidate.safeParse !== "function") return undefined;
-  const result = candidate.safeParse(value);
-  return result.success ? result.data : undefined;
+  let result = candidate.safeParse(value);
+  if (result.success) return result.data;
+
+  // 兜底截断:若校验因数组超长失败(例如 reactions 超过 3 项),自动截取前 N 项重新校验,避免无效重试
+  if (trimOversizedArrays(value, result.error ?? fallbackError)) {
+    result = candidate.safeParse(value);
+    if (result.success) return result.data;
+  }
+
+  return undefined;
 }
 
 /**
@@ -266,7 +316,7 @@ export function salvageStructuredOutput<T>(
 ): T | undefined {
   if (!NoObjectGeneratedError.isInstance(error)) return undefined;
   const extracted = extractJsonObject(error.text);
-  return extracted === undefined ? undefined : parseWithSchema(schema, extracted);
+  return extracted === undefined ? undefined : parseWithSchema(schema, extracted, error.cause);
 }
 
 interface StructuredCallOptions<T> {
@@ -293,6 +343,7 @@ const Color = {
 interface ZodIssueLike {
   path?: Array<string | number>;
   message: string;
+  maximum?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -302,19 +353,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function extractZodIssues(error: unknown): ZodIssueLike[] | undefined {
   if (!isRecord(error)) return undefined;
 
-  if (Array.isArray(error.issues)) {
-    return error.issues.filter(
+  const filterIssues = (issues: unknown): ZodIssueLike[] | undefined => {
+    if (!Array.isArray(issues)) return undefined;
+    return issues.filter(
       (item): item is ZodIssueLike => isRecord(item) && typeof item.message === "string",
     );
-  }
+  };
 
-  if (isRecord(error.cause) && Array.isArray(error.cause.issues)) {
-    return error.cause.issues.filter(
-      (item): item is ZodIssueLike => isRecord(item) && typeof item.message === "string",
-    );
-  }
-
-  return undefined;
+  return (
+    filterIssues(error.issues) ??
+    (isRecord(error.cause) ? filterIssues(error.cause.issues) : undefined)
+  );
 }
 
 function getSyntaxErrorPointer(rawText: string, message: string): string | null {
