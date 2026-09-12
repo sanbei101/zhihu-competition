@@ -131,7 +131,7 @@ export default async function WorldPage({ params }: WorldPageProps) {
 
       <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14">
-          <div>
+          <div className="order-last lg:order-first">
             <p className="text-primary text-sm font-medium">SOURCE / ZHIHU</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">问题原文</h2>
 
@@ -158,7 +158,7 @@ export default async function WorldPage({ params }: WorldPageProps) {
             </Card>
           </div>
 
-          <div className="space-y-6">
+          <div className="order-first space-y-6 lg:order-last">
             {/* 主玩法入口。放在最上面,因为打开反事实开关是这个作品的核心动作 */}
             <Card className="border-primary shadow-none">
               <CardHeader className="p-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, GitFork } from "lucide-react";
+import { Eye, GitFork, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -126,12 +126,23 @@ export function Observatory({
       <div className="shell">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="obs-tabs-container">
           <header className="bar">
-            <span className="worldline-mark">
-              <WorldlineMarkSvg skin={skin} scale={2} />
-            </span>
-            <div>
-              <h1>世界线观测台</h1>
-              <p className="sub">{view.scenarioTitle}</p>
+            <div className="bar-brand">
+              <span className="worldline-mark">
+                <WorldlineMarkSvg skin={skin} scale={2} />
+              </span>
+              <div className="bar-titles">
+                <h1>世界线观测台</h1>
+                <p className="sub">{view.scenarioTitle}</p>
+              </div>
+              <button
+                type="button"
+                className="btn ghost reset-btn-mobile sm:hidden"
+                onClick={onReset}
+                disabled={view.busy}
+                title="重建世界"
+              >
+                <RotateCcw className="size-3.5" />
+              </button>
             </div>
 
             <div className="obs-tab-nav">
@@ -148,18 +159,18 @@ export function Observatory({
               </TabsList>
             </div>
 
-            <div className="grow" />
+            <div className="hidden grow md:block" />
             <div className="chips">
-              <span className="chip">
+              <span className="chip chip-stance hidden md:inline-flex">
                 立场 <b>观察者</b>
               </span>
-              <span className="chip">
+              <span className="chip chip-scale">
                 尺度 <b>{view.scaleLabel}</b>
               </span>
-              <span className="chip accent">纪元 {eraNo}</span>
+              <span className="chip accent chip-era">纪元 {eraNo}</span>
               <button
                 type="button"
-                className="btn ghost"
+                className="btn ghost reset-btn-desktop hidden sm:inline-flex"
                 style={{ padding: "5px 11px", fontSize: "11px" }}
                 onClick={onReset}
                 disabled={view.busy}
@@ -199,14 +210,14 @@ export function Observatory({
               played={view.played}
             />
 
-            <footer className="foot">
-              <div className="grow">
+            <footer className="foot mobile-sticky">
+              <div className="foot-progress grow">
                 <div className="track">
                   <i style={{ width: "18%" }} />
                 </div>
                 <p className="note">{phaseNote(view)}</p>
               </div>
-              <div className="stats">
+              <div className="stats foot-stats">
                 <span className="chip">
                   编年 <b>{view.timeline.length}</b> 段
                 </span>
@@ -216,7 +227,7 @@ export function Observatory({
               </div>
               <button
                 type="button"
-                className="btn"
+                className="btn advance-btn"
                 onClick={onAdvance}
                 disabled={advanceDisabled(view)}
               >

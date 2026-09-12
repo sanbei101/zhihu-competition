@@ -31,25 +31,22 @@ const PARADE: Array<{ id: string; height: number }> = [
  * 首屏大字是垂直居中的,下面那簇小字会一直压到约 440px 处,
  * 所以精灵最多只能用'(视口高 - 440) / 2 - 56'这点空间,矮屏才不会被小字压住。
  */
-const PARADE_FIT = "w-auto max-h-[calc((100dvh_-_440px)/2_-_56px)]";
+const PARADE_FIT = "w-auto max-h-[clamp(44px,calc((100dvh_-_440px)/2_-_56px),160px)]";
 
 function WorldParade() {
   return (
     <div
-      className={`absolute inset-x-0 ${GROUND_LINE} flex items-end justify-between gap-3 px-[6%] sm:px-[9%]`}
+      className={`absolute inset-x-0 ${GROUND_LINE} flex items-end justify-around gap-2 px-[4%] sm:justify-between sm:gap-3 sm:px-[9%]`}
       aria-hidden="true"
     >
-      {PARADE.map((entry) => {
+      {PARADE.map((entry, idx) => {
         const skin = getSkin(entry.id);
         const sprite = spritesForSkin(skin)[0];
         if (!sprite) return null;
         return (
-          <StageSprite
-            key={entry.id}
-            sprite={sprite}
-            targetHeight={entry.height}
-            fit={PARADE_FIT}
-          />
+          <div key={entry.id} className={cn(idx >= 3 ? "hidden sm:block" : "block")}>
+            <StageSprite sprite={sprite} targetHeight={entry.height} fit={PARADE_FIT} />
+          </div>
         );
       })}
     </div>

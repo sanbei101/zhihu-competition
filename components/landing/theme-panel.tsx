@@ -125,8 +125,10 @@ export function ThemePanel({ theme, index, total, active, mounted }: ThemePanelP
               {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
             </span>
           </div>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-5xl">{skin.name}</h2>
-          <p className="mt-1 text-sm opacity-85 sm:text-base">{skin.mood}</p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight sm:mt-2 sm:text-5xl">
+            {skin.name}
+          </h2>
+          <p className="mt-0.5 text-xs opacity-85 sm:mt-1 sm:text-base">{skin.mood}</p>
         </div>
 
         {/* 浮动副本层:贴着演出带上方悬停,不再挤在屏幕最底边 */}
@@ -179,7 +181,7 @@ export function ThemePanel({ theme, index, total, active, mounted }: ThemePanelP
         </div>
 
         {/* 演出带:给地面精灵留出的高度,不放任何前景内容 */}
-        <div className="h-[26dvh] shrink-0 sm:h-[32dvh] lg:h-[38dvh]" aria-hidden="true" />
+        <div className="h-[14dvh] shrink-0 sm:h-[30dvh] lg:h-[38dvh]" aria-hidden="true" />
       </div>
     </section>
   );

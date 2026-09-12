@@ -305,7 +305,7 @@ export function WorldlineEvolutionTree({
     <div className="evolution-tree-view">
       {/* 演化树顶部操作工具栏 */}
       <div className="tree-toolbar">
-        <div className="tree-toolbar-left">
+        <div className="tree-toolbar-row">
           <div className="tree-mode-toggle">
             <Button
               size="xs"
@@ -327,76 +327,75 @@ export function WorldlineEvolutionTree({
             </Button>
           </div>
 
-          {/* 势力高亮过滤 */}
-          <div className="tree-filter-group">
-            <span className="filter-label">
-              <Filter className="size-3" />
-              观察视角:
-            </span>
-            <button
-              type="button"
-              className={`filter-chip ${activeBeingFilter === null ? "active" : ""}`}
-              onClick={() => {
-                setActiveBeingFilter(null);
-                onLit(null);
-              }}
-            >
-              全部演化脉络
-            </button>
-            {view.beings.map((b) => {
-              const active = activeBeingFilter === b.id;
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={`filter-chip being-chip ${active ? "active" : ""}`}
-                  onClick={() => {
-                    const next = active ? null : b.id;
-                    setActiveBeingFilter(next);
-                    onLit(next ? [next] : null);
-                  }}
-                  title={`聚焦高亮 ${b.name} 的全部演化分枝`}
-                >
-                  <span className="emblem-mini">
-                    <EmblemSvg id={b.id} name={b.name} kind={b.kind} skin={skin} scale={1} />
-                  </span>
-                  <span>{b.name}</span>
-                </button>
-              );
-            })}
+          <div className="tree-toolbar-actions">
+            <div className="zoom-controls">
+              <Button
+                size="icon-xs"
+                variant="outline"
+                onClick={() => setZoom((z) => Math.max(0.65, Number((z - 0.1).toFixed(2))))}
+                title="缩小"
+              >
+                <Minus className="size-3" />
+              </Button>
+              <span className="zoom-text font-mono text-[11px]">{Math.round(zoom * 100)}%</span>
+              <Button
+                size="icon-xs"
+                variant="outline"
+                onClick={() => setZoom((z) => Math.min(1.4, Number((z + 0.1).toFixed(2))))}
+                title="放大"
+              >
+                <Plus className="size-3" />
+              </Button>
+              <Button size="icon-xs" variant="outline" onClick={() => setZoom(1)} title="重置缩放">
+                <RotateCcw className="size-3" />
+              </Button>
+            </div>
+
+            <div className="tree-stats-chip hidden sm:inline-flex">
+              <span>{treeData.events.length} 纪元</span>
+              <span className="divider">·</span>
+              <span>{totalBranches} 分支</span>
+            </div>
           </div>
         </div>
 
-        {/* 视口控制 */}
-        <div className="tree-toolbar-right">
-          <div className="zoom-controls">
-            <Button
-              size="icon-xs"
-              variant="outline"
-              onClick={() => setZoom((z) => Math.max(0.65, Number((z - 0.1).toFixed(2))))}
-              title="缩小"
-            >
-              <Minus className="size-3" />
-            </Button>
-            <span className="zoom-text font-mono text-[11px]">{Math.round(zoom * 100)}%</span>
-            <Button
-              size="icon-xs"
-              variant="outline"
-              onClick={() => setZoom((z) => Math.min(1.4, Number((z + 0.1).toFixed(2))))}
-              title="放大"
-            >
-              <Plus className="size-3" />
-            </Button>
-            <Button size="icon-xs" variant="outline" onClick={() => setZoom(1)} title="重置缩放">
-              <RotateCcw className="size-3" />
-            </Button>
-          </div>
-
-          <div className="tree-stats-chip">
-            <span>{treeData.events.length} 个纪元节点</span>
-            <span className="divider">·</span>
-            <span>{totalBranches} 个演化分支</span>
-          </div>
+        {/* 势力高亮过滤滑轨 */}
+        <div className="tree-filter-group">
+          <span className="filter-label">
+            <Filter className="size-3" />
+            视角:
+          </span>
+          <button
+            type="button"
+            className={`filter-chip ${activeBeingFilter === null ? "active" : ""}`}
+            onClick={() => {
+              setActiveBeingFilter(null);
+              onLit(null);
+            }}
+          >
+            全部脉络
+          </button>
+          {view.beings.map((b) => {
+            const active = activeBeingFilter === b.id;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                className={`filter-chip being-chip ${active ? "active" : ""}`}
+                onClick={() => {
+                  const next = active ? null : b.id;
+                  setActiveBeingFilter(next);
+                  onLit(next ? [next] : null);
+                }}
+                title={`聚焦高亮 ${b.name} 的全部演化分枝`}
+              >
+                <span className="emblem-mini">
+                  <EmblemSvg id={b.id} name={b.name} kind={b.kind} skin={skin} scale={1} />
+                </span>
+                <span>{b.name}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -627,47 +626,55 @@ export function WorldlineEvolutionTree({
 
       {/* 选中节点详情抽屉 / 溯源卡片 */}
       {selectedNode && (
-        <aside className="tree-detail-drawer">
-          <div className="drawer-header">
-            <div className="drawer-title-area">
-              <span className="drawer-sub">{selectedNode.sub}</span>
-              <h4 className="drawer-title">{selectedNode.title}</h4>
-            </div>
-            <button
-              type="button"
-              className="drawer-close-btn"
-              onClick={() => setSelectedNode(null)}
-            >
-              ✕
-            </button>
-          </div>
-          <p className="drawer-desc">{selectedNode.desc}</p>
-          {selectedNode.involves && selectedNode.involves.length > 0 && (
-            <div className="drawer-section">
-              <div className="drawer-section-title">牵涉力量</div>
-              <div className="drawer-tags">
-                {selectedNode.involves.map((n) => (
-                  <span key={n} className="drawer-tag">
-                    {n}
-                  </span>
-                ))}
+        <>
+          <div
+            className="tree-drawer-backdrop"
+            onClick={() => setSelectedNode(null)}
+            aria-hidden="true"
+          />
+          <aside className="tree-detail-drawer">
+            <div className="drawer-drag-handle sm:hidden" />
+            <div className="drawer-header">
+              <div className="drawer-title-area">
+                <span className="drawer-sub">{selectedNode.sub}</span>
+                <h4 className="drawer-title">{selectedNode.title}</h4>
               </div>
+              <button
+                type="button"
+                className="drawer-close-btn"
+                onClick={() => setSelectedNode(null)}
+              >
+                ✕
+              </button>
             </div>
-          )}
-          {selectedNode.voices && selectedNode.voices.length > 0 && (
-            <div className="drawer-section">
-              <div className="drawer-section-title">亲历者证言</div>
-              <div className="drawer-voices-list">
-                {selectedNode.voices.map((v, i) => (
-                  <div key={i} className="drawer-voice-card">
-                    <span className="dv-speaker">{v.name}</span>
-                    <p className="dv-quote">“{v.line}”</p>
-                  </div>
-                ))}
+            <p className="drawer-desc">{selectedNode.desc}</p>
+            {selectedNode.involves && selectedNode.involves.length > 0 && (
+              <div className="drawer-section">
+                <div className="drawer-section-title">牵涉力量</div>
+                <div className="drawer-tags">
+                  {selectedNode.involves.map((n) => (
+                    <span key={n} className="drawer-tag">
+                      {n}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </aside>
+            )}
+            {selectedNode.voices && selectedNode.voices.length > 0 && (
+              <div className="drawer-section">
+                <div className="drawer-section-title">亲历者证言</div>
+                <div className="drawer-voices-list">
+                  {selectedNode.voices.map((v, i) => (
+                    <div key={i} className="drawer-voice-card">
+                      <span className="dv-speaker">{v.name}</span>
+                      <p className="dv-quote">“{v.line}”</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </>
       )}
     </div>
   );

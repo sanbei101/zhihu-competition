@@ -40,6 +40,17 @@
   gap: 14px;
   flex-wrap: wrap;
 }
+.observatory .bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.observatory .bar-titles {
+  min-width: 0;
+}
+.observatory .reset-btn-mobile {
+  display: none;
+}
 .observatory .bar h1 {
   margin: 0;
   font-size: 17px;
@@ -894,22 +905,11 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-/* ================= 窄屏:观测窗折到舞台下方 ================= */
+/* ================= 响应式与移动端深度适配 ================= */
 @media (max-width: 1000px) {
   .observatory .main {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(320px, auto) auto;
-    height: auto;
-  }
-  .observatory .sky {
-    height: 340px;
-  }
-  .observatory .rail-wrap {
-    border-left: 0;
-    border-top: 1px solid var(--border);
-  }
-  .observatory .scroller {
-    max-height: 360px;
+    height: 360px;
   }
   .observatory .clock {
     top: 12px;
@@ -925,11 +925,390 @@
   .observatory .board {
     justify-content: center;
   }
-  .observatory .bar > div {
-    min-width: 0;
-  }
   .observatory .bar .sub {
     max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .observatory .shell {
+    padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+  }
+
+  /* 顶栏分层自适应 */
+  .observatory .bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .observatory .bar-brand {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .observatory .bar-titles {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .observatory .bar-titles h1 {
+    font-size: 15px;
+  }
+  .observatory .bar-titles .sub {
+    font-size: 11px;
+    max-width: 100%;
+  }
+  .observatory .reset-btn-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    color: var(--muted-foreground);
+    cursor: pointer;
+  }
+  .observatory .reset-btn-mobile:hover {
+    color: var(--foreground);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Tab 导航横跨整行 */
+  .observatory .obs-tab-nav {
+    width: 100%;
+    margin-left: 0;
+  }
+  .observatory .obs-tabs-list {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .observatory .obs-tab-trigger {
+    justify-content: center;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .observatory .chips {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .observatory .chips .chip {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  /* 天幕舞台紧凑化 */
+  .observatory .main {
+    height: clamp(260px, 36vh, 310px);
+  }
+  .observatory .world {
+    padding: 12px 12px var(--ground);
+  }
+  .observatory .premise .kicker {
+    font-size: 9px;
+  }
+  .observatory .premise .statement {
+    font-size: 13px;
+    line-height: 1.4;
+    max-width: 62%;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .observatory .premise .meta {
+    margin-top: 6px;
+    gap: 4px;
+  }
+  .observatory .premise .meta .chip {
+    font-size: 9.5px;
+    padding: 2px 6px;
+  }
+  .observatory .clock {
+    top: 10px;
+    right: 12px;
+  }
+  .observatory .clock .clk-era {
+    font-size: 18px;
+  }
+  .observatory .clock .at {
+    font-size: 10px;
+    margin-top: 2px;
+  }
+
+  /* 4 个势力主体徽记等比收敛，消除横向溢出 */
+  .observatory .cast {
+    gap: 6px;
+    padding: 0 4px;
+  }
+  .observatory .being {
+    gap: 4px;
+  }
+  .observatory .being .emblem svg {
+    width: 44px;
+    height: 44px;
+  }
+  .observatory .being .plate {
+    padding: 1px 4px;
+    font-size: 9.5px;
+    line-height: 1.25;
+  }
+  .observatory .being .plate b {
+    font-size: 9.5px;
+  }
+  .observatory .being .plate i {
+    font-size: 9px;
+    opacity: 0.85;
+  }
+  .observatory .voices .say {
+    font-size: 11px;
+    padding: 4px 8px;
+    max-width: min(180px, 52vw);
+  }
+
+  /* 见证者与事件牌桌：移动端横向滑轨 */
+  .observatory .board {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+  }
+  .observatory .witness {
+    max-width: 100%;
+    width: 100%;
+    background: rgba(32, 22, 15, 0.72);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    gap: 10px;
+    align-items: center;
+  }
+  .observatory .witness .stand {
+    filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.4));
+  }
+  .observatory .witness .stand svg {
+    width: 36px;
+    height: 36px;
+  }
+  .observatory .witness .bubble {
+    margin-top: 0;
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+    flex: 1 1 auto;
+  }
+  .observatory .witness .bubble::before {
+    display: none;
+  }
+  .observatory .witness .bubble .who {
+    font-size: 9px;
+    margin-bottom: 2px;
+  }
+
+  .observatory .events {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 10px;
+    padding: 2px 2px 8px;
+    scrollbar-width: none;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .observatory .events::-webkit-scrollbar {
+    display: none;
+  }
+  .observatory .ecard {
+    width: clamp(210px, 66vw, 260px);
+    min-height: 138px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    padding: 10px;
+    font-size: 12px;
+  }
+  .observatory .ecard .ec-title {
+    font-size: 12px;
+    line-height: 1.45;
+    max-height: 2.9em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .observatory .ecard .ec-foot {
+    margin-top: auto;
+    font-size: 10.5px;
+  }
+  .observatory .ecard.pending {
+    width: clamp(130px, 40vw, 170px);
+    min-height: 138px;
+    flex-shrink: 0;
+  }
+
+  /* 底部吸底操作栏 */
+  .observatory .foot.mobile-sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 35;
+    background: rgba(14, 11, 9, 0.96);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--border);
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    margin: 0 -12px -14px;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.65);
+    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .observatory .foot-progress {
+    width: 100%;
+  }
+  .observatory .foot-stats {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .observatory .btn.advance-btn {
+    width: 100%;
+    height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 6px;
+  }
+
+  /* 演化树移动端体验 */
+  .observatory .evolution-tree-view {
+    height: calc(100dvh - 145px);
+    min-height: 460px;
+  }
+  .observatory .tree-toolbar {
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .observatory .tree-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+  .observatory .tree-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .observatory .tree-filter-group {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 5px;
+    width: 100%;
+    padding-bottom: 2px;
+  }
+  .observatory .tree-filter-group::-webkit-scrollbar {
+    display: none;
+  }
+  .observatory .filter-chip {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 2px 7px;
+    font-size: 10.5px;
+  }
+  .observatory .tree-scroll-container {
+    padding: 16px 10px;
+  }
+  .observatory .tree-columns {
+    gap: 36px;
+    padding: 10px 10px 40px 0;
+  }
+  .observatory .col-root {
+    width: 200px;
+    position: static;
+  }
+  .observatory .col-events {
+    min-width: 280px;
+    gap: 28px;
+  }
+  .observatory .tree-cluster {
+    grid-template-columns: 210px minmax(210px, 1fr);
+    gap: 30px;
+  }
+  .observatory .event-node {
+    width: 210px;
+    padding: 10px;
+  }
+  .observatory .event-title {
+    font-size: 12px;
+  }
+  .observatory .branch-node {
+    min-width: 210px;
+    max-width: 280px;
+    padding: 10px;
+  }
+  .observatory .branch-text {
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  /* 移动端详情抽屉 -> Bottom Sheet */
+  .observatory .tree-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(4px);
+    z-index: 49;
+    animation: fadeIn 0.18s ease-out;
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .observatory .tree-detail-drawer {
+    position: fixed;
+    inset-x: 0;
+    bottom: 0;
+    top: auto;
+    right: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 76dvh;
+    border-radius: 16px 16px 0 0;
+    z-index: 50;
+    animation: sheetUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.75);
+    border-bottom: 0;
+  }
+  @keyframes sheetUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .observatory .drawer-drag-handle {
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.28);
+    margin: 8px auto 2px;
+    flex-shrink: 0;
   }
 }
 
