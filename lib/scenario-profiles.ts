@@ -1,4 +1,4 @@
-import type { EntityKind, SimulationMode, TimeScale } from "@/lib/world-sim";
+import type { EntityKind, SimulationMode, TimeScale } from "@/lib/worldline";
 
 /**
  * Scenario Profile:不保存题目正文,只保存"模拟器如何处理这个主题"。

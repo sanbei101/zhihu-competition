@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { WorldRunner } from "@/components/world-simulator/world-runner";
+import { WorldlineRunner } from "@/components/worldline/runner";
 import { findScenario } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 
@@ -12,11 +12,14 @@ interface WorldSimPageProps {
 }
 
 /**
- * 世界线牌局。
+ * 世界线观测台。
  *
- * 这是 v3 玩法的正式入口:数据全部来自真实模型链路
- * (/api/world-seed 构建世界, /api/world-simulate 推进一个阶段并发牌)。
- * 页面本身只做两件事:按题目 id 找到副本、决定用哪套皮肤,剩下的交给 WorldRunner。
+ * 这是玩法的正式入口:数据全部来自真实模型链路
+ * (/api/worldline-seed 铺开世界,/api/worldline-wave 发下一波事件并演世界的反应)。
+ *
+ * 页面本身只做三件事:按题目 id 拿到副本、套上这个主题的皮肤、把整屏交给 WorldlineRunner。
+ * 注意这里**不给任何内边距与最大宽度** —— 观测台是整屏的,
+ * .shell 自己负责居中与留白,多一层容器就会把它挤变形。
  */
 export default async function WorldSimPage({ params }: WorldSimPageProps) {
   const { id } = await params;
@@ -32,7 +35,7 @@ export default async function WorldSimPage({ params }: WorldSimPageProps) {
             <CardHeader className="p-6 sm:p-8">
               <CardTitle className="text-xl">这间副本不在题库里</CardTitle>
               <p className="text-muted-foreground mt-2 text-sm leading-7">
-                世界线控制台需要一道真实的假设题作为起点,请从首页对应分区进入。
+                世界线观测台需要一道真实的假设题作为起点,请从首页对应分区进入。
               </p>
               <p className="text-muted-foreground mt-1 font-mono text-xs">ID: {id}</p>
             </CardHeader>
@@ -52,16 +55,13 @@ export default async function WorldSimPage({ params }: WorldSimPageProps) {
   const skin = getSkin(theme.id);
 
   return (
-    <main style={skinStyleVars(skin)} className="bg-background text-foreground min-h-screen">
-      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-8 sm:py-7">
-        <WorldRunner
-          scenarioId={topic.id}
-          scenarioTitle={topic.title}
-          themeId={theme.id}
-          themeName={theme.name}
-          skin={skin}
-        />
-      </section>
+    <main style={skinStyleVars(skin)}>
+      <WorldlineRunner
+        scenarioId={topic.id}
+        scenarioTitle={topic.title}
+        themeId={theme.id}
+        skin={skin}
+      />
     </main>
   );
 }

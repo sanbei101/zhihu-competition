@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "../node_modules/tw-animate-css/dist/tw-animate.css";
 @import "shadcn/tailwind.css";
+/* 世界线观测台的整屏样式。作用域在 .observatory 下,不影响其他页面 */
+@import "./observatory.css";
 
 @custom-variant dark (&:is(.dark *));
 

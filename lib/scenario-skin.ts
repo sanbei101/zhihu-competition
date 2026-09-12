@@ -224,5 +224,18 @@ export function skinStyleVars(skin: ScenarioSkin): CSSProperties {
     "--chart-4": skin.pixel.e,
     "--chart-5": skin.raised,
     "--radius": "0.25rem",
+    /*
+     * 世界线观测台自己要用的两个变量。
+     *
+     * 观测台的样式表(app/observatory.css)整体引用 shadcn 语义变量,
+     * 只有这两样在语义变量里没有对应物:
+     *   --obs-*   像素色板,给 CSS 里的浮尘与轴点用(SVG 由组件直接吃 skin)
+     *   --obs-accent-soft  时间轴与滚动条的中性强调色,shadcn 没有这个位
+     */
+    "--obs-po": skin.pixel.o,
+    "--obs-px": skin.pixel.x,
+    "--obs-py": skin.pixel.y,
+    "--obs-pe": skin.pixel.e,
+    "--obs-accent-soft": skin.accentSoft,
   } as CSSProperties;
 }

@@ -1,5 +1,5 @@
 import type { ScenarioSkin } from "@/lib/scenario-skin";
-import type { WitnessArchetype } from "@/lib/world-sim";
+import type { WitnessArchetype } from "@/lib/worldline";
 
 /**
  * 世界见证者的像素形象。

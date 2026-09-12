@@ -1,5 +1,5 @@
 import type { ScenarioSkin } from "@/lib/scenario-skin";
-import type { EntityKind } from "@/lib/world-sim";
+import type { EntityKind } from "@/lib/worldline";
 
 /**
  * 世界主体的像素徽记。
