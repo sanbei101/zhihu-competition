@@ -1,20 +1,9 @@
-/*
- * 世界线观测台的整屏样式。
- *
- * 这一份是原型（prototype/worldline-observatory.html）的忠实迁移。它刻意不用 Tailwind
- * 原子类：整屏有大量逐像素调过的定位、关键帧与呼吸节奏，拆成原子类既读不懂也守不住。
- * 作用域统一收在 .observatory 下，不污染首页与题库详情页。
- *
- * 颜色全部引用皮肤语义变量（lib/scenario-skin.ts 的 skinStyleVars 注入），
- * 换一套皮肤整屏跟着换；而同一个主题下的观感与原型逐像素一致。
- */
-
 .observatory {
   /* 布局常量。颜色由 skinStyleVars 注入，这里只管尺度 */
   --ground: 48px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --sans:
-    "Pixel Subset", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "PingFang SC",
+    "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "PingFang SC",
     "Microsoft YaHei", sans-serif;
   /* 原型里 .era .node 写的是未定义的 --px-x，实际渲染为透明。保持一致的观感 */
   --obs-px-x: transparent;
@@ -109,6 +98,9 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
+}
+.observatory .main.full-stage {
+  grid-template-columns: minmax(0, 1fr);
 }
 .observatory .sky {
   position: relative;
@@ -939,4 +931,778 @@
   .observatory .bar .sub {
     max-width: 100%;
   }
+}
+
+/* ================= 按钮基础 ================= */
+.observatory .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--primary-foreground, #1c140e);
+  border: 1px solid var(--primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.observatory .btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.observatory .btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.observatory .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+.observatory .btn.ghost {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted-foreground);
+  border-color: var(--border);
+}
+.observatory .btn.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--foreground);
+}
+
+/* ================= Tab 切换导航 ================= */
+.observatory .obs-tabs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.observatory .obs-tab-nav {
+  display: inline-flex;
+  margin-left: 8px;
+}
+
+.observatory .obs-tabs-list {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(18, 14, 11, 0.85);
+  border: 1px solid var(--border);
+  padding: 3px;
+  border-radius: 6px;
+  gap: 3px;
+}
+
+.observatory .obs-tab-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.observatory .obs-tab-trigger:hover {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.observatory .obs-tab-trigger[data-state="active"] {
+  background: var(--card);
+  color: var(--primary);
+  border-color: rgba(232, 163, 61, 0.35);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.observatory .obs-tab-badge {
+  font-size: 10px;
+  font-family: var(--mono);
+  background: rgba(232, 163, 61, 0.15);
+  color: var(--primary);
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 163, 61, 0.3);
+}
+
+.observatory .obs-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  outline: none;
+  width: 100%;
+}
+
+/* ================= 世界线演化树（发散思维导图） ================= */
+.observatory .evolution-tree-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(14, 11, 9, 0.92);
+  min-height: 580px;
+  height: calc(100vh - 120px);
+  max-height: 820px;
+  overflow: hidden;
+}
+
+.observatory .tree-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(24, 18, 14, 0.94);
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+.observatory .tree-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.observatory .tree-mode-toggle {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  gap: 2px;
+}
+
+.observatory .tree-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.observatory .filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted-foreground);
+  margin-right: 2px;
+}
+
+.observatory .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.observatory .filter-chip:hover {
+  color: var(--foreground);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.observatory .filter-chip.active {
+  background: rgba(232, 163, 61, 0.18);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.observatory .filter-chip .emblem-mini {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.observatory .tree-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.observatory .zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+}
+
+.observatory .zoom-text {
+  min-width: 36px;
+  text-align: center;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+
+.observatory .tree-stats-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.observatory .tree-stats-chip .divider {
+  opacity: 0.4;
+}
+
+.observatory .tree-linear-wrap {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px;
+  max-height: calc(100vh - 190px);
+}
+
+.observatory .tree-scroll-container {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: auto;
+  background-color: var(--background);
+  background-image: radial-gradient(rgba(232, 163, 61, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  padding: 40px;
+}
+
+.observatory .tree-canvas {
+  position: relative;
+  min-width: max-content;
+  min-height: 100%;
+  transition: transform 0.15s ease-out;
+}
+
+.observatory .tree-svg-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.observatory .tree-line {
+  transition:
+    stroke-width 0.2s ease,
+    opacity 0.2s ease,
+    stroke 0.2s ease;
+}
+
+.observatory .tree-line.pulsing {
+  animation: treeLinePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes treeLinePulse {
+  0%,
+  100% {
+    stroke-width: 2.5px;
+    opacity: 0.95;
+  }
+  50% {
+    stroke-width: 3.8px;
+    opacity: 0.55;
+  }
+}
+
+.observatory .tree-columns {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 90px;
+  padding: 20px 20px 60px 10px;
+}
+
+.observatory .tree-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.observatory .col-root {
+  width: 270px;
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  align-self: flex-start;
+}
+
+.observatory .col-events {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  min-width: 620px;
+}
+
+.observatory .tree-cluster {
+  display: grid;
+  grid-template-columns: 300px minmax(360px, 1fr);
+  gap: 75px;
+  align-items: center;
+  transition: opacity 0.25s ease;
+}
+
+.observatory .cluster-active {
+  opacity: 1;
+}
+
+.observatory .cluster-dimmed {
+  opacity: 0.35;
+}
+
+/* 节点卡片通用 */
+.observatory .node-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.observatory .node-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* 原点奇点节点 */
+.observatory .root-node {
+  background: linear-gradient(135deg, rgba(38, 28, 20, 0.95), rgba(24, 18, 13, 0.95));
+  border-color: rgba(232, 163, 61, 0.5);
+  border-left: 4px solid var(--primary);
+}
+
+.observatory .root-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.observatory .root-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.observatory .root-scale {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-family: var(--mono);
+}
+
+.observatory .root-statement {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.observatory .root-domains {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.observatory .domain-tag {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--primary);
+  background: rgba(232, 163, 61, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.observatory .root-meta {
+  font-size: 10.5px;
+  font-family: var(--mono);
+  color: var(--muted-foreground);
+}
+
+/* 事件节点 */
+.observatory .event-node {
+  width: 300px;
+}
+
+.observatory .event-node.node-live {
+  border-color: var(--primary);
+  box-shadow: 0 0 16px rgba(232, 163, 61, 0.25);
+}
+
+.observatory .event-node-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.observatory .event-era {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.observatory .event-at {
+  color: var(--muted-foreground);
+}
+
+.observatory .event-tone-badge {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+
+.observatory .live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.observatory .live-pill i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #38bdf8;
+  animation: pulseDot 1.4s infinite;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+.observatory .event-title {
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--foreground);
+}
+
+.observatory .event-involves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.observatory .involve-pill {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--muted-foreground);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* 分支反应组 */
+.observatory .tree-reaction-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.observatory .branch-node {
+  min-width: 320px;
+  max-width: 460px;
+  background: rgba(24, 18, 14, 0.88);
+  border-left: 3px solid rgba(232, 163, 61, 0.4);
+}
+
+.observatory .branch-node.branch-active {
+  border-left-color: var(--primary);
+  background: rgba(30, 22, 16, 0.95);
+}
+
+.observatory .branch-node.branch-dimmed {
+  opacity: 0.35;
+}
+
+.observatory .branch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.observatory .branch-being-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.observatory .emblem-container {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.observatory .branch-delay {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+}
+
+.observatory .branch-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--foreground);
+  opacity: 0.92;
+}
+
+.observatory .branch-voices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.observatory .voice-preview-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.observatory .voice-preview-pill .v-name {
+  color: var(--primary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.observatory .voice-preview-pill .v-line {
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.observatory .branch-empty-placeholder {
+  padding: 12px 18px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+/* 详情抽屉 */
+.observatory .tree-detail-drawer {
+  position: absolute;
+  right: 16px;
+  top: 60px;
+  bottom: 16px;
+  width: 360px;
+  max-width: 90vw;
+  background: rgba(20, 15, 12, 0.96);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  animation: drawerSlideIn 0.2s ease-out;
+}
+
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.observatory .drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.observatory .drawer-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.observatory .drawer-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--primary);
+}
+
+.observatory .drawer-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.observatory .drawer-close-btn {
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.observatory .drawer-close-btn:hover {
+  color: var(--foreground);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.observatory .drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.observatory .drawer-desc-block {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--foreground);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.observatory .drawer-section-title {
+  font-size: 11px;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.observatory .drawer-involves-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.observatory .drawer-being-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: rgba(232, 163, 61, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(232, 163, 61, 0.25);
+}
+
+.observatory .drawer-voices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.observatory .drawer-voice-card {
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  border-left: 2px solid var(--primary);
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+}
+
+.observatory .drawer-v-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-family: var(--mono);
+}
+
+.observatory .drawer-v-name {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.observatory .drawer-v-shift {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+.observatory .drawer-v-line {
+  margin: 0;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--muted-foreground);
 }

@@ -1,10 +1,14 @@
 "use client";
 
+import { Eye, GitFork } from "lucide-react";
+import { useState } from "react";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StageBackdrop } from "@/components/worldline/backdrop";
 import { EventBoard } from "@/components/worldline/board";
-import { Chronicle } from "@/components/worldline/chronicle";
 import { WorldlineMarkSvg } from "@/components/worldline/sprites";
 import { WorldArea, type ActiveVoice } from "@/components/worldline/stage";
+import { WorldlineEvolutionTree } from "@/components/worldline/tree";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
 import type {
   WitnessArchetype,
@@ -16,8 +20,9 @@ import type {
 /**
  * 世界线观测台的整屏。
  *
- * 一屏四层,从上到下:
- *   顶栏(这是什么) → 观测屏(左:世界 / 右:编年) → 牌桌(这一波落了什么) → 底部(《让世界走》)
+ * 一屏双模式:
+ *   Tab 1: 实时沙盘 —— 全宽天幕舞台 + 见证者牌桌 + 底部推进条
+ *   Tab 2: 演化世界树 · 编年 —— 发散式思维导图演化树图谱
  *
  * 纯展示,不碰网络 —— 会话、进度、台词全部由 WorldlineRunner 注入。
  */
@@ -112,101 +117,124 @@ export function Observatory({
   onAdvance: () => void;
   onReset: () => void;
 }) {
-  const lit = onLit;
+  const [activeTab, setActiveTab] = useState<string>("observatory");
   const eraNo = Math.max(1, view.timeline.length);
   const eraAt = view.timeline.at(-1)?.at ?? "起点";
 
   return (
     <div className="observatory">
       <div className="shell">
-        <header className="bar">
-          <span className="worldline-mark">
-            <WorldlineMarkSvg skin={skin} scale={2} />
-          </span>
-          <div>
-            <h1>世界线观测台</h1>
-            <p className="sub">{view.scenarioTitle}</p>
-          </div>
-          <div className="grow" />
-          <div className="chips">
-            <span className="chip">
-              立场 <b>观察者</b>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="obs-tabs-container">
+          <header className="bar">
+            <span className="worldline-mark">
+              <WorldlineMarkSvg skin={skin} scale={2} />
             </span>
-            <span className="chip">
-              尺度 <b>{view.scaleLabel}</b>
-            </span>
-            <span className="chip accent">纪元 {eraNo}</span>
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ padding: "5px 11px", fontSize: "11px" }}
-              onClick={onReset}
-              disabled={view.busy}
-            >
-              重建世界
-            </button>
-          </div>
-        </header>
-
-        <div className="main">
-          <section className="sky">
-            <StageBackdrop skin={skin} />
-            <WorldArea
-              statement={view.premiseStatement}
-              domains={view.domains}
-              beings={view.beings}
-              litIds={litIds}
-              eraNo={eraNo}
-              eraAt={eraAt}
-              voices={view.voices}
-              skin={skin}
-              loading={view.loading}
-            />
-          </section>
-
-          <Chronicle timeline={view.timeline} scrollerRef={scrollerRef} onLit={lit} />
-        </div>
-
-        <EventBoard
-          beings={view.beings}
-          witnessName={view.witnessName}
-          witnessArchetype={view.witnessArchetype}
-          witnessLine={view.witnessLine}
-          skin={skin}
-          events={view.events}
-          pending={view.pending}
-          playing={view.playing}
-          played={view.played}
-        />
-
-        <footer className="foot">
-          <div className="grow">
-            {/*
-             * 进度条停在 18% 是照搬原型的 —— 那一版没有把推进进度接上去。
-             * 保留原样是为了迁移前后逐像素一致;要接真实进度的话改这两行就够。
-             */}
-            <div className="track">
-              <i style={{ width: "18%" }} />
+            <div>
+              <h1>世界线观测台</h1>
+              <p className="sub">{view.scenarioTitle}</p>
             </div>
-            <p className="note">{phaseNote(view)}</p>
-          </div>
-          <div className="stats">
-            <span className="chip">
-              编年 <b>{view.timeline.length}</b> 段
-            </span>
-            <span className="chip">
-              反应 <b>{view.reactionDone}</b>/<b>{view.reactionTotal}</b>
-            </span>
-          </div>
-          <button
-            type="button"
-            className="btn"
-            onClick={onAdvance}
-            disabled={advanceDisabled(view)}
-          >
-            {advanceLabel(view)}
-          </button>
-        </footer>
+
+            <div className="obs-tab-nav">
+              <TabsList className="obs-tabs-list">
+                <TabsTrigger value="observatory" className="obs-tab-trigger">
+                  <Eye className="size-3.5" />
+                  <span>实时沙盘</span>
+                </TabsTrigger>
+                <TabsTrigger value="tree" className="obs-tab-trigger">
+                  <GitFork className="size-3.5" />
+                  <span>世界线 · 编年</span>
+                  <span className="obs-tab-badge">{view.timeline.length} 纪元</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <div className="grow" />
+            <div className="chips">
+              <span className="chip">
+                立场 <b>观察者</b>
+              </span>
+              <span className="chip">
+                尺度 <b>{view.scaleLabel}</b>
+              </span>
+              <span className="chip accent">纪元 {eraNo}</span>
+              <button
+                type="button"
+                className="btn ghost"
+                style={{ padding: "5px 11px", fontSize: "11px" }}
+                onClick={onReset}
+                disabled={view.busy}
+              >
+                重建世界
+              </button>
+            </div>
+          </header>
+
+          <TabsContent value="observatory" className="obs-tab-panel">
+            <div className="main full-stage">
+              <section className="sky">
+                <StageBackdrop skin={skin} />
+                <WorldArea
+                  statement={view.premiseStatement}
+                  domains={view.domains}
+                  beings={view.beings}
+                  litIds={litIds}
+                  eraNo={eraNo}
+                  eraAt={eraAt}
+                  voices={view.voices}
+                  skin={skin}
+                  loading={view.loading}
+                />
+              </section>
+            </div>
+
+            <EventBoard
+              beings={view.beings}
+              witnessName={view.witnessName}
+              witnessArchetype={view.witnessArchetype}
+              witnessLine={view.witnessLine}
+              skin={skin}
+              events={view.events}
+              pending={view.pending}
+              playing={view.playing}
+              played={view.played}
+            />
+
+            <footer className="foot">
+              <div className="grow">
+                <div className="track">
+                  <i style={{ width: "18%" }} />
+                </div>
+                <p className="note">{phaseNote(view)}</p>
+              </div>
+              <div className="stats">
+                <span className="chip">
+                  编年 <b>{view.timeline.length}</b> 段
+                </span>
+                <span className="chip">
+                  反应 <b>{view.reactionDone}</b>/<b>{view.reactionTotal}</b>
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={onAdvance}
+                disabled={advanceDisabled(view)}
+              >
+                {advanceLabel(view)}
+              </button>
+            </footer>
+          </TabsContent>
+
+          <TabsContent value="tree" className="obs-tab-panel">
+            <WorldlineEvolutionTree
+              view={view}
+              skin={skin}
+              litIds={litIds}
+              onLit={onLit}
+              scrollerRef={scrollerRef}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
