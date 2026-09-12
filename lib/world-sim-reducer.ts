@@ -4,7 +4,6 @@ import type {
   EntitySimulationReport,
   EraSnapshot,
   EventChoice,
-  GlobalMetric,
   PlayerDirective,
   WorldBranch,
   WorldEntity,
@@ -21,7 +20,6 @@ import type { Adjudication, SeedGeneration } from "@/lib/world-sim-events";
  * World Simulation v4 的状态合并器。
  *
  * 这是全部"确定性限制"的落点。模型负责叙事与判断,这里负责**不让它越界**:
- *   - 指标永远钳制在 0-100,单阶段变化有上限
  *   - 事件必须有真实存在的行动者,没有就补一个或丢弃
  *   - 引用了不存在主体的关系、事件,就地剪掉而不是整份失败
  *   - 每批牌的额度、特殊事件的优先级都在这里裁
@@ -32,10 +30,6 @@ import type { Adjudication, SeedGeneration } from "@/lib/world-sim-events";
  * 对应 plan.md §6.5 与 §13。
  */
 
-/** 单阶段单个全局指标的涨跌上限。超过这个量级就不是演化而是重置了 */
-const GLOBAL_DELTA_LIMIT = 12;
-/** 重大事件发生时放宽到的上限(severity 为 critical) */
-const GLOBAL_DELTA_LIMIT_CRITICAL = 20;
 /** 一批最多几张"有取舍"的牌。超过这个数玩家会开始闭眼点 */
 const MAX_CHOICE_CARDS = 4;
 /**
@@ -44,9 +38,6 @@ const MAX_CHOICE_CARDS = 4;
  * 模型很容易在第一大段就把世界判成"彻底崩坏",直接终结,那是最差的体验。
  */
 const MIN_STABILIZED_ERAS = 8;
-
-const METRIC_FLOOR = 0;
-const METRIC_CEILING = 100;
 
 /**
  * 展示预算。
@@ -61,26 +52,19 @@ const DISPLAY = {
   affectedDomains: 6,
   hardRules: 6,
   entities: 7,
-  globalMetrics: 6,
   initialEvents: 5,
   goals: 4,
   capabilities: 5,
   constraints: 4,
-  entityMetrics: 5,
   relations: 8,
   actions: 3,
   events: 5,
   forkAlternatives: 3,
   choices: 3,
-  effects: 4,
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-function clampMetric(value: number): number {
-  return clamp(Math.round(value), METRIC_FLOOR, METRIC_CEILING);
 }
 
 function take<T>(items: readonly T[], limit: number): T[] {
@@ -94,7 +78,6 @@ function take<T>(items: readonly T[], limit: number): T[] {
  *
  * 卡牌的全部内容都从这里过一遍:
  *   - 选项裁到 3 个 —— 再多玩家就不读了,只会闭眼点第一个
- *   - effects 里引用不存在的指标就地丢掉,而不是让整张卡作废
  *   - 少于 2 个选项的事件不算"有取舍",直接退回成纯叙事事件
  *
  * allowCard 是这个阶段还剩不剩牌额。为 false 时 choices 与 special **必须一起**摘掉 ——
@@ -106,7 +89,6 @@ function normalizeEventExtras(
     narrator?: WorldEvent["narrator"];
     special?: WorldEvent["special"];
   },
-  metricIds: Set<string>,
   allowCard: boolean,
 ): Pick<WorldEvent, "choices" | "narrator" | "special"> {
   const extras: Pick<WorldEvent, "choices" | "narrator" | "special"> = {};
@@ -115,15 +97,9 @@ function normalizeEventExtras(
 
   if (!allowCard) return extras;
 
-  const choices = take(event.choices ?? [], DISPLAY.choices)
-    .map((choice) => {
-      const effects = take(
-        choice.effects.filter((effect) => metricIds.has(effect.metricId)),
-        DISPLAY.effects,
-      );
-      return Object.assign({}, choice, { effects });
-    })
-    .filter((choice) => choice.label.trim().length > 0);
+  const choices = take(event.choices ?? [], DISPLAY.choices).filter(
+    (choice) => choice.label.trim().length > 0,
+  );
 
   // 一道选择题至少要两个选项,一个选项的"选择"是假的
   if (choices.length >= 2) {
@@ -170,9 +146,6 @@ export function normalizeSeed(input: {
         goals: take(entity.goals, DISPLAY.goals),
         capabilities: take(entity.capabilities, DISPLAY.capabilities),
         constraints: take(entity.constraints, DISPLAY.constraints),
-        metrics: take(entity.metrics, DISPLAY.entityMetrics).map((metric) =>
-          Object.assign({}, metric, { value: clampMetric(metric.value) }),
-        ),
         relations: take(entity.relations, DISPLAY.relations),
         pixelArchetype: entity.pixelArchetype || entity.kind,
       };
@@ -219,29 +192,7 @@ export function normalizeSeed(input: {
     Object.assign({}, rule, { id: `rule-${index + 1}-${rule.scope}` }),
   );
 
-  // 4. 全局指标:优先保留与本主题 profile 对应的那些,超出预算的裁掉
-  const profileIds = new Set(profile.metricDefinitions.map((metric) => metric.id));
-  const picked = generation.globalMetrics.filter((metric) => profileIds.has(metric.id));
-  const chosen = take(
-    picked.length >= 3 ? picked : generation.globalMetrics,
-    DISPLAY.globalMetrics,
-  );
-  const seenMetricIds = new Set<string>();
-  const globalMetrics: GlobalMetric[] = [];
-  for (const metric of chosen) {
-    if (seenMetricIds.has(metric.id)) continue;
-    seenMetricIds.add(metric.id);
-    globalMetrics.push({
-      id: metric.id,
-      label: metric.label,
-      value: clampMetric(metric.value),
-      description: metric.description,
-      goodDirection: metric.goodDirection,
-    });
-  }
-  const metricIds = new Set(globalMetrics.map((metric) => metric.id));
-
-  // 5. 初始事件:行动者必须存在,否则归给第一个主体(自然事件才允许无主,这里统一兜底)
+  // 4. 初始事件:行动者必须存在,否则归给第一个主体(自然事件才允许无主,这里统一兜底)
   const fallbackActor = linkedEntities[0]?.id;
   const initialEvents: WorldEvent[] = take(generation.initialEvents, DISPLAY.initialEvents).map(
     (event, index) => {
@@ -258,7 +209,7 @@ export function normalizeSeed(input: {
         summary: event.summary,
       };
       // 起跑线上的事件只是叙事:牌要等世界真的走起来之后再发
-      return Object.assign(built, normalizeEventExtras(event, metricIds, false));
+      return Object.assign(built, normalizeEventExtras(event, false));
     },
   );
 
@@ -282,7 +233,6 @@ export function normalizeSeed(input: {
     },
     hardRules,
     entities: linkedEntities,
-    globalMetrics,
     initialEvents,
   };
 }
@@ -318,13 +268,12 @@ export function createSession(seed: WorldSeed): WorldSimSession {
   const state: WorldState = {
     currentEra: 0,
     currentBranchId: "branch-main",
-    globalMetrics: seed.globalMetrics,
     entities: seed.entities,
     latestSnapshotId: "",
   };
 
   return {
-    version: 6,
+    version: 7,
     scenarioId: seed.scenarioId,
     scenarioTitle: seed.scenarioTitle,
     scenarioUrl: seed.scenarioUrl,
@@ -339,36 +288,11 @@ export function createSession(seed: WorldSeed): WorldSimSession {
 
 // ==================== 裁决应用 ====================
 
-/** 重新计算指标:加上裁决给的变化,钳制在量纲内,标记 delta 供 UI 显示涨跌 */
-function applyMetricDeltas(
-  current: GlobalMetric[],
-  deltas: { metricId: string; delta: number }[],
-  limit: number,
-): { metrics: GlobalMetric[]; applied: { metricId: string; delta: number }[] } {
-  const byId = new Map(deltas.map((delta) => [delta.metricId, delta]));
-  const applied: { metricId: string; delta: number }[] = [];
-
-  const metrics = current.map((metric) => {
-    const delta = byId.get(metric.id);
-    if (!delta) return { ...metric, delta: 0 };
-
-    const bounded = clamp(Math.round(delta.delta), -limit, limit);
-    const next = clampMetric(metric.value + bounded);
-    const actual = next - metric.value;
-    if (actual !== 0) applied.push({ metricId: metric.id, delta: actual });
-
-    return { ...metric, value: next, delta: actual };
-  });
-
-  return { metrics, applied };
-}
-
 /**
  * 把裁决的主体结算写回主体清单。
  *
- * v4 起只结算状态词。主体的内部指标与关系不再逐阶段重算 ——
- * 牌局里主体只以"一枚徽记 + 一个状态词"出现,重算它们是纯 token 开销。
- * 如果日后要做主体详情页,再把 metricShifts 加回来,那是一个独立的增量改动。
+ * 只结算状态词。牌局里主体只以"一枚徽记 + 一个状态词"出现,
+ * 指标与关系的逐阶段重算都是纯 token 开销 —— 已经全部砍掉。
  */
 function applyEntityUpdates(
   entities: WorldEntity[],
@@ -388,11 +312,10 @@ function applyEntityUpdates(
  *
  * 级联裁决:一次裁决自带 3-5 段 beats,每段被拆成一个独立快照(era 递增)。
  * 主体只在大阶段开头博弈一次(报告只挂进第一段),中间段落由裁决器沿时间轴演变。
- * 事件、指标变化各自归到它们发生的段落,发牌时从整段的快照池里挑。
+ * 事件各自归到它们发生的段落,发牌时从整段的快照池里挑。
  *
  * 确定性限制集中在这里:
  *   - 事件行动者必须存在,断引用就地补全或丢弃
- *   - 指标变化按是否有 critical 事件选择上限,逐段累计
  *   - 分叉只有在真的有 2 条以上候选时才落库
  */
 export function applyAdjudication(input: {
@@ -406,29 +329,14 @@ export function applyAdjudication(input: {
   const branchId = session.state.currentBranchId;
   const entityIds = new Set(session.state.entities.map((entity) => entity.id));
 
-  const hasCritical = adjudication.beats.some((beat) =>
-    beat.events.some((event) => event.severity === "critical"),
-  );
-  const globalLimit = hasCritical ? GLOBAL_DELTA_LIMIT_CRITICAL : GLOBAL_DELTA_LIMIT;
-
-  // 指标沿段落逐步累计
   let era = session.state.currentEra;
-  let metrics = session.state.globalMetrics;
   let timeBefore = latestTimeLabel(session);
   const snapshots: EraSnapshot[] = [];
 
   for (const [index, beat] of adjudication.beats.entries()) {
     era += 1;
 
-    const { metrics: nextMetrics, applied: metricDeltas } = applyMetricDeltas(
-      metrics,
-      beat.metricDeltas,
-      globalLimit,
-    );
-    metrics = nextMetrics;
-
     const fallbackActor = session.state.entities[0]?.id;
-    const metricIds = new Set(metrics.map((metric) => metric.id));
     const events: WorldEvent[] = beat.events.map((event, eventIndex) => {
       const actors = [...new Set(event.actorEntityIds.filter((actor) => entityIds.has(actor)))];
       const built: WorldEvent = {
@@ -441,7 +349,7 @@ export function applyAdjudication(input: {
         summary: event.summary,
       };
       // 段内所有事件都允许带取舍,真正的牌额由发牌时从整段池子里挑
-      return Object.assign(built, normalizeEventExtras(event, metricIds, true));
+      return Object.assign(built, normalizeEventExtras(event, true));
     });
 
     snapshots.push({
@@ -459,7 +367,6 @@ export function applyAdjudication(input: {
       reports: index === 0 ? reports : [],
       events,
       conclusion: beat.conclusion,
-      metricDeltas,
     });
 
     timeBefore = snapshots.at(-1)!.timeAfter;
@@ -508,7 +415,6 @@ export function applyAdjudication(input: {
   const nextState: WorldState = {
     currentEra: era,
     currentBranchId: branchId,
-    globalMetrics: metrics,
     entities,
     latestSnapshotId: last.id,
   };
@@ -597,4 +503,4 @@ export function forkChoiceNote(session: WorldSimSession, forkId: string): string
   return `「${alternative.title}」—— ${alternative.premise}`;
 }
 
-export { GLOBAL_DELTA_LIMIT, GLOBAL_DELTA_LIMIT_CRITICAL, MAX_CHOICE_CARDS };
+export { MAX_CHOICE_CARDS };

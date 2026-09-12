@@ -57,11 +57,10 @@ export const ADJUDICATION_INSTRUCTIONS = `你是这个世界的历史裁决者,�
 事件可以超出当时的常识,但必须由主体的行动与世界的硬约束合理推导出来 —— 天马行空,但前后因果连续,不能凭空变出来。
 小事件只是给大事件垫步:它说明局势如何一步一步走到了那一步,不要让它成为主角。
 
-**事件体量自检 —— 每写完一条事件,用下面三条过一遍,至少满足一条才算合格:**
+**事件体量自检 —— 每写完一条事件,用下面两条过一遍,至少满足一条才算合格:**
 1. 它改变了至少两个主体之间的力量对比;
-2. 它让某个全局指标发生了结构性转向(不是 ±1 ±2 的抖动);
-3. 它大到后人要用纪年去标记("大疫那年""天倾之年")。
-三条件一条都不满足的事件,删掉,换一条更大的。
+2. 它大到后人要用纪年去标记("大疫那年""天倾之年")。
+两条一条都不满足的事件,删掉,换一条更大的。
 "渡口的幼崽被拖走""某个村的围栏塌了"不是事件 —— 那是县志里的闲笔,不够格进这条世界线。
 
 **荒诞但不荒谬 —— 这是新颖感的来源。** 允许离谱的设定,只要它由本世界的因果与硬约束推得出来。
@@ -87,8 +86,7 @@ export const ADJUDICATION_INSTRUCTIONS = `你是这个世界的历史裁决者,�
 
 第七步 为事件配可选走向(choices)
 choices 是事件可能的分叉走向,**不是必填**。只有少数几条重大事件可以配 2-3 个走向,
-每条给出 label(四到六字的动作)、hint(不超过 20 字,只写代价与收益)、tone 与 effects
-(2-4 条对全局指标的量级提示,metricId 必须来自【当前全局指标】)。
+每条给出 label(四到六字的动作)、hint(不超过 20 字,只写代价与收益)与 tone。
 大多数事件保持纯叙事,不配 choices。如果没有真正站得住的走向,宁可空着。
 hint 用大白话,像一句提醒:写"粮是有了,怨也攒下了",不写"此政策或可缓解短期财政压力,但长期社会成本高企"。
 
@@ -113,16 +111,12 @@ hint 用大白话,像一句提醒:写"粮是有了,怨也攒下了",不写"此�
 要能一眼看出它整段走完后的处境;changed 表示它这一大阶段是否真的发生了值得注意的变化。
 不要在这里写它为什么 —— 那些内容属于事件与结论。
 
-第十步 裁定全局指标
-每个段落的 metricDeltas 绝对值通常不超过 12,除非该段发生了改写格局的重大事件。
-指标的变化要能追溯到具体事件,整段连起来看方向是明确的。
-
-第十一步 判断是否需要分叉
+第十步 判断是否需要分叉
 只有在**重大且无法调和**的冲突下才开分叉:两条路都站得住脚,且走下去会得到完全不同的世界。
 平时 fork 填 null。候选给 2-3 个,每个有 title、premise(这条路具体怎么走)、
 expectedEffects(走下去会怎样)、plausibility。
 
-第十二步 判断收敛
+第十一步 判断收敛
 stabilized 是整条世界线的**终场信号**,不是阶段性的安定。只有世界走到真正的尾声
 (核心矛盾彻底解决,或存续的体系无可挽回地走到尽头)才填 true。
 只要世界还在剧烈变化、仍有力量在行动冲突、仍留有悬念,就填 false。
@@ -166,10 +160,6 @@ export function buildAdjudicationPrompt(input: {
   const rulesBlock = seed.hardRules
     .slice(0, 5)
     .map((rule) => `- [${rule.scope}] ${rule.statement}`)
-    .join("\n");
-
-  const metricsBlock = state.globalMetrics
-    .map((metric) => `- ${metric.id}:${metric.label}=${metric.value}(${metric.goodDirection})`)
     .join("\n");
 
   // 主体清单刻意压成每主体两行。目标、能力、约束的全文只服务于主体自己的推演调用,
@@ -230,7 +220,7 @@ export function buildAdjudicationPrompt(input: {
 
     return `\n【观测者此前的取舍 — 已经是既成条件】
 观测者不是上帝,他没有改写任何已经发生的事。但他在几个节点上替世界做了一次坍缩。
-下面这些取舍请当作本阶段的既有条件来处理,它们的影响应该体现在整段历史的走向与指标的变化里:
+下面这些取舍请当作本阶段的既有条件来处理,它们的影响应该体现在整段历史的走向里:
 
 ${lines}
 ${hasEarlier ? "\n如果本段适合安排 echo(回响),优先从这些取舍里挑一条来回收。\n" : ""}`;
@@ -245,9 +235,6 @@ ${hasEarlier ? "\n如果本段适合安排 echo(回响),优先从这些取舍里
 【世界硬约束 — 违背者一律判定失败】
 ${rulesBlock}
 
-【当前全局指标】
-${metricsBlock}
-
 【当前主体清单与状态】
 ${entityBlock}
 
@@ -260,13 +247,12 @@ ${reportsBlock || "(没有任何主体提交行动,请裁定世界缓慢自然�
 
 现在请你裁决这一大阶段的历史。
 填满 schema:
-- beats:2 到 3 段(spanLabel、timeAfter 只需 label 与 elapsed、headline、events 每段 1-3 条、conclusion、metricDeltas),整段首尾相接
+- beats:2 到 3 段(spanLabel、timeAfter 只需 label 与 elapsed、headline、events 每段 1-3 条、conclusion),整段首尾相接
 - entityUpdates:每个主体最终一条(只有 status 与 changed)
 - fork:没有分叉就填 null
-- stabilized:按第十二步判断
+- stabilized:按第十一步判断
 
-每个事件 actorEntityIds、choices[].effects[].metricId、entityUpdates 的 entityId
-都必须使用上面出现过的 id。
+每个事件 actorEntityIds、entityUpdates 的 entityId 都必须使用上面出现过的 id。
 事件要够大(见第四步);headline 每段必填(见第五步);choices 可选,不硬凑。
 ${input.followedEntityId ? `\n【观测者关注】观测者正在追踪 id=${input.followedEntityId} 的主体,请让它的状态变化比别的更具体。` : ""}
 

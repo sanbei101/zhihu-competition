@@ -2,7 +2,6 @@ import type {
   CardTier,
   EraSnapshot,
   EventChoice,
-  GlobalMetric,
   SpecialEventKind,
   WitnessLine,
   WorldEntity,
@@ -29,13 +28,6 @@ import { CARD_TIER_ORDER, cardTierGrades, cardTierLabels, entityKindLabels } fro
 
 export type CardKind = "origin" | "event" | "fork" | "attention" | "settle";
 
-/** 卡面上展示的指标变化。label 是给人看的,metricId 是给结算用的 */
-export interface CardDelta {
-  metricId: string;
-  label: string;
-  delta: number;
-}
-
 export interface WorldCard {
   id: string;
   kind: CardKind;
@@ -56,8 +48,6 @@ export interface WorldCard {
   choices: EventChoice[];
   /** 分叉卡的数据 */
   fork: WorldFork | null;
-  /** 结算卡用:这一阶段的净变化 */
-  deltas: CardDelta[];
 }
 
 /** 一批的规模。5 张是读得完的上限,也是抽卡手感的下限 */
@@ -98,20 +88,6 @@ function namesOf(entities: WorldEntity[], ids: readonly string[]): string[] {
   return ids.map((id) => nameOf(entities, id)).filter((name): name is string => Boolean(name));
 }
 
-/** 指标变化的人话标签,供结算与空桌状态共用 */
-export function metricDeltas(
-  metrics: readonly GlobalMetric[],
-  deltas: readonly { metricId: string; delta: number }[],
-): CardDelta[] {
-  return deltas
-    .map((item) => {
-      const metric = metrics.find((candidate) => candidate.id === item.metricId);
-      if (!metric) return null;
-      return { metricId: metric.id, label: metric.label, delta: item.delta };
-    })
-    .filter((item): item is CardDelta => item !== null && item.delta !== 0);
-}
-
 /**
  * 原点卡。整个世界的起因,开局第一张,也是唯一一张**开局就正面朝上**的牌 ——
  * 它是前提,不是赌注。
@@ -130,7 +106,6 @@ export function originCard(seed: WorldSeed): WorldCard {
     special: null,
     choices: [],
     fork: null,
-    deltas: [],
   };
 }
 
@@ -202,7 +177,6 @@ export function dealHand(input: {
     special: event.special ?? null,
     choices: event.choices ?? [],
     fork: null,
-    deltas: [],
   }));
 
   // 带取舍的牌超过额度,把排在末尾的降成纯叙事(优先级最低的几张),
@@ -234,7 +208,6 @@ export function dealHand(input: {
       special: null,
       choices: [],
       fork,
-      deltas: [],
     });
   }
 
@@ -259,7 +232,6 @@ export function dealHand(input: {
       special: null,
       choices: [],
       fork: null,
-      deltas: [],
     });
   }
 
@@ -302,7 +274,6 @@ export function settleCard(session: WorldSimSession): WorldCard {
     special: null,
     choices: [],
     fork: null,
-    deltas: [],
   };
 }
 

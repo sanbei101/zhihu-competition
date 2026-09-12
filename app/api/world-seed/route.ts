@@ -87,7 +87,6 @@ export async function POST(request: Request) {
           send({ type: "entity", entity });
         }
 
-        send({ type: "seed-metrics", globalMetrics: seed.globalMetrics });
         send({ type: "seed-events", initialEvents: seed.initialEvents });
 
         // createSession 只是用来确认这份种子能组装成合法会话(引用完整性检查),

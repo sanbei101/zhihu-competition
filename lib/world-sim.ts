@@ -3,7 +3,7 @@
  *
  * 与旧的 world-cast 不同:这里不再有"角色"这个概念。
  * 世界主体(WorldEntity)可以是政权、生态、物种、技术、AI、行星系统 --
- * 它们都有目标、能力、约束和指标,由独立 Agent 推演。
+ * 它们都有目标、能力和约束,由独立 Agent 推演。
  *
  * 玩家是观察者,不是上帝:世界自主演化,玩家能做的只有两件事 --
  *   1. 推进时间,看世界自己发出什么牌
@@ -120,15 +120,6 @@ export const hardRuleScopeLabels: Record<HardRule["scope"], string> = {
   technology: "技术",
 };
 
-/** 主体的单项指标。规模、资源、凝聚力这类内部状态 */
-export interface EntityMetric {
-  id: string;
-  label: string;
-  value: number;
-  /** 0-100 量纲之外的原始口径说明,如 "万户" */
-  unit?: string;
-}
-
 /** 主体之间的定向关系。-100 敌对,0 中立,100 同盟 */
 export interface EntityRelation {
   targetEntityId: string;
@@ -158,7 +149,6 @@ export interface WorldEntity {
   goals: string[];
   capabilities: string[];
   constraints: string[];
-  metrics: EntityMetric[];
   relations: EntityRelation[];
   /** 像素徽记的造型键,对应 components/pixel/entity-emblem.ts 的生成器 */
   pixelArchetype: string;
@@ -166,17 +156,6 @@ export interface WorldEntity {
   changedThisEra?: boolean;
   /** 结算后的状态词,如 "扩张中" / "濒临崩溃" */
   status?: string;
-}
-
-/** 全局指标。不同主题用不同标签,但结构统一 */
-export interface GlobalMetric {
-  id: string;
-  label: string;
-  value: number;
-  description: string;
-  goodDirection: "up" | "down" | "mixed";
-  /** 本阶段的变化量,控制台据此显示涨跌 */
-  delta?: number;
 }
 
 /**
@@ -193,11 +172,6 @@ export interface EventChoice {
   hint: string;
   /** 倾向。决定卡面上的图标与语气,不参与数值结算 */
   tone: "bold" | "cautious" | "cunning" | "mercy";
-  /**
-   * 预估影响。**这只是给玩家看的量级提示**,不是承诺 ——
-   * 真正的后果由下一阶段的裁决在合并全部主体行动之后给出。
-   */
-  effects: { metricId: string; delta: number }[];
 }
 
 export const eventChoiceToneLabels: Record<EventChoice["tone"], string> = {
@@ -382,8 +356,6 @@ export interface EraSnapshot {
   events: WorldEvent[];
   /** 阶段结论:一句能解释这段历史的话 */
   conclusion: string;
-  /** 本阶段各全局指标的变化 */
-  metricDeltas: { metricId: string; delta: number }[];
   /** 裁决器判定这个世界已经收敛(矛盾解决或彻底崩坏),UI 据此发出结算卡 */
   stabilized?: boolean;
 }
@@ -441,7 +413,6 @@ export interface WorldSeed {
   witness: WorldWitness;
   hardRules: HardRule[];
   entities: WorldEntity[];
-  globalMetrics: GlobalMetric[];
   initialEvents: WorldEvent[];
 }
 
@@ -466,7 +437,6 @@ export interface PlayerDirective {
 export interface WorldState {
   currentEra: number;
   currentBranchId: string;
-  globalMetrics: GlobalMetric[];
   entities: WorldEntity[];
   /** 最近一次快照 id */
   latestSnapshotId: string;
@@ -474,7 +444,7 @@ export interface WorldState {
 
 /** 一次完整会话:种子 + 历史快照 + 分叉 + 分支 + 玩家取舍 */
 export interface WorldSimSession {
-  version: 6;
+  version: 7;
   scenarioId: string;
   scenarioTitle: string;
   scenarioUrl: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles, TrendingDown, TrendingUp } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,18 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { TierBadge, TIER_RIBBON } from "@/components/world-simulator/card-tier";
 import type { WorldCard } from "@/lib/world-cards";
-import {
-  eventChoiceToneLabels,
-  plausibilityLabels,
-  type EventChoice,
-  type GlobalMetric,
-} from "@/lib/world-sim";
+import { eventChoiceToneLabels, plausibilityLabels, type EventChoice } from "@/lib/world-sim";
 
 /**
  * 事件卡。
  *
  * 整款游戏的信息载体就是这一张牌:一件事、一句见证者的话、两三个代价明确的选择。
- * 它刻意不显示任何"世界状态" —— 那些在舞台和底部指标条里,牌面上只留决策需要的东西。
+ * 它刻意不显示任何"世界状态" —— 牌面上只留决策需要的东西。
  *
  * 卡面状态只有两个:提问态(列出选项)与结果态(显示已做的取舍)。
  * 结果态不写"后来发生了什么",因为真正的后果在下一阶段的裁决里 ——
@@ -38,43 +33,14 @@ const SPECIAL_HINT: Record<NonNullable<WorldCard["special"]>, string> = {
   anomaly: "规则之外的东西闯了进来,它不在任何人的预期里。",
 };
 
-function EffectChips({
-  effects,
-  metrics,
-}: {
-  effects: EventChoice["effects"];
-  metrics: GlobalMetric[];
-}) {
-  if (!effects.length) return null;
-
-  return (
-    <span className="flex shrink-0 flex-wrap gap-1">
-      {effects.map((effect) => {
-        const metric = metrics.find((item) => item.id === effect.metricId);
-        const up = effect.delta > 0;
-        return (
-          <Badge key={effect.metricId} variant="outline" className="gap-1 font-mono text-[10px]">
-            {up ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-            {metric?.label ?? effect.metricId}
-            {up ? "+" : ""}
-            {effect.delta}
-          </Badge>
-        );
-      })}
-    </span>
-  );
-}
-
 export function EventCard({
   card,
-  metrics,
   resolvedChoiceId,
   onChoose,
   action,
   busy,
 }: {
   card: WorldCard;
-  metrics: GlobalMetric[];
   /** 已选中的选项 id。非空时卡面进入结果态 */
   resolvedChoiceId: string | null;
   onChoose: (choice: EventChoice) => void;
@@ -147,9 +113,6 @@ export function EventCard({
                   "")
                 : (resolved as EventChoice).label}
             </p>
-            {!isFork && (resolved as EventChoice).effects.length ? (
-              <EffectChips effects={(resolved as EventChoice).effects} metrics={metrics} />
-            ) : null}
           </div>
           <p className="text-muted-foreground text-xs leading-6">
             这不是改写。它已经记进这条世界线,
@@ -193,7 +156,6 @@ export function EventCard({
                     label: alternative.title,
                     hint: alternative.premise,
                     tone: "bold",
-                    effects: [],
                   })
                 }
                 className="h-auto w-full flex-col items-start gap-2 px-4 py-3 text-left whitespace-normal"
@@ -243,7 +205,6 @@ export function EventCard({
                   {choice.hint}
                 </span>
               </span>
-              <EffectChips effects={choice.effects} metrics={metrics} />
             </Button>
           ))}
         </CardContent>

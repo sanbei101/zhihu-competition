@@ -4,7 +4,6 @@ import { errorCodeSchema } from "@/lib/app-error";
 import {
   type EntitySimulationReport,
   type EraSnapshot,
-  type GlobalMetric,
   type HardRule,
   type TimeScale,
   type WorldEntity,
@@ -42,17 +41,12 @@ const LOOSE = {
   goals: 6,
   capabilities: 8,
   constraints: 6,
-  entityMetrics: 6,
   relations: 10,
   actions: 5,
-  metricShifts: 10,
-  relationShifts: 10,
   events: 6,
-  metricDeltas: 12,
   entityUpdates: 10,
   alternatives: 4,
   choices: 4,
-  effects: 8,
 } as const;
 
 const entityKindSchema = z.enum([
@@ -91,8 +85,6 @@ const timeScaleSchema = z.enum([
   "mega-annum",
 ]);
 
-const goodDirectionSchema = z.enum(["up", "down", "mixed"]);
-
 // ==================== 世界模型片段 ====================
 
 export const counterfactualPremiseSchema = z.object({
@@ -105,7 +97,7 @@ export const counterfactualPremiseSchema = z.object({
 /**
  * 数值字段刻意不写 min/max。
  *
- * 一次真实事故:种子生成里某个主体把指标写成 120(超出 0-100),
+ * 一次真实事故:种子生成里某个主体把亲疏度写成 120(超出 -100..100),
  * 于是 Zod 直接拒绝,整份已经写好的世界被丢掉 —— 白烧一次调用,玩家白等一轮。
  * 这类"量纲写歪了"不该是致命错误,它只是一个需要被修正的排版问题。
  *
@@ -128,13 +120,6 @@ export const hardRuleSchema = z.object({
   statement: z.string().min(1),
 });
 
-export const entityMetricSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  value: freeNumber,
-  unit: z.string().optional(),
-});
-
 export const entityRelationSchema = z.object({
   targetEntityId: z.string().min(1),
   posture: z.enum(["rival", "ally", "vassal", "trade", "isolated"]),
@@ -150,20 +135,10 @@ export const worldEntitySchema = z.object({
   goals: z.array(z.string().min(1)).max(LOOSE.goals),
   capabilities: z.array(z.string().min(1)).max(LOOSE.capabilities),
   constraints: z.array(z.string().min(1)).max(LOOSE.constraints),
-  metrics: z.array(entityMetricSchema).max(LOOSE.entityMetrics),
   relations: z.array(entityRelationSchema).max(LOOSE.relations),
   pixelArchetype: z.string().min(1),
   changedThisEra: z.boolean().optional(),
   status: z.string().optional(),
-});
-
-export const globalMetricSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().min(1),
-  value: freeNumber,
-  description: z.string().min(1),
-  goodDirection: goodDirectionSchema,
-  delta: freeNumber.optional(),
 });
 
 export const eventChoiceSchema = z.object({
@@ -171,8 +146,6 @@ export const eventChoiceSchema = z.object({
   label: z.string().min(1),
   hint: z.string().min(1),
   tone: z.enum(["bold", "cautious", "cunning", "mercy"]),
-  // 预估影响只是给玩家看的量级提示,允许为空 —— 有些取舍本来就说不清代价
-  effects: z.array(z.object({ metricId: z.string().min(1), delta: freeNumber })).max(LOOSE.effects),
 });
 
 export const witnessLineSchema = z.object({
@@ -221,11 +194,6 @@ export const entitySimulationReportSchema = z.object({
  */
 export const entityReportDraftSchema = entitySimulationReportSchema.omit({ entityId: true });
 
-export const metricDeltaSchema = z.object({
-  metricId: z.string().min(1),
-  delta: freeNumber,
-});
-
 export const eraSnapshotSchema = z.object({
   id: z.string().min(1),
   era: z.number().int().min(1),
@@ -237,7 +205,6 @@ export const eraSnapshotSchema = z.object({
   reports: z.array(entitySimulationReportSchema).max(8),
   events: z.array(worldEventSchema).max(LOOSE.events),
   conclusion: z.string().min(1),
-  metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
   stabilized: z.boolean().optional(),
 });
 
@@ -282,7 +249,6 @@ export const worldSeedSchema = z.object({
   // reducer 只负责裁到预算内,这里的下限必须足够松,才接得住裁完之后的结果。
   hardRules: z.array(hardRuleSchema).max(6),
   entities: z.array(worldEntitySchema).min(1).max(7),
-  globalMetrics: z.array(globalMetricSchema).min(1).max(6),
   initialEvents: z.array(worldEventSchema).max(5),
 });
 
@@ -295,7 +261,7 @@ export const playerDirectiveSchema = z.object({
 });
 
 export const worldSimSessionSchema = z.object({
-  version: z.literal(6),
+  version: z.literal(7),
   scenarioId: z.string().min(1),
   scenarioTitle: z.string().min(1),
   scenarioUrl: z.string(),
@@ -306,7 +272,6 @@ export const worldSimSessionSchema = z.object({
   state: z.object({
     currentEra: z.number().int().min(0),
     currentBranchId: z.string().min(1),
-    globalMetrics: z.array(globalMetricSchema),
     entities: z.array(worldEntitySchema),
     latestSnapshotId: z.string(),
   }),
@@ -326,12 +291,8 @@ export const seedGenerationSchema = z.object({
   witness: worldWitnessSchema,
   // 硬规则与初始事件允许为空:少了它们世界只是约束更松,不该整份作废
   hardRules: z.array(hardRuleSchema.omit({ id: true })).max(8),
-  // 主体与全局指标是 UI 的骨架,至少要有一个,否则没有东西可画
+  // 主体是 UI 的骨架,至少要有一个,否则没有东西可画
   entities: z.array(worldEntitySchema).min(1).max(9),
-  globalMetrics: z
-    .array(globalMetricSchema.omit({ delta: true }))
-    .min(1)
-    .max(8),
   initialEvents: z.array(worldEventSchema.omit({ id: true, era: true })).max(7),
 });
 
@@ -340,7 +301,7 @@ export const seedGenerationSchema = z.object({
  * 玩家在这整段里只做一次取舍,不再每轮停下。
  *
  * 这一段就是旧版"一个时代"的产物,只是被裁成几段、让 UI 能像看长剧一样逐段播放:
- * 事件、结论、指标变化都归到它们各自发生的段落里。
+ * 事件与结论都归到它们各自发生的段落里。
  */
 export const adjudicationBeatSchema = z.object({
   /** 本段推进了多久,如"世界推进了 30 年" */
@@ -350,7 +311,6 @@ export const adjudicationBeatSchema = z.object({
   headline: z.string().min(1),
   events: z.array(worldEventSchema.omit({ id: true, era: true })).max(4),
   conclusion: z.string().min(1),
-  metricDeltas: z.array(metricDeltaSchema).max(LOOSE.metricDeltas),
 });
 
 /**
@@ -361,7 +321,7 @@ export const adjudicationBeatSchema = z.object({
  *     AI 把这条世界线连续往前推 5 段,期间不再打断他
  *   - entityUpdates 只做最终结算:主体只在每大阶段的开头博弈一次,
  *     中间段落的状态由裁决器沿着时间轴自然演变
- *   - 因果链、内部指标与关系的逐段重算都砍掉了(见 v4 注释),token 省给"演得长"
+ *   - 因果链与关系的逐段重算都砍掉了(见 v4 注释),token 省给"演得长"
  */
 export const adjudicationSchema = z.object({
   /** 3-5 段,每段一段可以单独展示的历史 */
@@ -443,7 +403,6 @@ export const worldSeedEventSchema = z.discriminatedUnion("type", [
     name: z.string().min(1),
   }),
   z.object({ type: z.literal("entity"), entity: worldEntitySchema }),
-  z.object({ type: z.literal("seed-metrics"), globalMetrics: z.array(globalMetricSchema) }),
   z.object({ type: z.literal("seed-events"), initialEvents: z.array(worldEventSchema) }),
   z.object({ type: z.literal("seed-complete"), seed: worldSeedSchema }),
   z.object({ type: z.literal("error"), error: streamErrorSchema }),
@@ -484,7 +443,6 @@ export const worldSimulateEventSchema = z.discriminatedUnion("type", [
     state: z.object({
       currentEra: z.number().int().min(0),
       currentBranchId: z.string().min(1),
-      globalMetrics: z.array(globalMetricSchema),
       entities: z.array(worldEntitySchema),
       latestSnapshotId: z.string(),
     }),
@@ -505,7 +463,6 @@ type _ReportMatches =
   EntitySimulationReport extends z.infer<typeof entitySimulationReportSchema> ? true : never;
 type _SnapshotMatches = EraSnapshot extends z.infer<typeof eraSnapshotSchema> ? true : never;
 type _EntityMatches = WorldEntity extends z.infer<typeof worldEntitySchema> ? true : never;
-type _MetricMatches = GlobalMetric extends z.infer<typeof globalMetricSchema> ? true : never;
 type _ForkAltMatches =
   WorldForkAlternative extends z.infer<typeof worldForkAlternativeSchema> ? true : never;
 type _RuleMatches = HardRule extends z.infer<typeof hardRuleSchema> ? true : never;
@@ -518,7 +475,6 @@ export type WorldSimProtocolCheck = [
   _ReportMatches,
   _SnapshotMatches,
   _EntityMatches,
-  _MetricMatches,
   _ForkAltMatches,
   _RuleMatches,
   _ScaleMatches,

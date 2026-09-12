@@ -16,7 +16,6 @@ const entity = (id: string, name: string) => ({
   goals: ["活下去"],
   capabilities: ["动员"],
   constraints: ["粮草有限"],
-  metrics: [],
   relations: [],
   pixelArchetype: "state",
 });
@@ -37,10 +36,6 @@ const seed = {
   timeScale: "year" as const,
   hardRules: [],
   entities: [entity("a", "曹魏"), entity("b", "江东"), entity("c", "荆州")],
-  globalMetrics: [
-    { id: "m1", label: "统一度", value: 40, description: "", goodDirection: "up" as const },
-    { id: "m2", label: "民生", value: 55, description: "", goodDirection: "up" as const },
-  ],
   initialEvents: [],
   witness: {
     name: "许昌太仓的记账小吏",
@@ -50,7 +45,7 @@ const seed = {
 };
 
 const session = {
-  version: 5,
+  version: 7,
   scenarioId: seed.scenarioId,
   scenarioTitle: seed.scenarioTitle,
   scenarioUrl: seed.scenarioUrl,
@@ -79,14 +74,12 @@ const session = {
               label: "照册征发",
               hint: "粮是有了,怨也攒下了",
               tone: "bold",
-              effects: [{ metricId: "m1", delta: 4 }],
             },
             {
               id: "c2",
               label: "缓征一年",
               hint: "民心回了,军期拖了",
               tone: "cautious",
-              effects: [{ metricId: "m2", delta: 5 }],
             },
           ],
           narrator: { speaker: seed.witness.name, line: "册子一旦写成,就得按册子活。" },
@@ -102,7 +95,6 @@ const session = {
         },
       ],
       conclusion: "北方在数人,江东在数船。",
-      metricDeltas: [{ metricId: "m1", delta: 4 }],
     },
   ],
   forks: [],
@@ -119,7 +111,6 @@ const session = {
   state: {
     currentEra: 1,
     currentBranchId: "branch-main",
-    globalMetrics: seed.globalMetrics,
     entities: seed.entities,
     latestSnapshotId: "snap-1",
   },
@@ -143,7 +134,6 @@ function Probe({ stage, pickedId }: { stage: DeckStage; pickedId: string | null 
         activeCardId={pickedId}
         flippingId={null}
         resolvedChoiceId={null}
-        metrics={session.state.globalMetrics}
         onPick={() => {}}
         onChoose={() => {}}
         cardAction={{ label: "拉开这条世界线", onClick: () => {} }}

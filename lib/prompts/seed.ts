@@ -2,7 +2,7 @@
  * 世界种子生成。
  *
  * 对应 plan.md §6.1:把知乎原题翻译成一套可以被反复推演的初始状态 ——
- * 反事实前提、起始时间、时间尺度、世界硬约束、世界主体、全局指标、初始事件。
+ * 反事实前提、起始时间、时间尺度、世界硬约束、世界主体、初始事件。
  *
  * 主体不是角色:它们是政权、势力、群体、生态、技术这类互相博弈的力量,
  * 所以这里不生成玩家、不生成台词、不生成结局。
@@ -55,22 +55,16 @@ export const SEED_INSTRUCTIONS =
   - goals:2-4 条它自己追求的东西。**不同主体的目标必须不重叠甚至有冲突** —— 目标全都一致就不存在博弈。
   - capabilities:它实际能调动的东西,不是愿望。
   - constraints:它无法逾越的限制。
-  - metrics:1-5 项内部状态,value 用 0-100 的表达力的量纲(在 unit 里注明真实口径,如"万""处""家")。
   - relations:它对其他主体的定向关系,用 targetEntityId 指向上面定义的 id,posture 取 rival/ally/vassal/trade/isolated,affinity 从 -100(死敌)到 100(同盟),note 一句话说明。
   - pixelArchetype:与 kind 同名即可。
 - **不要让所有主体的规模或处境一样**。要有一个明显最强的、一个正在衰落或受压的、一个态度暧昧的。
 
-六、全局指标(globalMetrics)
-- 3-6 项。id 用简短英文小写,label 要贴合这个主题的语境,不要用通用的"稳定度"。
-- value 是 0-100 的当前值。description 说明这个指标衡量什么。
-- goodDirection 表示"什么方向对这个主题算好":up / down / mixed。注意有些指标涨了反而是坏事(如"物种竞争""误判风险")。
-
-七、初始事件(initialEvents)
+六、初始事件(initialEvents)
 - 1-5 条。这是反事实刚刚落地时**已经发生**的事,是整段历史的起跑线。
 - 每条必须有 title、scope(global/regional/entity/natural)、severity(info/notable/severe/critical)、actorEntityIds(必须引用上面定义过的 id)、summary。
 - 初始事件不配 choices:牌要等世界真的走起来之后再发。
 
-八、见证者(witness)
+七、见证者(witness)
 - 这是整份种子最后、也是唯一一件"有人味"的东西,请认真对待。
 - 见证者是**站在卡牌旁边替玩家解说这条世界线的人**。它属于这个世界,亲眼看过这些事,
   但它不是主角,也不掌握任何权力。
@@ -96,9 +90,6 @@ export function buildSeedPrompt(input: {
 }): string {
   const { scenarioId, title, profile } = input;
   const kinds = profile.entityKinds.map((kind) => `${kind}(${entityKindLabels[kind]})`).join("、");
-  const metrics = profile.metricDefinitions
-    .map((metric) => `${metric.label}(倾向:${metric.goodDirection}) — ${metric.description}`)
-    .join("\n");
 
   return `为下面这道知乎假设题构建反事实世界的初始条件。
 
@@ -111,9 +102,6 @@ export function buildSeedPrompt(input: {
 
 这个模式适合的主体类型(优先从这里选,但可以按题目实际需要调整):
 ${kinds}
-
-这个模式建议使用的全局指标方向(请据此为指标命名与定义,不要照抄通用词):
-${metrics}
 
 请先把反事实前提钉死,再列出硬约束,最后才派生主体。
 主体之间的目标必须彼此不重叠:如果两个主体的目标一致,就把它们合并成一个。

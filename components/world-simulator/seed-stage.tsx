@@ -16,7 +16,6 @@ import type { ScenarioSkin } from "@/lib/scenario-skin";
 import {
   timeScaleLabels,
   type CounterfactualPremise,
-  type GlobalMetric,
   type HardRule,
   type TimeScale,
   type TimeState,
@@ -43,7 +42,6 @@ export function SeedStage({
   timeScale,
   hardRules,
   entities,
-  globalMetrics,
   error,
   onRetry,
 }: {
@@ -57,11 +55,10 @@ export function SeedStage({
   timeScale: TimeScale | null;
   hardRules: HardRule[];
   entities: WorldEntity[];
-  globalMetrics: GlobalMetric[];
   error: string;
   onRetry: () => void;
 }) {
-  const percent = seedProgressPercent({ premise, hardRules, entities, globalMetrics });
+  const percent = seedProgressPercent({ premise, hardRules, entities });
   const archetype = witnessArchetypeFor(themeId);
 
   return (

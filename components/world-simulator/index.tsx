@@ -6,7 +6,7 @@ import { witnessArchetypeFor } from "@/components/pixel/witness";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { MetricStrip } from "@/components/world-simulator/metric-strip";
+import { AdvanceBar } from "@/components/world-simulator/advance-bar";
 import {
   SimulationView,
   type SimulationViewState,
@@ -30,8 +30,8 @@ import {
 /**
  * 世界线牌局的壳。
  *
- * 一屏四层,从上到下:
- *   舞台(我在哪) → 标题行(这是什么) → 牌桌(盲抽 + 翻牌 + 取舍) → 指标条(世界怎么样)
+ * 一屏三层,从上到下:
+ *   舞台(我在哪) → 标题行(这是什么) → 牌桌(盲抽 + 翻牌 + 取舍) + 底部动作条(把时间往前推)
  *
  * 这个组件是纯展示:会话、手牌、翻牌状态、进度、见证者的话全部由 WorldRunner 注入。
  */
@@ -172,7 +172,6 @@ export function WorldSimulator({
           activeCardId={activeCardId}
           flippingId={flippingId}
           resolvedChoiceId={resolvedChoiceId}
-          metrics={session.state.globalMetrics}
           onPick={onPick}
           onChoose={onChoose}
           cardAction={cardAction}
@@ -184,8 +183,7 @@ export function WorldSimulator({
 
       <Separator />
 
-      <MetricStrip
-        metrics={session.state.globalMetrics}
+      <AdvanceBar
         onAdvance={onAdvance}
         advanceLabel={advanceLabel}
         advanceDisabled={advanceDisabled}

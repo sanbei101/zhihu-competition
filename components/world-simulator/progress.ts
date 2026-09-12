@@ -1,5 +1,4 @@
-import type { GlobalMetric, HardRule, WorldEntity } from "@/lib/world-sim";
-import type { CounterfactualPremise } from "@/lib/world-sim";
+import type { CounterfactualPremise, HardRule, WorldEntity } from "@/lib/world-sim";
 
 /**
  * 进度估算。
@@ -10,19 +9,17 @@ import type { CounterfactualPremise } from "@/lib/world-sim";
  */
 
 const WEIGHTS = {
-  premise: 12,
-  rules: 14,
-  entities: 56,
-  metrics: 18,
+  premise: 14,
+  rules: 16,
+  entities: 70,
 } as const;
 
-const TOTAL_WEIGHT = WEIGHTS.premise + WEIGHTS.rules + WEIGHTS.entities + WEIGHTS.metrics;
+const TOTAL_WEIGHT = WEIGHTS.premise + WEIGHTS.rules + WEIGHTS.entities;
 
 export function seedProgressPercent(input: {
   premise: CounterfactualPremise | null;
   hardRules: HardRule[];
   entities: WorldEntity[];
-  globalMetrics: GlobalMetric[];
 }): number {
   let earned = 0;
   if (input.premise) earned += WEIGHTS.premise;
@@ -32,7 +29,6 @@ export function seedProgressPercent(input: {
     const expected = Math.max(3, Math.min(4, input.entities.length));
     earned += Math.round(WEIGHTS.entities * Math.min(1, input.entities.length / expected) || 0);
   }
-  if (input.globalMetrics.length) earned += WEIGHTS.metrics;
 
   return Math.max(0, Math.min(99, Math.round((earned / TOTAL_WEIGHT) * 100)));
 }

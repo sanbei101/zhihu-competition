@@ -12,7 +12,6 @@ import type { ScenarioSkin } from "@/lib/scenario-skin";
 import {
   dealHand,
   hasSettled,
-  metricDeltas,
   originCard,
   PICKS_PER_HAND,
   settleCard,
@@ -20,7 +19,6 @@ import {
 } from "@/lib/world-cards";
 import type {
   CounterfactualPremise,
-  GlobalMetric,
   HardRule,
   PlayerDirective,
   TimeScale,
@@ -70,7 +68,6 @@ interface SeedProgressState {
   timeScale: TimeScale | null;
   hardRules: HardRule[];
   entities: WorldEntity[];
-  globalMetrics: GlobalMetric[];
   error: string;
 }
 
@@ -82,7 +79,6 @@ const EMPTY_SEED_PROGRESS: SeedProgressState = {
   timeScale: null,
   hardRules: [],
   entities: [],
-  globalMetrics: [],
   error: "",
 };
 
@@ -101,7 +97,7 @@ interface AdvanceBeat {
   }[];
 }
 
-/** 推进过程中的实时进度。牌局界面里只在底部指标条上占一行 */
+/** 推进过程中的实时进度。牌局界面里留给底部动作条那一行 */
 interface AdvanceProgress {
   phase: "idle" | "entities" | "adjudicating";
   startedIds: string[];
@@ -129,7 +125,6 @@ function summaryFor(session: WorldSimSession): DeckSummary | null {
   return {
     era: snapshot.era,
     conclusion: snapshot.conclusion,
-    deltas: metricDeltas(session.state.globalMetrics, snapshot.metricDeltas),
   };
 }
 
@@ -261,9 +256,6 @@ export function WorldRunner({
             break;
           case "entity":
             setSeedProgress((prev) => ({ ...prev, entities: [...prev.entities, event.entity] }));
-            break;
-          case "seed-metrics":
-            setSeedProgress((prev) => ({ ...prev, globalMetrics: event.globalMetrics }));
             break;
           case "seed-complete":
             built = event.seed;
@@ -586,7 +578,6 @@ export function WorldRunner({
         timeScale={seedProgress.timeScale}
         hardRules={seedProgress.hardRules}
         entities={seedProgress.entities}
-        globalMetrics={seedProgress.globalMetrics}
         error={seedProgress.error}
         onRetry={() => void buildWorld()}
       />

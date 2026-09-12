@@ -72,10 +72,6 @@ export function buildEntityPrompt(input: {
 
   const rulesBlock = seed.hardRules.map((rule) => `- [${rule.scope}] ${rule.statement}`).join("\n");
 
-  const globalBlock = seed.globalMetrics
-    .map((metric) => `- ${metric.label}: ${metric.value}/100(${metric.goodDirection})`)
-    .join("\n");
-
   const selfBlock = `名称:${entity.name}(${entityKindLabels[entity.kind]})
 定位:${entity.description}
 目标:${entity.goals.join(";")}
@@ -111,9 +107,6 @@ export function buildEntityPrompt(input: {
 
 【世界硬约束 — 你不能违背任何一条】
 ${rulesBlock}
-
-【当前世界整体状况】
-${globalBlock}
 
 【你就是下面这个主体】
 ${selfBlock}

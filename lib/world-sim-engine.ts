@@ -67,7 +67,7 @@ export async function generateSeed(context: SeedContext, signal?: AbortSignal): 
     schema: seedGenerationSchema,
     // 种子要稳:这里不要创意,要的是合乎时代条件的推演
     temperature: 0.55,
-    // 预算给足。种子要一次性吐出 3-4 个大主体 × 各自的目标/能力/约束/指标/关系,
+    // 预算给足。种子要一次性吐出 3-4 个大主体 × 各自的目标/能力/约束/关系,
     // 预算卡太紧会截断成不合法 JSON,而截断的代价是整次调用白烧。
     maxOutputTokens: 6000,
     abortSignal: signal,

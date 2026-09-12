@@ -7,8 +7,8 @@ import { CardHand } from "@/components/world-simulator/card-hand";
 import { EventCard } from "@/components/world-simulator/event-card";
 import { WitnessDialogue } from "@/components/world-simulator/witness-dialogue";
 import type { ScenarioSkin } from "@/lib/scenario-skin";
-import type { CardDelta, WorldCard } from "@/lib/world-cards";
-import type { EventChoice, GlobalMetric, WitnessArchetype, WitnessLine } from "@/lib/world-sim";
+import type { WorldCard } from "@/lib/world-cards";
+import type { EventChoice, WitnessArchetype, WitnessLine } from "@/lib/world-sim";
 
 /**
  * 牌桌。
@@ -28,7 +28,6 @@ export type DeckStage = "origin" | "pick" | "open" | "closed" | "empty";
 export interface DeckSummary {
   era: number;
   conclusion: string;
-  deltas: CardDelta[];
 }
 
 /** 阶段结算。空桌与收束状态共用,不再单独发一张"小结卡" */
@@ -42,24 +41,6 @@ function SummaryPanel({ summary }: { summary: DeckSummary }) {
           </p>
           <p className="text-muted-foreground text-sm leading-7">{summary.conclusion}</p>
         </div>
-
-        {summary.deltas.length ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {summary.deltas.map((delta) => (
-              <div key={delta.metricId} className="bg-muted/40 rounded-sm border px-3 py-2">
-                <p className="text-muted-foreground text-[11px]">{delta.label}</p>
-                <p
-                  className={`mt-1 font-mono text-base ${
-                    delta.delta > 0 ? "text-chart-2" : "text-destructive"
-                  }`}
-                >
-                  {delta.delta > 0 ? "+" : ""}
-                  {delta.delta}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
@@ -75,7 +56,6 @@ export function WorldDeck({
   activeCardId,
   flippingId,
   resolvedChoiceId,
-  metrics,
   onPick,
   onChoose,
   cardAction,
@@ -94,7 +74,6 @@ export function WorldDeck({
   activeCardId: string | null;
   flippingId: string | null;
   resolvedChoiceId: string | null;
-  metrics: GlobalMetric[];
   onPick: (card: WorldCard) => void;
   onChoose: (choice: EventChoice) => void;
   /** 卡面底部那个唯一的主按钮(拉开世界线 / 收下这张牌 / 重新洗牌) */
@@ -119,7 +98,6 @@ export function WorldDeck({
     <div className="w-full max-w-xl">
       <EventCard
         card={opened}
-        metrics={metrics}
         resolvedChoiceId={resolvedChoiceId}
         onChoose={onChoose}
         action={cardAction}
