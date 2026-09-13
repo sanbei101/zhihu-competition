@@ -101,6 +101,15 @@ const TextType = ({
     }
   }, [showCursor, cursorBlinkDuration]);
 
+  const onSentenceCompleteRef = useRef(onSentenceComplete);
+  useEffect(() => {
+    onSentenceCompleteRef.current = onSentenceComplete;
+  }, [onSentenceComplete]);
+  const hasCompletedRef = useRef(false);
+  useEffect(() => {
+    hasCompletedRef.current = false;
+  }, [textArray]);
+
   useEffect(() => {
     if (!isVisible) return;
 
@@ -117,8 +126,8 @@ const TextType = ({
             return;
           }
 
-          if (onSentenceComplete) {
-            onSentenceComplete(textArray[currentTextIndex], currentTextIndex);
+          if (onSentenceCompleteRef.current) {
+            onSentenceCompleteRef.current(textArray[currentTextIndex], currentTextIndex);
           }
 
           setCurrentTextIndex(prev => (prev + 1) % textArray.length);
@@ -140,7 +149,10 @@ const TextType = ({
           );
         } else if (textArray.length >= 1) {
           if (!loop && currentTextIndex === textArray.length - 1) {
-            onSentenceComplete?.(textArray[currentTextIndex], currentTextIndex);
+            if (!hasCompletedRef.current) {
+              hasCompletedRef.current = true;
+              onSentenceCompleteRef.current?.(textArray[currentTextIndex], currentTextIndex);
+            }
             return;
           }
           timeout = setTimeout(() => {
@@ -170,8 +182,7 @@ const TextType = ({
     initialDelay,
     isVisible,
     reverseMode,
-    variableSpeed,
-    onSentenceComplete
+    variableSpeed
   ]);
 
   const shouldHideCursor =

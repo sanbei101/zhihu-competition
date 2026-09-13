@@ -29,34 +29,22 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };
 
-      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
       void (async () => {
         try {
-          // 渐进式流式输出: 维持逐级推演揭示节奏(~1.1s), 杜绝网关超时同时保证沙盘演算仪式感
+          // 流式即时输出完整数据结构，由前端精确调度串行打字机与卡牌登场演播
           send({ type: "stage", stage: "setting" });
-          await delay(100);
-          if (request.signal.aborted) return controller.close();
-
           send({ type: "setting", setting: cast.setting });
-          await delay(150);
-          if (request.signal.aborted) return controller.close();
 
           send({ type: "stage", stage: "players" });
           for (const character of cast.playerCharacters) {
             send({ type: "player-character", character });
-            await delay(120);
-            if (request.signal.aborted) return controller.close();
           }
 
           send({ type: "stage", stage: "agents" });
           for (const character of cast.agentCharacters) {
             send({ type: "agent-character", character });
-            await delay(100);
-            if (request.signal.aborted) return controller.close();
           }
 
-          await delay(80);
           send({ type: "complete", cast });
           controller.close();
         } catch (error) {
