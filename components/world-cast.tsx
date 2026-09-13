@@ -20,7 +20,6 @@ import { toast } from "@/components/ui/toast";
 import { errorEnvelopeSchema, userErrorMessage } from "@/lib/app-error";
 import { readNdjsonStream } from "@/lib/ndjson-stream";
 import { getCastPreset } from "@/lib/presets";
-import { clearCachedCast, loadCachedCast, saveCachedCast } from "@/lib/world-cache";
 import {
   type WorldCast,
   worldCastStreamEventSchema,
@@ -129,8 +128,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [cacheNote, setCacheNote] = useState("");
-  const [elapsed, setElapsed] = useState("");
 
   const clearStepTimeout = useCallback(() => {
     if (stepTimeoutRef.current) {
@@ -177,9 +174,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
       setIsLoading(true);
       setCast(null);
       setSelectedCharacterId(null);
-      setCacheNote("");
-      setElapsed("");
-      const startedAt = Date.now();
 
       try {
         const response = await fetch("/api/world-cast", {
@@ -221,9 +215,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
         currentPresetIdRef.current = nextLookup.preset.id;
 
         setCast(finalCast);
-        saveCachedCast(scenario.id, finalCast);
-        const spent = ((Date.now() - startedAt) / 1000).toFixed(2);
-        setElapsed(`推演就绪 (${spent}s) · 视角:《${nextLookup.preset.title}》`);
 
         // 启动从开场到卡牌的严格串行演播
         transitionToPhase("setting", 0);
@@ -238,33 +229,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     },
     [scenario.id, scenario.title, scenario.content, clearStepTimeout, transitionToPhase],
   );
-
-  // 页面加载后从本地记录恢复并启动串行演播;若无记录则自动生成
-  useEffect(() => {
-    const cached = loadCachedCast(scenario.id);
-    if (cached) {
-      setCast(cached.cast);
-      setCacheNote(
-        `已从本地记录恢复(${new Date(cached.savedAt).toLocaleString("zh-CN", { hour12: false })})`,
-      );
-      transitionToPhase("setting", 0);
-      return;
-    }
-
-    void generateCast();
-  }, [scenario.id, generateCast, transitionToPhase]);
-
-  function clearCache() {
-    clearStepTimeout();
-    clearCachedCast(scenario.id);
-    setCast(null);
-    setSelectedCharacterId(null);
-    setCacheNote("");
-    setElapsed("");
-    setCurrentPresetId("");
-    toast.add({ title: "已重置本地推演记录", type: "info" });
-    void generateCast("");
-  }
 
   const visibleSetting = cast?.setting ?? null;
   const visiblePlayers = cast?.playerCharacters ?? [];
@@ -331,11 +295,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
             >
               {error}
             </p>
-            {cacheNote || elapsed ? (
-              <p className="text-muted-foreground mt-3 text-xs leading-5" aria-live="polite">
-                {[cacheNote, elapsed].filter(Boolean).join(" · ")}
-              </p>
-            ) : null}
           </CardContent>
           <CardFooter className="bg-muted/30 flex-col items-stretch gap-2 border-t px-6 py-4">
             {cast && phase !== "done" ? (
@@ -355,11 +314,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                 {cast ? "推演其他分支世界线" : "推演世界线阵容"}
               </Button>
             )}
-            {cast && phase === "done" && !isLoading ? (
-              <Button variant="ghost" size="sm" className="w-full" onClick={clearCache}>
-                重置推演进度
-              </Button>
-            ) : null}
           </CardFooter>
         </Card>
       </aside>
