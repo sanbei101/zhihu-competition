@@ -125,20 +125,20 @@ export default async function WorldPage({ params }: WorldPageProps) {
 
       <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-14">
-          <div>
+          <div className="flex h-full flex-col">
             <p className="text-primary text-sm font-medium">SOURCE / ZHIHU</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">问题原文</h2>
 
-            <Card className="border-border mt-5 shadow-none">
+            <Card className="border-border mt-5 flex flex-1 flex-col shadow-none">
               <CardHeader className="p-6 sm:p-8">
                 <Quote className="text-primary size-6" />
-                <CardTitle className="pt-2 text-xl leading-8">{topic.title}</CardTitle>
+                <CardTitle className="pt-2 text-3xl leading-8">{topic.title}</CardTitle>
               </CardHeader>
-              <CardContent className="text-muted-foreground px-6 text-sm leading-7 sm:px-8">
+              <CardContent className="text-muted-foreground px-6 text-base leading-7 sm:px-8">
                 该副本已收入题库,推演时以标题与所属主题的时代背景为准。原始讨论可在知乎查看。
               </CardContent>
               {topic.url ? (
-                <CardFooter className="bg-muted border-border border-t px-6 py-4 sm:px-8">
+                <CardFooter className="bg-muted border-border mt-auto border-t px-6 py-4 sm:px-8">
                   <Button
                     variant="outline"
                     nativeButton={false}

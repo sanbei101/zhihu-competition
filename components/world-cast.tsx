@@ -257,9 +257,9 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
 
   return (
     <>
-      <aside>
-        <Card className="border-border/70 shadow-none">
-          <CardHeader className="p-6">
+      <aside className="h-full">
+        <Card className="border-border/70 flex h-full flex-col gap-4 shadow-none">
+          <CardHeader className="p-4">
             <Badge variant="secondary" className="w-fit">
               WORLDLINE / CAST
             </Badge>
@@ -268,7 +268,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               推演引擎已就绪,已锁定本世界线推演剧本,支持切换不同推演视角与阵营。
             </CardDescription>
           </CardHeader>
-          <CardContent className="px-6">
+          <CardContent className="px-3">
             <ol className="text-muted-foreground space-y-4 text-sm">
               <li className="flex gap-3">
                 <span className="text-primary font-mono">01</span>
@@ -296,7 +296,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
               {error}
             </p>
           </CardContent>
-          <CardFooter className="bg-muted/30 flex-col items-stretch gap-2 border-t px-6 py-4">
+          <CardFooter className="bg-muted/30 mt-auto flex-col items-stretch gap-2 border-t px-6 py-4">
             {cast && phase !== "done" ? (
               <Button variant="secondary" className="w-full" disabled>
                 <LoaderCircle className="animate-spin" data-icon="inline-start" />
