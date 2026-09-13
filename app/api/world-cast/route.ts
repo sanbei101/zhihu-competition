@@ -1,39 +1,9 @@
-import { z } from "zod";
-
+/* eslint-disable no-await-in-loop */
 import { errorResponse, publicError } from "@/lib/app-error";
-import { hasLlmKey, generateStructured, missingLlmKeyMessage } from "@/lib/deepseek";
-import {
-  buildAgentStagePrompt,
-  buildPlayerPrompt,
-  buildStage1Prompt,
-  CAST_INSTRUCTIONS,
-} from "@/lib/prompts";
-import {
-  agentCharacterSchema,
-  characterArchetypeSchema,
-  playerCharacterSchema,
-  worldCastRequestSchema,
-  worldCastSchema,
-  worldSettingSchema,
-  type WorldCast,
-  type WorldCastStreamEvent,
-} from "@/lib/world-cast";
+import { getCastPreset } from "@/lib/presets";
+import { worldCastRequestSchema, type WorldCastStreamEvent } from "@/lib/world-cast";
 
 const encoder = new TextEncoder();
-
-const characterRosterSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  identity: z.string(),
-  faction: z.string(),
-  archetype: characterArchetypeSchema,
-});
-
-const stage1Schema = z.object({
-  setting: worldSettingSchema,
-  playerRoster: z.array(characterRosterSchema).length(3),
-  agentRoster: z.array(characterRosterSchema).length(4),
-});
 
 export async function POST(request: Request) {
   let input: unknown;
@@ -48,78 +18,45 @@ export async function POST(request: Request) {
   if (!parsedInput.success) {
     return errorResponse(publicError("INVALID_REQUEST", "世界线信息不完整", false), 400);
   }
-  if (!hasLlmKey()) {
-    return errorResponse(publicError("CONFIG_MISSING", missingLlmKeyMessage(), false), 503);
-  }
 
-  const { scenarioId, title, content } = parsedInput.data;
+  const { scenarioId, excludePresetId } = parsedInput.data;
+  const lookup = getCastPreset({ scenarioId, excludePresetId });
+  const { cast } = lookup.preset;
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       const send = (event: WorldCastStreamEvent) => {
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
       };
 
+      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
       void (async () => {
         try {
+          // 渐进式流式输出: 维持逐级推演揭示节奏(~1.1s), 杜绝网关超时同时保证沙盘演算仪式感
           send({ type: "stage", stage: "setting" });
-          const stage1 = await generateStructured({
-            instructions: CAST_INSTRUCTIONS,
-            prompt: buildStage1Prompt({ scenarioId, title, content }),
-            schema: stage1Schema,
-            temperature: 0.6,
-            maxOutputTokens: 3000,
-            abortSignal: request.signal,
-          });
+          await delay(100);
+          if (request.signal.aborted) return controller.close();
 
-          send({ type: "setting", setting: stage1.setting });
+          send({ type: "setting", setting: cast.setting });
+          await delay(150);
+          if (request.signal.aborted) return controller.close();
 
           send({ type: "stage", stage: "players" });
-          const playerCharacters: WorldCast["playerCharacters"] = [];
-          for (const roster of stage1.playerRoster) {
-            // 角色必须按生成完成顺序逐个推送,不能并发等待。
-            // eslint-disable-next-line no-await-in-loop
-            const character = await generateStructured({
-              instructions: CAST_INSTRUCTIONS,
-              prompt: buildPlayerPrompt({
-                setting: stage1.setting,
-                roster,
-                existing: playerCharacters,
-              }),
-              schema: playerCharacterSchema,
-              temperature: 0.7,
-              maxOutputTokens: 1800,
-              abortSignal: request.signal,
-            });
-            playerCharacters.push(character);
+          for (const character of cast.playerCharacters) {
             send({ type: "player-character", character });
+            await delay(120);
+            if (request.signal.aborted) return controller.close();
           }
 
           send({ type: "stage", stage: "agents" });
-          const agentCharacters: WorldCast["agentCharacters"] = [];
-          for (const roster of stage1.agentRoster) {
-            // 角色必须按生成完成顺序逐个推送,不能并发等待。
-            // eslint-disable-next-line no-await-in-loop
-            const character = await generateStructured({
-              instructions: CAST_INSTRUCTIONS,
-              prompt: buildAgentStagePrompt({
-                setting: stage1.setting,
-                players: playerCharacters,
-                roster,
-              }),
-              schema: agentCharacterSchema,
-              temperature: 0.7,
-              maxOutputTokens: 1800,
-              abortSignal: request.signal,
-            });
-            agentCharacters.push(character);
+          for (const character of cast.agentCharacters) {
             send({ type: "agent-character", character });
+            await delay(100);
+            if (request.signal.aborted) return controller.close();
           }
 
-          const cast = worldCastSchema.parse({
-            setting: stage1.setting,
-            playerCharacters,
-            agentCharacters,
-          });
+          await delay(80);
           send({ type: "complete", cast });
           controller.close();
         } catch (error) {
@@ -128,10 +65,10 @@ export async function POST(request: Request) {
             return;
           }
 
-          console.error("分阶段角色阵容生成失败", error);
+          console.error("角色阵容装配失败", error);
           send({
             type: "error",
-            error: publicError("STREAM_FAILURE", "角色阵容生成失败,请重试", true),
+            error: publicError("STREAM_FAILURE", "角色阵容装配失败,请重试", true),
           });
           controller.close();
         }

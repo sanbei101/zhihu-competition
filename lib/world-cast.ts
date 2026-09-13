@@ -6,6 +6,8 @@ export const worldCastRequestSchema = z.object({
   scenarioId: z.string().trim().min(1).max(100),
   title: z.string().trim().min(1).max(300),
   content: z.string().trim().max(6000),
+  forceRegenerate: z.boolean().optional(),
+  excludePresetId: z.string().optional(),
 });
 
 /**
