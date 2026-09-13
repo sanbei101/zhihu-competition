@@ -447,7 +447,7 @@ export function assembleFinaleArticle(input: {
     sections.push(body);
   }
 
-  sections.push(`*以上为亲历者自述，由世界线推演沙盘归档。*`);
+  sections.push(`*以上为亲历者自述,由世界线推演沙盘归档。*`);
   return sections.join("\n\n---\n\n");
 }
 
