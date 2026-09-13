@@ -84,7 +84,7 @@ function readJson<T>(key: string, schema: ZodType<T>): T | null {
   }
 }
 
-/** 极简 markdown 渲染:只认标题、分隔线、斜体落款和普通段落。 */
+/** 极简 markdown 渲染:标题、引用、分隔线、落款与段落。 */
 function ArticleBody({ markdown }: { markdown: string }) {
   const blocks = markdown.split(/\n{2,}/);
   return (
@@ -92,30 +92,40 @@ function ArticleBody({ markdown }: { markdown: string }) {
       {blocks.map((block, index) => {
         const trimmed = block.trim();
         if (!trimmed) return null;
-        if (/^-{3,}$/.test(trimmed)) return <Separator key={index} />;
+        if (/^-{3,}$/.test(trimmed)) return <Separator key={index} className="my-6" />;
         if (trimmed.startsWith("# ")) {
           return (
-            <h2 key={index} className="text-2xl leading-9 font-semibold">
+            <h2 key={index} className="text-xl sm:text-2xl leading-8 sm:leading-9 font-bold text-foreground">
               {trimmed.slice(2)}
             </h2>
           );
         }
         if (trimmed.startsWith("## ")) {
           return (
-            <h3 key={index} className="pt-3 text-lg font-semibold">
+            <h3 key={index} className="pt-2 text-lg sm:text-xl font-semibold text-primary">
               {trimmed.slice(3)}
             </h3>
           );
         }
+        if (trimmed.startsWith("> ")) {
+          return (
+            <blockquote
+              key={index}
+              className="border-l-2 border-primary/60 bg-muted/30 pl-4 py-2 my-2 text-muted-foreground text-sm leading-6 rounded-r"
+            >
+              {trimmed.slice(2)}
+            </blockquote>
+          );
+        }
         if (/^\*[^*]+\*$/.test(trimmed)) {
           return (
-            <p key={index} className="text-muted-foreground text-xs">
+            <p key={index} className="text-muted-foreground text-xs italic">
               {trimmed.replaceAll("*", "")}
             </p>
           );
         }
         return (
-          <p key={index} className="text-[15px] leading-8">
+          <p key={index} className="text-[15px] leading-8 text-foreground/90">
             {trimmed}
           </p>
         );
@@ -171,12 +181,12 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
 
   useEffect(() => {
     if (!session || session.status !== "ended" || !session.ending) return;
-    if (finale || runningRef.current) return;
+    if (finale || plan || runningRef.current) return;
     if (bootRef.current === worldId) return;
     bootRef.current = worldId;
-    void run(session);
+    void ensurePlan(session);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, finale, worldId]);
+  }, [session, finale, plan, worldId]);
 
   function persistProgress(nextPlan: FinalePlan, nextChapters: FinaleChapter[]) {
     try {
@@ -205,95 +215,126 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
     };
   }
 
-  async function run(game: WorldGameSession) {
-    if (runningRef.current) return;
+  async function ensurePlan(game: WorldGameSession): Promise<FinalePlan | null> {
+    if (plan) return plan;
+    if (runningRef.current) return null;
     runningRef.current = true;
     setIsWriting(true);
     setError("");
-
-    let activePlan = plan;
-    let written = [...chapters];
+    setWritingLabel("史官正在以知乎答主身份梳理卷目大纲……");
 
     try {
-      if (!activePlan) {
-        setWritingLabel("史官正在梳理卷目……");
-        const planned = await generateFinalePlanAction(gameRef(game));
-        if (!planned.ok) {
-          setError(userErrorMessage(planned.error));
-          toast.add({ title: "卷目生成失败", description: planned.error.message, type: "error" });
-          return;
-        }
-        activePlan = planned.data;
-        written = [];
-        setPlan(activePlan);
-        setChapters([]);
-        persistProgress(activePlan, []);
+      const planned = await generateFinalePlanAction(gameRef(game));
+      if (!planned.ok) {
+        setError(userErrorMessage(planned.error));
+        toast.add({ title: "卷目大纲拟定失败", description: planned.error.message, type: "error" });
+        return null;
+      }
+      const activePlan = planned.data;
+      setPlan(activePlan);
+      setChapters([]);
+      persistProgress(activePlan, []);
+      setWritingLabel("卷目大纲与谢邀自述已就绪，等待展开第一片段");
+      return activePlan;
+    } catch (err) {
+      console.error("卷目大纲生成异常", err);
+      setError("卷目大纲生成失败，请重试");
+      return null;
+    } finally {
+      runningRef.current = false;
+      setIsWriting(false);
+    }
+  }
+
+  async function writeNextChapter(game: WorldGameSession) {
+    if (runningRef.current || isWriting) return;
+
+    let activePlan = plan;
+    if (!activePlan) {
+      activePlan = await ensurePlan(game);
+      if (!activePlan) return;
+    }
+
+    const total = activePlan.chapters.length;
+    const nextIndex = chapters.length;
+    if (nextIndex >= total) return;
+
+    const chapter = activePlan.chapters[nextIndex];
+    runningRef.current = true;
+    setIsWriting(true);
+    setError("");
+    setWritingLabel(`正在撰写 第 ${nextIndex + 1} / ${total} 卷 · 《${chapter.title}》……`);
+
+    try {
+      const previous = chapters[chapters.length - 1];
+      const drafted = await generateFinaleChapterAction({
+        ...gameRef(game),
+        chapterCount: total,
+        chapter,
+        outline: activePlan.chapters.map((entry) => ({
+          index: entry.index,
+          title: entry.title,
+        })),
+        previousTitle: previous?.title ?? "",
+        previousTail: previous ? previous.markdown.slice(-700) : "",
+      });
+
+      if (!drafted.ok) {
+        setError(userErrorMessage(drafted.error));
+        toast.add({
+          title: `第 ${nextIndex + 1} 卷生成失败`,
+          description: drafted.error.message,
+          type: "error",
+        });
+        return;
       }
 
-      const total = activePlan.chapters.length;
-      for (let index = written.length; index < total; index += 1) {
-        const chapter = activePlan.chapters[index];
-        setWritingLabel(`正在撰写 第 ${index + 1} / ${total} 章 · ${chapter.title}`);
-        const previous = written[written.length - 1];
+      const nextChapters = [...chapters, drafted.data];
+      setChapters(nextChapters);
+      persistProgress(activePlan, nextChapters);
 
-        // 必须逐章串行:每一章都要接着上一章的结尾往下写,不能并行。
-        // eslint-disable-next-line no-await-in-loop
-        const drafted = await generateFinaleChapterAction({
-          ...gameRef(game),
-          chapterCount: total,
-          chapter,
-          outline: activePlan.chapters.map((entry) => ({
-            index: entry.index,
-            title: entry.title,
-          })),
-          previousTitle: previous?.title ?? "",
-          previousTail: previous ? previous.markdown.slice(-700) : "",
+      if (nextChapters.length === total) {
+        const articleMarkdown = assembleFinaleArticle({
+          verdictTitle: activePlan.verdictTitle,
+          prologue: activePlan.prologue,
+          selfIntro: activePlan.selfIntro,
+          chapters: nextChapters,
+        });
+        const assembled = finaleSchema.parse({
+          verdictTitle: activePlan.verdictTitle,
+          verdictLine: activePlan.verdictLine,
+          rating: activePlan.rating,
+          privateGoalVerdict: activePlan.privateGoalVerdict,
+          privateGoalNote: activePlan.privateGoalNote,
+          timeline: activePlan.timeline,
+          articleMarkdown,
+          charCount: countArticleChars(articleMarkdown),
+          shareText: activePlan.shareText,
         });
 
-        if (!drafted.ok) {
-          setError(userErrorMessage(drafted.error));
-          toast.add({
-            title: `第 ${index + 1} 章生成失败`,
-            description: drafted.error.message,
-            type: "error",
-          });
-          return;
+        setFinale(assembled);
+        setWritingLabel(`全文已完结，共 ${assembled.charCount.toLocaleString("zh-CN")} 字`);
+        try {
+          sessionStorage.setItem(finaleCacheKey(worldId), JSON.stringify(assembled));
+        } catch (err) {
+          console.error("终章缓存写入失败", err);
         }
-
-        written = [...written, drafted.data];
-        setChapters(written);
-        persistProgress(activePlan, written);
+        toast.add({
+          title: "终章全文完结",
+          description: "亲历者自述已全篇撰写完毕，可一键分享至知乎",
+          type: "success",
+        });
+      } else {
+        setWritingLabel(`第 ${nextIndex + 1} 卷已撰就，点击下方继续展开下一卷`);
+        toast.add({
+          title: `第 ${nextIndex + 1} 卷已撰就`,
+          description: `《${chapter.title}》已生成，可继续展开下一片段`,
+          type: "success",
+        });
       }
-
-      const articleMarkdown = assembleFinaleArticle({
-        verdictTitle: activePlan.verdictTitle,
-        prologue: activePlan.prologue,
-        selfIntro: activePlan.selfIntro,
-        chapters: written,
-      });
-      const assembled = finaleSchema.parse({
-        verdictTitle: activePlan.verdictTitle,
-        verdictLine: activePlan.verdictLine,
-        rating: activePlan.rating,
-        privateGoalVerdict: activePlan.privateGoalVerdict,
-        privateGoalNote: activePlan.privateGoalNote,
-        timeline: activePlan.timeline,
-        articleMarkdown,
-        charCount: countArticleChars(articleMarkdown),
-        shareText: activePlan.shareText,
-      });
-
-      setFinale(assembled);
-      setWritingLabel(`全文已完成,共 ${assembled.charCount.toLocaleString("zh-CN")} 字`);
-      try {
-        sessionStorage.setItem(finaleCacheKey(worldId), JSON.stringify(assembled));
-      } catch (err) {
-        console.error("终章缓存写入失败", err);
-      }
-      toast.add({ title: "终章已写完", type: "success" });
     } catch (err) {
-      console.error("终章生成异常", err);
-      setError("终章生成失败,请重试");
+      console.error("终章片段生成异常", err);
+      setError("终章片段生成失败，请重试");
     } finally {
       runningRef.current = false;
       setIsWriting(false);
@@ -511,28 +552,49 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
       ) : null}
 
       <Card className="shadow-none">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <BookOpenText className="size-4" />
-            亲历者自述
-          </CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BookOpenText className="size-4 text-primary" />
+              <CardTitle className="text-lg">知乎高赞回答 · 亲历者自述</CardTitle>
+            </div>
+            {totalChapters > 0 ? (
+              <Badge variant={chapters.length >= totalChapters ? "default" : "secondary"}>
+                {chapters.length >= totalChapters
+                  ? "全文已完结"
+                  : `连载中 · 已完成 ${chapters.length}/${totalChapters} 卷`}
+              </Badge>
+            ) : null}
+          </div>
+          {player ? (
+            <div className="bg-muted/30 border-border/60 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="bg-primary/10 text-primary rounded px-2 py-0.5 font-semibold">
+                  答主
+                </span>
+                <span className="font-medium text-foreground">{player.name}</span>
+                <span className="text-muted-foreground">({player.identity})</span>
+              </div>
+              <span className="text-muted-foreground">所属阵营：{player.faction}</span>
+            </div>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           {totalChapters ? (
             <div className="space-y-2">
               <Progress value={ratio}>
                 <ProgressLabel className="text-xs font-normal">
-                  {isWriting ? "正在续写" : "写作完成"}
+                  {isWriting ? "正在执笔" : chapters.length >= totalChapters ? "全文完成" : "等待续写"}
                 </ProgressLabel>
                 <ProgressValue className="text-xs">
-                  {() => `${chapters.length} / ${totalChapters} 章`}
+                  {() => `${chapters.length} / ${totalChapters} 卷`}
                 </ProgressValue>
               </Progress>
               <p
                 className="text-muted-foreground flex items-center gap-2 text-xs"
                 aria-live="polite"
               >
-                {isWriting ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
+                {isWriting ? <LoaderCircle className="size-3.5 animate-spin text-primary" /> : null}
                 {writingLabel}
                 {writtenChars > 0 ? ` · 已写正文 ${writtenChars.toLocaleString("zh-CN")} 字` : null}
               </p>
@@ -542,25 +604,25 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-40" />
               <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                <LoaderCircle className="size-3.5 animate-spin" />
-                {writingLabel || "史官正在整理你的世界线……"}
+                <LoaderCircle className="size-3.5 animate-spin text-primary" />
+                {writingLabel || "史官正在梳理世界线推演卷宗与自述大纲……"}
               </p>
             </div>
           ) : null}
 
-          {error ? (
-            <div className="space-y-3">
+          {!plan && error ? (
+            <div className="bg-destructive/10 border-destructive/20 space-y-3 rounded-md border p-4">
               <p className="text-destructive text-sm" role="alert">
                 {error}
               </p>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void run(session)}
+                onClick={() => void ensurePlan(session)}
                 disabled={isWriting}
               >
                 <RotateCcw data-icon="inline-start" />
-                {chapters.length ? "从断点继续写" : "重新生成终章"}
+                重新拟定卷目大纲
               </Button>
             </div>
           ) : null}
@@ -570,10 +632,83 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               <ArticleBody markdown={liveMarkdown} />
               {isWriting ? (
                 <p className="text-muted-foreground mt-4 flex items-center gap-2 text-xs">
-                  <PenLine className="size-3.5" />
-                  下笔中……
+                  <PenLine className="size-3.5 animate-pulse" />
+                  亲历者落笔中……
                 </p>
               ) : null}
+            </div>
+          ) : null}
+
+          {plan && chapters.length < totalChapters ? (
+            <div className="bg-muted/40 border-border/80 space-y-4 rounded-xl border p-5 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    待展开 · 第 {plan.chapters[chapters.length].index} / {totalChapters} 卷
+                  </Badge>
+                  <span className="text-sm font-semibold text-foreground">
+                    《{plan.chapters[chapters.length].title}》
+                  </span>
+                </div>
+                <span className="text-muted-foreground font-mono text-xs">
+                  进度: {chapters.length} / {totalChapters} 卷 ({ratio}%)
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-5">
+                📖 本卷看点：{plan.chapters[chapters.length].brief}
+              </p>
+
+              {error ? (
+                <div className="bg-destructive/10 border-destructive/20 rounded-md border p-3">
+                  <p className="text-destructive text-xs leading-5" role="alert">
+                    {error}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  onClick={() => void writeNextChapter(session)}
+                  disabled={isWriting}
+                  className="w-full sm:w-auto"
+                >
+                  {isWriting ? (
+                    <>
+                      <LoaderCircle className="size-4 animate-spin" />
+                      正在撰写 第 {plan.chapters[chapters.length].index} 卷……
+                    </>
+                  ) : error ? (
+                    <>
+                      <RotateCcw className="size-4" />
+                      重试生成第 {plan.chapters[chapters.length].index} 卷
+                    </>
+                  ) : (
+                    <>
+                      <PenLine className="size-4" />
+                      {chapters.length === 0
+                        ? `执笔生成第 1 卷 · 《${plan.chapters[0].title}》`
+                        : `生成下一片段：第 ${plan.chapters[chapters.length].index} 卷 · 《${plan.chapters[chapters.length].title}》`}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {finale || (plan && chapters.length >= totalChapters) ? (
+            <div className="bg-primary/5 border-primary/20 space-y-3 rounded-xl border p-5 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge>全文完结</Badge>
+                  <span className="text-sm font-semibold">知乎深度长回答已完整归档</span>
+                </div>
+                <span className="text-muted-foreground font-mono text-xs">
+                  共 {charCount.toLocaleString("zh-CN")} 字
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs leading-5">
+                亲历者自述已全部撰写完毕，包含开篇谢邀破题、关键博弈交锋与历史终局复盘。可直接一键复制发往知乎社区。
+              </p>
             </div>
           ) : null}
         </CardContent>

@@ -420,18 +420,35 @@ export function countArticleChars(markdown: string): number {
   return markdown.replace(/\s/g, "").length;
 }
 
-/** 把楔子(旁白 + 自述)和逐章正文拼成最终的知乎故事长文。 */
+/** 把楔子(局势开端 + 答主自述)和逐章正文拼成最终的知乎故事长文。 */
 export function assembleFinaleArticle(input: {
   verdictTitle: string;
   prologue: string;
   selfIntro: string;
   chapters: { title: string; markdown: string }[];
 }): string {
-  const body = input.chapters
-    .map((chapter) => `## ${chapter.title}\n\n${chapter.markdown.trim()}`)
-    .join("\n\n");
-  const opening = [input.prologue.trim(), input.selfIntro.trim()].filter(Boolean).join("\n\n");
-  return `# ${input.verdictTitle}\n\n## 楔子\n\n${opening}\n\n---\n\n${body}\n\n---\n\n*以上为亲历者自述,由世界线史官整理归档。*`;
+  const sections: string[] = [`# ${input.verdictTitle}`];
+
+  const openingParts: string[] = [];
+  if (input.prologue.trim()) {
+    openingParts.push(`## 楔子 · 局势开端\n\n${input.prologue.trim()}`);
+  }
+  if (input.selfIntro.trim()) {
+    openingParts.push(`## 答主自述 · 局中人言\n\n${input.selfIntro.trim()}`);
+  }
+  if (openingParts.length > 0) {
+    sections.push(openingParts.join("\n\n"));
+  }
+
+  if (input.chapters.length > 0) {
+    const body = input.chapters
+      .map((chapter) => `## ${chapter.title}\n\n${chapter.markdown.trim()}`)
+      .join("\n\n---\n\n");
+    sections.push(body);
+  }
+
+  sections.push(`*以上为亲历者自述，由世界线推演沙盘归档。*`);
+  return sections.join("\n\n---\n\n");
 }
 
 // ==================== 对局存档 ====================

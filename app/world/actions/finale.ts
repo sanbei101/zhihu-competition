@@ -115,8 +115,9 @@ export async function generateFinaleChapterAction(
       const player = cast.playerCharacters.find((character) => character.id === playerId);
       if (!player) throw new Error("玩家角色不存在");
 
+      const isFinalChapter = chapter.index === chapterCount;
       const object = await generateStructured({
-        instructions: finaleChapterInstructions(chapterCount),
+        instructions: finaleChapterInstructions(chapterCount, isFinalChapter),
         prompt: buildFinaleChapterPrompt({
           scenarioTitle,
           player,
@@ -128,6 +129,7 @@ export async function generateFinaleChapterAction(
           outline: data.outline,
           previousTail: data.previousTail,
           previousTitle: data.previousTitle,
+          isFinalChapter,
         }),
         schema: finaleChapterSchema,
         temperature: 0.85,
