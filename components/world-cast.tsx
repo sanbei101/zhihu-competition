@@ -18,13 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import TextType from "@/components/ui/TextType";
 import { toast } from "@/components/ui/toast";
 import { errorEnvelopeSchema, userErrorMessage } from "@/lib/app-error";
-import { readNdjsonStream } from "@/lib/ndjson-stream";
-import { getCastPreset } from "@/lib/presets";
-import {
-  type WorldCast,
-  worldCastStreamEventSchema,
-  worldCouncilStorageKey,
-} from "@/lib/world-cast";
+import { type WorldCast, worldCouncilStorageKey } from "@/lib/world-cast";
 import { createInitialGameSession } from "@/lib/world-ending";
 
 interface WorldCastProps {
@@ -198,23 +192,21 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
           }
           throw new Error(message);
         }
-        const completedCast: { value: WorldCast | null } = { value: null };
+        const json: unknown = await response.json();
+        if (
+          typeof json !== "object" ||
+          json === null ||
+          !("ok" in json) ||
+          !("data" in json)
+        ) {
+          throw new Error("世界线角色阵容未完整生成");
+        }
 
-        await readNdjsonStream(response, worldCastStreamEventSchema, (event) => {
-          if (event.type === "error") throw new Error(userErrorMessage(event.error));
-          if (event.type === "complete") completedCast.value = event.cast;
-        });
-        const finalCast = completedCast.value;
-        if (!finalCast) throw new Error("世界线角色阵容未完整生成");
+        const payload = (json as { data: { cast: WorldCast; presetId: string } }).data;
+        setCurrentPresetId(payload.presetId);
+        currentPresetIdRef.current = payload.presetId;
 
-        const nextLookup = getCastPreset({
-          scenarioId: scenario.id,
-          excludePresetId: excludeId,
-        });
-        setCurrentPresetId(nextLookup.preset.id);
-        currentPresetIdRef.current = nextLookup.preset.id;
-
-        setCast(finalCast);
+        setCast(payload.cast);
 
         // 启动从开场到卡牌的严格串行演播
         transitionToPhase("setting", 0);

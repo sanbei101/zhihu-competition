@@ -7,7 +7,8 @@ import { useRef } from "react";
 import { ThemeStage } from "@/components/pixel/theme-stage";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { SpotlightCard } from "@/components/ui/spotlight-card";
 import type { ScenarioTheme, ScenarioTopic } from "@/lib/scenario-library";
 import { getSkin, skinStyleVars } from "@/lib/scenario-skin";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,10 @@ function TopicCard({ topic, order }: { topic: ScenarioTopic; order: number }) {
       href={topicHref(topic)}
       className="focus-visible:ring-ring block h-full rounded-xl focus-visible:ring-2 focus-visible:outline-none"
     >
-      <Card className="bg-card/85 hover:ring-primary/50 h-full gap-0 py-0 shadow-lg backdrop-blur-md transition-all">
+      <SpotlightCard
+        spotlightColor="rgba(255, 255, 255, 0.12)"
+        className="bg-card/85 hover:border-primary/50 h-full p-0 gap-0 shadow-lg backdrop-blur-md transition-all"
+      >
         <CardHeader className="gap-2 p-4 sm:p-5">
           <div className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px]">
             <span>{String(order + 1).padStart(2, "0")}</span>
@@ -63,7 +67,7 @@ function TopicCard({ topic, order }: { topic: ScenarioTopic; order: number }) {
             <ArrowRight data-icon="inline-end" />
           </span>
         </CardFooter>
-      </Card>
+      </SpotlightCard>
     </Link>
   );
 }

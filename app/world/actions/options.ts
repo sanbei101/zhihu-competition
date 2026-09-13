@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-import { fail, failParse, requireDeepSeekKey, type ActionResult } from "@/app/world/action-result";
+import { runCouncilAction, type ActionResult } from "@/app/world/action-result";
 import { generateStructured } from "@/lib/deepseek";
 import { OPTIONS_INSTRUCTIONS, buildOptionsPrompt } from "@/lib/prompts";
 import { worldCastSchema } from "@/lib/world-cast";
@@ -27,49 +27,47 @@ const generateOptionsInputSchema = z.object({
 });
 
 export async function generateOptionsAction(input: unknown): Promise<ActionResult<RoundOptions>> {
-  const parsed = generateOptionsInputSchema.safeParse(input);
-  if (!parsed.success) return failParse("选项", parsed.error);
+  return runCouncilAction({
+    name: "回合选项生成",
+    schema: generateOptionsInputSchema,
+    input,
+    handler: async (data) => {
+      const { cast, playerId, metrics, round, history, relations, crisis, ultimatum } = data;
+      const player = cast.playerCharacters.find((character) => character.id === playerId);
+      if (!player) throw new Error("玩家角色不存在");
 
-  const keyCheck = requireDeepSeekKey();
-  if (typeof keyCheck !== "string") return keyCheck;
-
-  const { cast, playerId, metrics, round, history, relations, crisis, ultimatum } = parsed.data;
-  const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail({ code: "NOT_FOUND", message: "玩家角色不存在", retryable: false });
-
-  try {
-    const object = await generateStructured({
-      instructions: OPTIONS_INSTRUCTIONS,
-      prompt: buildOptionsPrompt({
-        cast,
-        player,
-        round,
-        metrics,
-        history,
-        relations,
-        crisis,
-        ultimatum,
-      }),
-      schema: roundOptionsSchema,
-      temperature: 0.85,
-      maxOutputTokens: 2600,
-    });
-    const data = roundOptionsSchema.parse(object);
-    const agentIds = cast.agentCharacters.map((character) => character.id);
-    const options = data.options.slice(0, 4).map((option) => {
-      const covered = new Set(option.forecast.map((entry) => entry.agentId));
-      const missing = agentIds.filter((id) => !covered.has(id));
-      if (!missing.length) return option;
-      return Object.assign({}, option, {
-        forecast: [
-          ...option.forecast,
-          ...missing.map((agentId) => ({ agentId, lean: "doubt" as const })),
-        ],
+      const object = await generateStructured({
+        instructions: OPTIONS_INSTRUCTIONS,
+        prompt: buildOptionsPrompt({
+          cast,
+          player,
+          round,
+          metrics,
+          history,
+          relations,
+          crisis,
+          ultimatum,
+        }),
+        schema: roundOptionsSchema,
+        temperature: 0.85,
+        maxOutputTokens: 2600,
       });
-    });
-    return { ok: true, data: { ...data, options } };
-  } catch (error) {
-    console.error("回合选项生成失败", error);
-    return fail({ code: "UPSTREAM_FAILURE", message: "选项生成失败,请重试", retryable: true });
-  }
+
+      const parsedData = roundOptionsSchema.parse(object);
+      const agentIds = cast.agentCharacters.map((character) => character.id);
+      const options = parsedData.options.slice(0, 4).map((option) => {
+        const covered = new Set(option.forecast.map((entry) => entry.agentId));
+        const missing = agentIds.filter((id) => !covered.has(id));
+        if (!missing.length) return option;
+        return Object.assign({}, option, {
+          forecast: [
+            ...option.forecast,
+            ...missing.map((agentId) => ({ agentId, lean: "doubt" as const })),
+          ],
+        });
+      });
+
+      return { ...parsedData, options };
+    },
+  });
 }

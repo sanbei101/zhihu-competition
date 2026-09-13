@@ -33,6 +33,9 @@ export const JUDGE_INSTRUCTIONS = `你是公正但鼓励玩家试错的世界线
 - 回合数没有上限,拖延本身就是代价。推演时要体现出各方耐心、资源与信任的持续消耗。
 - 旁白不超过三百字,简体中文,具体而不煽情。你只负责本回合的增量、事件、结算与旁白,结局与是否收束由系统按四维指标规则计算,不要自行宣告终局。`;
 
+/**
+ * 结构优化: 静态世界背景与规则置顶 -> 累加推演历史居中 -> 动态回合变量与本轮表态置底
+ */
 export const buildJudgePrompt = (input: {
   cast: WorldCast;
   player: PlayerCharacter;
@@ -46,34 +49,30 @@ export const buildJudgePrompt = (input: {
   relations: AgentRelation[];
   crisis: WorldCrisis | null;
   ultimatum: WorldUltimatum | null;
-}) => `时间:${input.cast.setting.time};地点:${input.cast.setting.location};危机:${input.cast.setting.crisis}
+}) => `时间:${input.cast.setting.time};地点:${input.cast.setting.location};核心危机:${input.cast.setting.crisis}
 世界硬约束:
 ${input.cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
 
-本回合突发处境:${input.situation}
-当前是第 ${input.round} 回合(回合数没有上限)。
-当前四维指标:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+在场角色设定:
+- 玩家:${input.player.name}(${input.player.identity} · ${input.player.faction})
+${input.cast.agentCharacters.map((c) => `- ${c.id}: ${c.name}(${c.identity} · ${c.faction}),公开诉求:${c.publicGoal}`).join("\n")}
 
-大势损耗:${entropyNoteForRound(input.round)}
-
-压在头上的突发事件:
-${describeCrisis(input.crisis)}
-
-未决的最后通牒:
-${describeUltimatum(input.ultimatum)}
-
-各方对玩家的信任度:
-${describeRelations(input.relations)}
-
-此前已结算回合:
+此前已结算推演历史:
 ${summarizeTurnsForPrompt(input.history)}
 
-本回合玩家(${input.player.name},${input.player.identity})作出抉择:'${input.decision}'
+本回合动态现场与各方行动:
+- 回合进度:第 ${input.round} 回合(大势损耗:${entropyNoteForRound(input.round)})
+- 基础四维指标:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+- 突发事件倒计时:${describeCrisis(input.crisis)}
+- 未决最后通牒:${describeUltimatum(input.ultimatum)}
+- 各方信任度现状:${describeRelations(input.relations)}
+- 本回合突发处境:${input.situation}
+- 玩家行动抉择:'${input.decision}'
 
-本回合各方第一轮表态:
+本回合在场各方第一轮表态:
 ${summarizeReactionsForPrompt(input.reactions)}
 
-本回合面对面的交锋:
+本回合当面对峙交锋:
 ${summarizeRetortsForPrompt(input.retorts)}
 
 请给出事件、四维增量、逐项变化原因、世界旁白、下一回合危机,并结算突发事件与最后通牒。是否结束由系统判定,你不必输出结局。`;

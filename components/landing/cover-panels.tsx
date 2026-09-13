@@ -71,12 +71,7 @@ export function CoverPanel({ onJump }: { onJump: (index: number) => void }) {
         <WorldParade />
       </div>
 
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, ${skin.bg}f5, ${skin.bg}c0 40%, ${skin.bg}00 70%)`,
-        }}
-      />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/75 to-transparent pointer-events-none" />
 
       <div className="relative flex h-full flex-col items-center px-5 pt-14 pb-14 text-center">
         {/* 上簇:贴着大字的上沿,把大字顶到页心 */}
@@ -166,12 +161,7 @@ export function OutroPanel({
     >
       {mounted ? <ThemeStage skin={skin} /> : null}
 
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, ${skin.bg}f5, ${skin.bg}c0 42%, ${skin.bg}00 76%)`,
-        }}
-      />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/75 to-transparent pointer-events-none" />
 
       <div className="relative flex h-full flex-col items-center justify-center px-5 text-center">
         <Badge variant="outline" className="tracking-[0.2em]">

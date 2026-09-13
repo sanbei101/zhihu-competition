@@ -1,14 +1,10 @@
-export {
-  CAST_INSTRUCTIONS,
-  buildStage1Prompt,
-  buildPlayerPrompt,
-  buildAgentStagePrompt,
-} from "./cast";
 export { OPTIONS_INSTRUCTIONS, buildOptionsPrompt } from "./options";
 export {
   buildAgentInstructions,
   buildEnvironmentBlock,
   buildAgentPrompt,
+  CLASH_INSTRUCTIONS,
+  buildClashPrompt,
   buildRetortInstructions,
   buildRetortPrompt,
 } from "./turn";

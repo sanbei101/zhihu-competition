@@ -26,6 +26,9 @@ export const OPTIONS_INSTRUCTIONS = `你是世界线导演。每回合给出一�
 7. 必须承接此前回合留下的未解决问题。若存在正在倒计时的突发事件或未决的最后通牒,优先围绕它们出题。
 8. 遵守世界硬约束,只写本回合能做的具体行动,不提前揭示结局。不要写抽象口号。使用简体中文。`;
 
+/**
+ * 结构优化: 静态世界背景与角色置顶 -> 历史推演记录居中 -> 动态回合变量与上轮后果置底
+ */
 export const buildOptionsPrompt = (input: {
   cast: WorldCast;
   player: PlayerCharacter;
@@ -37,33 +40,27 @@ export const buildOptionsPrompt = (input: {
   ultimatum: WorldUltimatum | null;
 }) => {
   const lastTurn = input.history.at(-1);
-  return `时间:${input.cast.setting.time};地点:${input.cast.setting.location};危机:${input.cast.setting.crisis}
+  return `时间:${input.cast.setting.time};地点:${input.cast.setting.location};核心危机:${input.cast.setting.crisis}
 世界硬约束:
 ${input.cast.setting.rules.map((rule) => `- ${rule}`).join("\n")}
-玩家:${input.player.name}(${input.player.identity}),可调动:${input.player.decisionPower}
 
-在场角色(forecast 必须覆盖这些 id):
-${input.cast.agentCharacters.map((character) => `- ${character.id} = ${character.name}(${character.identity}),公开诉求是${character.publicGoal}`).join("\n")}
+玩家设定:
+- ${input.player.name}(${input.player.identity}),可调动资源与权力:${input.player.decisionPower}
 
-当前是第 ${input.round} 回合(回合数没有上限,局势拖得越久越坏)。
-当前四维:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+在场各方角色(forecast 必须覆盖这些 id):
+${input.cast.agentCharacters.map((character) => `- ${character.id} = ${character.name}(${character.identity}),公开诉求是【${character.publicGoal}】`).join("\n")}
 
-各方对玩家的信任度:
-${describeRelations(input.relations)}
-
-压在头上的突发事件:
-${describeCrisis(input.crisis)}
-
-未决的最后通牒:
-${describeUltimatum(input.ultimatum)}
-
-大势损耗:${entropyNoteForRound(input.round)}
-
-此前已结算回合:
+此前已结算历史回合:
 ${summarizeTurnsForPrompt(input.history)}
 
-上一回合留下的直接后果(本回合至少要有选项正面处理它):
+当前局势与本轮分叉点:
+- 回合进度:第 ${input.round} 回合(大势损耗:${entropyNoteForRound(input.round)})
+- 当前四维指标:政权稳定 ${input.metrics.stability},军心士气 ${input.metrics.morale},民众支持 ${input.metrics.support},战略资源 ${input.metrics.resources}
+- 各方信任度现状:${describeRelations(input.relations)}
+- 突发事件倒计时:${describeCrisis(input.crisis)}
+- 未决最后通牒:${describeUltimatum(input.ultimatum)}
+- 上一回合直接遗留后果(本回合至少有选项正面处理之):
 ${lastTurn?.nextSituation ?? input.cast.setting.crisis}
 
-请给出本回合处境与恰好四个选项。`;
+请给出本回合突发处境与恰好四个互斥抉择。`;
 };

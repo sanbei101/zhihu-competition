@@ -2,8 +2,7 @@
 
 import { z } from "zod";
 
-import { fail, failParse, requireDeepSeekKey, type ActionResult } from "@/app/world/action-result";
-import { publicError } from "@/lib/app-error";
+import { runCouncilAction, type ActionResult } from "@/app/world/action-result";
 import { generateStructured } from "@/lib/deepseek";
 import {
   buildFinaleChapterPrompt,
@@ -41,44 +40,47 @@ const generateFinalePlanInputSchema = z.object({
 });
 
 export async function generateFinalePlanAction(input: unknown): Promise<ActionResult<FinalePlan>> {
-  const parsed = generateFinalePlanInputSchema.safeParse(input);
-  if (!parsed.success) return failParse("结算", parsed.error);
-  const keyCheck = requireDeepSeekKey();
-  if (typeof keyCheck !== "string") return keyCheck;
+  return runCouncilAction({
+    name: "终章卷目生成",
+    schema: generateFinalePlanInputSchema,
+    input,
+    handler: async (data) => {
+      const { scenarioTitle, cast, playerId, turns, metrics, ending, relations, crisis } = data;
+      const player = cast.playerCharacters.find((character) => character.id === playerId);
+      if (!player) throw new Error("玩家角色不存在");
+      const chapterCount = finaleChapterCountFor(turns.length);
 
-  const { scenarioTitle, cast, playerId, turns, metrics, ending, relations, crisis } = parsed.data;
-  const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
-  const chapterCount = finaleChapterCountFor(turns.length);
+      const object = await generateStructured({
+        instructions: finalePlanInstructions(chapterCount),
+        prompt: buildFinalePlanPrompt({
+          scenarioTitle,
+          setting: cast.setting,
+          player,
+          ending,
+          metrics,
+          fallbackRating: ratingForMetrics(metrics),
+          turns,
+          relations,
+          crisis,
+          chapterCount,
+        }),
+        schema: finalePlanSchema,
+        temperature: 0.75,
+        maxOutputTokens: 3000,
+      });
 
-  try {
-    const object = await generateStructured({
-      instructions: finalePlanInstructions(chapterCount),
-      prompt: buildFinalePlanPrompt({
-        scenarioTitle,
-        setting: cast.setting,
-        player,
-        ending,
-        metrics,
-        fallbackRating: ratingForMetrics(metrics),
-        turns,
-        relations,
-        crisis,
-        chapterCount,
-      }),
-      schema: finalePlanSchema,
-      temperature: 0.75,
-      maxOutputTokens: 3000,
-    });
-    const plan = finalePlanSchema.parse(object);
-    const chapters = plan.chapters
-      .slice(0, Math.max(chapterCount, FINALE_CHAPTER_MIN))
-      .map((chapter, index) => ({ index: index + 1, title: chapter.title, brief: chapter.brief }));
-    return { ok: true, data: { ...plan, chapters } };
-  } catch (error) {
-    console.error("终章卷目生成失败", error);
-    return fail(publicError("UPSTREAM_FAILURE", "终章卷目生成失败,请重试", true));
-  }
+      const plan = finalePlanSchema.parse(object);
+      const chapters = plan.chapters
+        .slice(0, Math.max(chapterCount, FINALE_CHAPTER_MIN))
+        .map((chapter, index) => ({
+          index: index + 1,
+          title: chapter.title,
+          brief: chapter.brief,
+        }));
+
+      return { ...plan, chapters };
+    },
+  });
 }
 
 const generateFinaleChapterInputSchema = z.object({
@@ -103,38 +105,36 @@ const generateFinaleChapterInputSchema = z.object({
 export async function generateFinaleChapterAction(
   input: unknown,
 ): Promise<ActionResult<FinaleChapter>> {
-  const parsed = generateFinaleChapterInputSchema.safeParse(input);
-  if (!parsed.success) return failParse("章节", parsed.error);
-  const keyCheck = requireDeepSeekKey();
-  if (typeof keyCheck !== "string") return keyCheck;
+  return runCouncilAction({
+    name: "终章正文撰写",
+    schema: generateFinaleChapterInputSchema,
+    input,
+    handler: async (data) => {
+      const { scenarioTitle, cast, playerId, turns, metrics, ending, chapterCount, chapter } =
+        data;
+      const player = cast.playerCharacters.find((character) => character.id === playerId);
+      if (!player) throw new Error("玩家角色不存在");
 
-  const { scenarioTitle, cast, playerId, turns, metrics, ending, chapterCount, chapter } =
-    parsed.data;
-  const player = cast.playerCharacters.find((character) => character.id === playerId);
-  if (!player) return fail(publicError("NOT_FOUND", "玩家角色不存在", false));
+      const object = await generateStructured({
+        instructions: finaleChapterInstructions(chapterCount),
+        prompt: buildFinaleChapterPrompt({
+          scenarioTitle,
+          player,
+          ending,
+          metrics,
+          turns,
+          chapterCount,
+          chapter,
+          outline: data.outline,
+          previousTail: data.previousTail,
+          previousTitle: data.previousTitle,
+        }),
+        schema: finaleChapterSchema,
+        temperature: 0.85,
+        maxOutputTokens: 3000,
+      });
 
-  try {
-    const object = await generateStructured({
-      instructions: finaleChapterInstructions(chapterCount),
-      prompt: buildFinaleChapterPrompt({
-        scenarioTitle,
-        player,
-        ending,
-        metrics,
-        turns,
-        chapterCount,
-        chapter,
-        outline: parsed.data.outline,
-        previousTail: parsed.data.previousTail,
-        previousTitle: parsed.data.previousTitle,
-      }),
-      schema: finaleChapterSchema,
-      temperature: 0.85,
-      maxOutputTokens: 3000,
-    });
-    return { ok: true, data: finaleChapterSchema.parse(object) };
-  } catch (error) {
-    console.error(`终章第 ${chapter.index} 章生成失败`, error);
-    return fail(publicError("UPSTREAM_FAILURE", `第 ${chapter.index} 章生成失败,请重试`, true));
-  }
+      return finaleChapterSchema.parse(object);
+    },
+  });
 }
