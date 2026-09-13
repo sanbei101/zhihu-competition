@@ -54,9 +54,9 @@ interface DecisionPanelProps {
 }
 
 const leanStyles: Record<Lean, string> = {
-  back: "border-emerald-500/60 bg-emerald-50 text-emerald-700",
+  back: "border-emerald-500/60 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-300",
   doubt: "border-border bg-muted/60 text-muted-foreground",
-  oppose: "border-red-500/60 bg-red-50 text-red-700",
+  oppose: "border-red-500/60 bg-red-50 text-red-700 dark:border-red-700/60 dark:bg-red-950/40 dark:text-red-300",
 };
 
 function ImpactRow({ impact }: { impact: ImpactHint }) {
@@ -65,9 +65,9 @@ function ImpactRow({ impact }: { impact: ImpactHint }) {
       {metricKeys.map((key) => {
         const hint = impact[key];
         const tone = hint.startsWith("↑")
-          ? "text-emerald-600"
+          ? "text-emerald-600 dark:text-emerald-400"
           : hint.startsWith("↓")
-            ? "text-destructive"
+            ? "text-destructive dark:text-red-400"
             : "text-muted-foreground";
         return (
           <span

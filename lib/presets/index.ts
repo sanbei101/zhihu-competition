@@ -93,7 +93,7 @@ export function getCastPreset(options: GetCastPresetOptions): PresetLookupResult
   const selected = candidatePool[selectedIndex] ?? candidatePool[0] ?? ALL_PRESETS[0];
 
   return {
-    preset: JSON.parse(JSON.stringify(selected)) as PresetCastEntry,
+    preset: structuredClone(selected) as PresetCastEntry,
     totalInPool,
     currentIndex: selectedIndex,
   };

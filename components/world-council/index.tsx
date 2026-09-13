@@ -188,16 +188,18 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
 
         <TabsContent value="council" className="mt-0">
           <div className="grid items-start gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-            <SeatsPanel
-              cast={cast}
-              activePlayer={activePlayer}
-              agentStatuses={agentStatuses}
-              relations={relations}
-              ultimatum={ultimatum}
-              speakingId={stageSpeakerId}
-              opposingId={stageOpponentId}
-              skin={skin}
-            />
+            <div className="order-2 lg:order-1">
+              <SeatsPanel
+                cast={cast}
+                activePlayer={activePlayer}
+                agentStatuses={agentStatuses}
+                relations={relations}
+                ultimatum={ultimatum}
+                speakingId={stageSpeakerId}
+                opposingId={stageOpponentId}
+                skin={skin}
+              />
+            </div>
 
             <div className="order-1 min-w-0 space-y-4 lg:order-2">
               <SpeechStage
@@ -244,24 +246,26 @@ export function WorldCouncil({ initial, worldId, onBack, skin }: WorldCouncilPro
               </Card>
             </div>
 
-            <WorldTabs
-              cast={cast}
-              activePlayer={activePlayer}
-              metrics={metrics}
-              lastDeltas={lastDeltas}
-              lastEntropy={lastEntropy}
-              lastCrisisPenalty={lastCrisisPenalty}
-              round={round}
-              turns={turns}
-              relations={relations}
-              reactions={reactions}
-              retorts={retorts}
-              submittedDecision={submittedDecision}
-              currentTurnSettled={currentTurnSettled}
-              isTurnComplete={isTurnComplete}
-              crisis={crisis}
-              ultimatum={ultimatum}
-            />
+            <div className="order-3 lg:order-3">
+              <WorldTabs
+                cast={cast}
+                activePlayer={activePlayer}
+                metrics={metrics}
+                lastDeltas={lastDeltas}
+                lastEntropy={lastEntropy}
+                lastCrisisPenalty={lastCrisisPenalty}
+                round={round}
+                turns={turns}
+                relations={relations}
+                reactions={reactions}
+                retorts={retorts}
+                submittedDecision={submittedDecision}
+                currentTurnSettled={currentTurnSettled}
+                isTurnComplete={isTurnComplete}
+                crisis={crisis}
+                ultimatum={ultimatum}
+              />
+            </div>
           </div>
         </TabsContent>
 

@@ -68,7 +68,7 @@ export function BranchTimeline({
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">第 {turn.round} 回合</span>
                     <Badge variant="secondary">{branchLabel(turn.branchId)}</Badge>
-                    <Badge variant="outline" className="text-emerald-700">
+                    <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
                       <Check data-icon="inline-start" />
                       已写入主线
                     </Badge>

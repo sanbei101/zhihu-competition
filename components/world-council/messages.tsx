@@ -34,20 +34,24 @@ export const stanceLabels: Record<AgentReaction["stance"], string> = {
 
 export const stanceStyles: Record<AgentReaction["stance"], { bubble: string; badge: string }> = {
   support: {
-    bubble: "border-l-emerald-500 bg-emerald-50/70",
-    badge: "border-emerald-500/60 bg-emerald-100 text-emerald-700",
+    bubble: "border-l-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/30",
+    badge:
+      "border-emerald-500/60 bg-emerald-100 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/60 dark:text-emerald-300",
   },
   oppose: {
-    bubble: "border-l-red-500 bg-red-50/70",
-    badge: "border-red-500/60 bg-red-100 text-red-700",
+    bubble: "border-l-red-500 bg-red-50/70 dark:bg-red-950/30",
+    badge:
+      "border-red-500/60 bg-red-100 text-red-700 dark:border-red-700/60 dark:bg-red-950/60 dark:text-red-300",
   },
   negotiate: {
-    bubble: "border-l-sky-500 bg-sky-50/70",
-    badge: "border-sky-500/60 bg-sky-100 text-sky-700",
+    bubble: "border-l-sky-500 bg-sky-50/70 dark:bg-sky-950/30",
+    badge:
+      "border-sky-500/60 bg-sky-100 text-sky-700 dark:border-sky-700/60 dark:bg-sky-950/60 dark:text-sky-300",
   },
   exploit: {
-    bubble: "border-l-amber-500 bg-amber-50/70",
-    badge: "border-amber-500/60 bg-amber-100 text-amber-700",
+    bubble: "border-l-amber-500 bg-amber-50/70 dark:bg-amber-950/30",
+    badge:
+      "border-amber-500/60 bg-amber-100 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/60 dark:text-amber-300",
   },
 };
 
@@ -113,8 +117,8 @@ export function TrustDeltaBadge({ delta }: { delta: number }) {
       variant="outline"
       className={
         rising
-          ? "border-emerald-500/60 bg-emerald-100 text-emerald-700"
-          : "border-red-500/60 bg-red-100 text-red-700"
+          ? "border-emerald-500/60 bg-emerald-100 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/60 dark:text-emerald-300"
+          : "border-red-500/60 bg-red-100 text-red-700 dark:border-red-700/60 dark:bg-red-950/60 dark:text-red-300"
       }
     >
       {rising ? `对你的信任 +${delta}` : `对你的信任 ${delta}`}

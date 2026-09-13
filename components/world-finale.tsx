@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  BookOpenText,
   Check,
   Copy,
   ExternalLink,
@@ -95,14 +94,17 @@ function ArticleBody({ markdown }: { markdown: string }) {
         if (/^-{3,}$/.test(trimmed)) return <Separator key={index} className="my-6" />;
         if (trimmed.startsWith("# ")) {
           return (
-            <h2 key={index} className="text-xl sm:text-2xl leading-8 sm:leading-9 font-bold text-foreground">
+            <h2
+              key={index}
+              className="text-foreground text-xl leading-8 font-bold sm:text-2xl sm:leading-9"
+            >
               {trimmed.slice(2)}
             </h2>
           );
         }
         if (trimmed.startsWith("## ")) {
           return (
-            <h3 key={index} className="pt-2 text-lg sm:text-xl font-semibold text-primary">
+            <h3 key={index} className="text-primary pt-2 text-lg font-semibold sm:text-xl">
               {trimmed.slice(3)}
             </h3>
           );
@@ -111,7 +113,7 @@ function ArticleBody({ markdown }: { markdown: string }) {
           return (
             <blockquote
               key={index}
-              className="border-l-2 border-primary/60 bg-muted/30 pl-4 py-2 my-2 text-muted-foreground text-sm leading-6 rounded-r"
+              className="border-primary/60 bg-muted/30 text-muted-foreground my-2 rounded-r border-l-2 py-2 pl-4 text-sm leading-6"
             >
               {trimmed.slice(2)}
             </blockquote>
@@ -125,7 +127,7 @@ function ArticleBody({ markdown }: { markdown: string }) {
           );
         }
         return (
-          <p key={index} className="text-[15px] leading-8 text-foreground/90">
+          <p key={index} className="text-foreground/90 text-[15px] leading-8">
             {trimmed}
           </p>
         );
@@ -551,31 +553,65 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
         </Card>
       ) : null}
 
-      <Card className="shadow-none">
-        <CardHeader className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <BookOpenText className="size-4 text-primary" />
-              <CardTitle className="text-lg">知乎高赞回答 · 亲历者自述</CardTitle>
-            </div>
-            {totalChapters > 0 ? (
-              <Badge variant={chapters.length >= totalChapters ? "default" : "secondary"}>
-                {chapters.length >= totalChapters
-                  ? "全文已完结"
-                  : `连载中 · 已完成 ${chapters.length}/${totalChapters} 卷`}
-              </Badge>
-            ) : null}
-          </div>
-          {player ? (
-            <div className="bg-muted/30 border-border/60 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs">
+      <Card className="border-primary/20 bg-card/60 shadow-none backdrop-blur-sm">
+        <CardHeader className="space-y-4 border-b pb-5">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="bg-primary/10 text-primary rounded px-2 py-0.5 font-semibold">
-                  答主
+                <span className="flex items-center gap-1.5 rounded-full bg-[#0066ff]/10 px-2.5 py-1 font-mono text-[11px] font-medium text-[#0066ff] dark:bg-[#0066ff]/20 dark:text-[#3b82f6]">
+                  <img src="/zhihu.svg" alt="知乎" className="size-3.5 rounded-sm" />
+                  知乎脑洞推演专栏
                 </span>
-                <span className="font-medium text-foreground">{player.name}</span>
-                <span className="text-muted-foreground">({player.identity})</span>
+                <span className="text-muted-foreground text-xs">· 深度亲历回答</span>
               </div>
-              <span className="text-muted-foreground">所属阵营：{player.faction}</span>
+              {session.scenarioUrl ? (
+                <a
+                  href={session.scenarioUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-muted-foreground hover:text-primary flex items-center gap-1 text-xs transition-colors"
+                >
+                  去知乎原帖讨论
+                  <ExternalLink className="size-3" />
+                </a>
+              ) : null}
+            </div>
+
+            <CardTitle className="text-xl font-bold tracking-tight sm:text-2xl">
+              {plan ? plan.verdictTitle : session.scenarioTitle}
+            </CardTitle>
+          </div>
+
+          {player ? (
+            <div className="bg-muted/40 border-border/70 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3.5 sm:px-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#0066ff] font-semibold text-white shadow-sm">
+                  {player.name.slice(0, 1)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground text-sm font-semibold">{player.name}</span>
+                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                      当事亲历者
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground mt-0.5 text-xs">
+                    {player.identity} · 【{player.faction}】阵营核心掌印人
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {plan ? (
+                  <Badge variant="outline" className="border-primary/40 text-primary font-mono">
+                    终章评级 {plan.rating}
+                  </Badge>
+                ) : null}
+                <Badge variant={chapters.length >= totalChapters ? "default" : "secondary"}>
+                  {chapters.length >= totalChapters
+                    ? "全文已完结"
+                    : `连载中 (${chapters.length}/${totalChapters} 卷)`}
+                </Badge>
+              </div>
             </div>
           ) : null}
         </CardHeader>
@@ -584,7 +620,11 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
             <div className="space-y-2">
               <Progress value={ratio}>
                 <ProgressLabel className="text-xs font-normal">
-                  {isWriting ? "正在执笔" : chapters.length >= totalChapters ? "全文完成" : "等待续写"}
+                  {isWriting
+                    ? "正在执笔"
+                    : chapters.length >= totalChapters
+                      ? "全文完成"
+                      : "等待续写"}
                 </ProgressLabel>
                 <ProgressValue className="text-xs">
                   {() => `${chapters.length} / ${totalChapters} 卷`}
@@ -594,7 +634,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
                 className="text-muted-foreground flex items-center gap-2 text-xs"
                 aria-live="polite"
               >
-                {isWriting ? <LoaderCircle className="size-3.5 animate-spin text-primary" /> : null}
+                {isWriting ? <LoaderCircle className="text-primary size-3.5 animate-spin" /> : null}
                 {writingLabel}
                 {writtenChars > 0 ? ` · 已写正文 ${writtenChars.toLocaleString("zh-CN")} 字` : null}
               </p>
@@ -604,7 +644,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-40" />
               <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                <LoaderCircle className="size-3.5 animate-spin text-primary" />
+                <LoaderCircle className="text-primary size-3.5 animate-spin" />
                 {writingLabel || "史官正在梳理世界线推演卷宗与自述大纲……"}
               </p>
             </div>
@@ -646,7 +686,7 @@ export function WorldFinaleView({ worldId }: { worldId: string }) {
                   <Badge variant="secondary">
                     待展开 · 第 {plan.chapters[chapters.length].index} / {totalChapters} 卷
                   </Badge>
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-foreground text-sm font-semibold">
                     《{plan.chapters[chapters.length].title}》
                   </span>
                 </div>
