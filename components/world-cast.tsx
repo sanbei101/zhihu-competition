@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, FastForward, LoaderCircle, Play, RefreshCw, Sparkles, UserRound } from "lucide-react";
+import { Bot, LoaderCircle, Play, RefreshCw, Sparkles, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -112,7 +112,7 @@ function getPhaseStatus(phase: SerialPhase, cast: WorldCast | null): string {
     case "agent-3":
       return `正在召集 Agent 势力 (4/4): ${cast.agentCharacters[3]?.name ?? ""}...`;
     case "done":
-      return "世界线阵容推演完成，请选择你的角色";
+      return "世界线阵容推演完成,请选择你的角色";
   }
 }
 
@@ -152,11 +152,6 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     },
     [clearStepTimeout],
   );
-
-  const skipSerialAnimation = useCallback(() => {
-    clearStepTimeout();
-    setPhase("done");
-  }, [clearStepTimeout]);
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -244,7 +239,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
     [scenario.id, scenario.title, scenario.content, clearStepTimeout, transitionToPhase],
   );
 
-  // 页面加载后从本地记录恢复并启动串行演播；若无记录则自动生成
+  // 页面加载后从本地记录恢复并启动串行演播;若无记录则自动生成
   useEffect(() => {
     const cached = loadCachedCast(scenario.id);
     if (cached) {
@@ -306,7 +301,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
             </Badge>
             <CardTitle className="pt-2 text-xl leading-8">世界线推演与角色召集</CardTitle>
             <CardDescription className="leading-6">
-              推演引擎已就绪，已锁定本世界线推演剧本，支持切换不同推演视角与阵营。
+              推演引擎已就绪,已锁定本世界线推演剧本,支持切换不同推演视角与阵营。
             </CardDescription>
           </CardHeader>
           <CardContent className="px-6">
@@ -344,9 +339,9 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
           </CardContent>
           <CardFooter className="bg-muted/30 flex-col items-stretch gap-2 border-t px-6 py-4">
             {cast && phase !== "done" ? (
-              <Button variant="secondary" className="w-full" onClick={skipSerialAnimation}>
-                <FastForward data-icon="inline-start" />
-                跳过演播过程 ({getRevealedCount(phase)}/7)
+              <Button variant="secondary" className="w-full" disabled>
+                <LoaderCircle className="animate-spin" data-icon="inline-start" />
+                正在推演角色阵容 ({getRevealedCount(phase)}/7)...
               </Button>
             ) : (
               <Button className="w-full" onClick={() => generateCast()} disabled={isLoading}>
@@ -375,16 +370,12 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
             <div className="flex items-center justify-between">
               <p className="text-primary text-sm font-medium">ACT I / OPENING</p>
               {phase !== "done" ? (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={skipSerialAnimation}
-                  className="text-muted-foreground hover:text-foreground text-xs"
-                >
-                  <FastForward className="size-3.5" data-icon="inline-start" />
-                  跳过演播
-                </Button>
-              ) : null}
+                <span className="text-primary animate-pulse font-mono text-xs">
+                  推演演算中 · 实时生成...
+                </span>
+              ) : (
+                <span className="text-muted-foreground font-mono text-xs">世界线已确立</span>
+              )}
             </div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">{visibleSetting.crisis}</h2>
             <p className="text-muted-foreground mt-3 text-sm">
@@ -397,13 +388,13 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                   text={visibleSetting.opening}
                   as="p"
                   loop={false}
-                  typingSpeed={25}
+                  typingSpeed={20}
                   initialDelay={100}
                   showCursor={true}
                   cursorCharacter="▎"
                   cursorClassName="text-primary font-bold animate-pulse ml-0.5"
                   className="block w-full"
-                  onSentenceComplete={() => transitionToPhase("rules", 350)}
+                  onSentenceComplete={() => transitionToPhase("rules", 300)}
                 />
               ) : (
                 <p>{visibleSetting.opening}</p>
@@ -569,7 +560,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                           <p className="mt-1">{character.pressureMethod}</p>
                         </div>
                         <blockquote className="text-muted-foreground min-h-14 border-l pl-3 italic">
-                          “
+                          "
                           {isCurrentlyTyping ? (
                             <TextType
                               key={`agent-type-${character.id}`}
@@ -595,7 +586,7 @@ export function WorldCastPanel({ scenario }: WorldCastProps) {
                           ) : (
                             <span>{character.openingLine}</span>
                           )}
-                          ”
+                          "
                         </blockquote>
                       </CardContent>
                     </Card>

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
       void (async () => {
         try {
-          // 流式即时输出完整数据结构，由前端精确调度串行打字机与卡牌登场演播
+          // 流式即时输出完整数据结构,由前端精确调度串行打字机与卡牌登场演播
           send({ type: "stage", stage: "setting" });
           send({ type: "setting", setting: cast.setting });
 

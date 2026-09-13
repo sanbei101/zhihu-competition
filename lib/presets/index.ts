@@ -59,7 +59,7 @@ interface GetCastPresetOptions {
  * 根据知乎问题 ID 获取匹配的世界线预制。
  * 1. 优先在专属绑定了此 scenarioId 的预制中抽取。
  * 2. 次选在该问题所属的世界主题 (themeId) 预制池中轮转抽取。
- * 3. 支持 excludePresetId，保证点击“重新生成”时切换至同一池内的下一套预制。
+ * 3. 支持 excludePresetId,保证点击"重新生成"时切换至同一池内的下一套预制。
  */
 export function getCastPreset(options: GetCastPresetOptions): PresetLookupResult {
   const { scenarioId, excludePresetId } = options;
@@ -70,8 +70,8 @@ export function getCastPreset(options: GetCastPresetOptions): PresetLookupResult
   // 1. 寻找直接绑定了此 scenarioId 的专属预制池
   const directlyBound = ALL_PRESETS.filter((item) => item.scenarioIds?.includes(scenarioId));
 
-  // 2. 确定候选池：
-  // 若无排除项，优先使用专属预制；若有排除项且专属池只有1套，则扩展至整个主题预制池轮转，确保用户能切到新视角
+  // 2. 确定候选池:
+  // 若无排除项,优先使用专属预制;若有排除项且专属池只有1套,则扩展至整个主题预制池轮转,确保用户能切到新视角
   let candidatePool =
     directlyBound.length > 0 && (!excludePresetId || directlyBound.length > 1)
       ? directlyBound
@@ -83,7 +83,7 @@ export function getCastPreset(options: GetCastPresetOptions): PresetLookupResult
 
   const totalInPool = candidatePool.length;
 
-  // 3. 轮转选取：若传入了 excludePresetId，选同一池或主题池内的下一套
+  // 3. 轮转选取:若传入了 excludePresetId,选同一池或主题池内的下一套
   let selectedIndex = 0;
   if (excludePresetId && totalInPool > 1) {
     const prevIndex = candidatePool.findIndex((item) => item.id === excludePresetId);
