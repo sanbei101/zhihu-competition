@@ -154,26 +154,34 @@ export function Observatory({
   const eraAt = view.timeline.at(-1)?.at ?? "起点";
 
   return (
-    <div className="observatory">
+    <div className="observatory bg-background text-foreground min-h-dvh font-sans text-sm leading-[1.6] antialiased">
       <EpicProclamationBanner
         proclamation={proclamation ?? null}
         skin={skin}
         onDismiss={onDismissProclamation ?? (() => {})}
       />
-      <div className="shell">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="obs-tabs-container">
-          <header className="bar">
-            <div className="bar-brand">
-              <span className="worldline-mark">
+      <div className="mx-auto flex min-h-dvh max-w-[1560px] flex-col gap-3.5 px-4 pt-3 pb-4 max-md:gap-3 max-md:px-3 max-md:pt-2.5 max-md:pb-[calc(14px+env(safe-area-inset-bottom,0px))]">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="flex w-full flex-col gap-3.5! data-horizontal:flex-col"
+        >
+          <header className="flex flex-wrap items-center gap-3.5 max-md:flex-col max-md:items-stretch max-md:gap-2.5">
+            <div className="flex items-center gap-3 max-md:w-full max-md:justify-between max-md:gap-2.5">
+              <span>
                 <WorldlineMarkSvg skin={skin} scale={2} />
               </span>
-              <div className="bar-titles">
-                <h1>世界线观测台</h1>
-                <p className="sub">{view.scenarioTitle}</p>
+              <div className="min-w-0 max-md:min-w-0 max-md:flex-1">
+                <h1 className="text-[17px] font-semibold tracking-[0.02em] max-md:text-[15px]">
+                  世界线观测台
+                </h1>
+                <p className="text-muted-foreground max-w-[46ch] truncate text-xs max-md:max-w-full max-md:text-[11px]">
+                  {view.scenarioTitle}
+                </p>
               </div>
               <button
                 type="button"
-                className="btn ghost reset-btn-mobile sm:hidden"
+                className="btn ghost border-border text-muted-foreground hover:text-foreground inline-flex cursor-pointer items-center justify-center rounded-[4px] border bg-white/5 px-2.5 py-1.5 hover:bg-white/10 sm:hidden"
                 onClick={onReset}
                 disabled={view.busy}
                 title="重建世界"
@@ -182,43 +190,54 @@ export function Observatory({
               </button>
             </div>
 
-            <div className="obs-tab-nav">
-              <TabsList className="obs-tabs-list">
-                <TabsTrigger value="observatory" className="obs-tab-trigger">
+            <div className="ml-2 inline-flex max-md:ml-0 max-md:w-full">
+              <TabsList
+                variant="line"
+                className="border-border inline-flex items-center gap-0.5 rounded-md! border bg-[rgba(18,14,11,0.85)]! p-0.5! max-md:grid max-md:w-full max-md:grid-cols-2 max-md:gap-1"
+              >
+                <TabsTrigger
+                  value="observatory"
+                  className="text-muted-foreground! data-active:bg-card! data-active:text-primary! gap-1.5 px-3! py-[5px]! text-xs! hover:bg-[rgba(255,255,255,0.04)] data-active:border-[rgba(232,163,61,0.35)] data-active:font-semibold data-active:shadow-[0_1px_4px_rgba(0,0,0,0.35)] max-md:justify-center max-md:px-2.5 max-md:py-[7px]"
+                >
                   <Eye className="size-3.5" />
                   <span>实时沙盘</span>
                 </TabsTrigger>
-                <TabsTrigger value="tree" className="obs-tab-trigger">
+                <TabsTrigger
+                  value="tree"
+                  className="text-muted-foreground! data-active:bg-card! data-active:text-primary! gap-1.5 px-3! py-[5px]! text-xs! hover:bg-[rgba(255,255,255,0.04)] data-active:border-[rgba(232,163,61,0.35)] data-active:font-semibold data-active:shadow-[0_1px_4px_rgba(0,0,0,0.35)] max-md:justify-center max-md:px-2.5 max-md:py-[7px]"
+                >
                   <GitFork className="size-3.5" />
                   <span>世界线 · 编年</span>
-                  <span className="obs-tab-badge">{view.timeline.length} 纪元</span>
+                  <span className="text-primary rounded-full border border-[rgba(232,163,61,0.3)] bg-[rgba(232,163,61,0.15)] px-1.5 py-px font-mono text-[10px]">
+                    {view.timeline.length} 纪元
+                  </span>
                 </TabsTrigger>
               </TabsList>
             </div>
 
             <div className="hidden grow md:block" />
-            <div className="chips">
-              <span className="chip chip-stance hidden md:inline-flex">
-                立场 <b>观察者</b>
+            <div className="flex flex-wrap items-center gap-2 max-md:w-full max-md:justify-start max-md:gap-1.5 [&_.chip]:max-md:px-2 [&_.chip]:max-md:py-[3px] [&_.chip]:max-md:text-[10px]">
+              <span className="chip hidden md:inline-flex">
+                立场 <b className="text-foreground font-semibold">观察者</b>
               </span>
-              <span className="chip chip-scale">
-                尺度 <b>{view.scaleLabel}</b>
+              <span className="chip">
+                尺度 <b className="text-foreground font-semibold">{view.scaleLabel}</b>
               </span>
-              <span className="chip accent chip-era">纪元 {eraNo}</span>
+              <span className="chip border-primary text-primary">纪元 {eraNo}</span>
               {view.isConcluded && (
                 <button
                   type="button"
-                  className="chip chip-concluded"
+                  className="chip inline-flex cursor-pointer items-center gap-1.25 rounded-[4px] border border-amber-500/50 bg-amber-500/15 px-2.5 py-1 font-mono text-[11px] text-[#fbbf24] transition-all duration-200 hover:-translate-y-px hover:border-[#f59e0b] hover:bg-amber-500/25"
                   onClick={onSettle}
                   title="查看知乎体深度推演回答与终局报告"
                 >
                   <Sparkles className="size-3 text-amber-400" />
-                  <b>终局报告</b>
+                  <b className="font-semibold">终局报告</b>
                 </button>
               )}
               <button
                 type="button"
-                className="btn ghost reset-btn-desktop hidden sm:inline-flex"
+                className="btn ghost hidden sm:inline-flex"
                 style={{ padding: "5px 11px", fontSize: "11px" }}
                 onClick={onReset}
                 disabled={view.busy}
@@ -228,9 +247,9 @@ export function Observatory({
             </div>
           </header>
 
-          <TabsContent value="observatory" className="obs-tab-panel">
-            <div className="main full-stage">
-              <section className="sky">
+          <TabsContent value="observatory" className="flex w-full flex-col gap-3.5 outline-none">
+            <div className="border-border grid h-[clamp(330px,45vh,500px)] grid-cols-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-[4px] border max-md:h-[clamp(260px,36vh,310px)] min-[769px]:max-[1000px]:h-[360px]">
+              <section className="relative min-h-0 min-w-0 overflow-hidden">
                 <StageBackdrop skin={skin} />
                 <WorldArea
                   statement={view.premiseStatement}
@@ -258,30 +277,34 @@ export function Observatory({
               played={view.played}
             />
 
-            <footer className="foot mobile-sticky">
-              <div className="foot-progress grow">
-                <div className="track">
+            <footer className="border-border max-md:border-border flex flex-wrap items-center gap-4 border-t pt-3 max-md:sticky max-md:bottom-0 max-md:z-[35] max-md:-mx-3 max-md:-mb-3.5 max-md:flex-col max-md:items-stretch max-md:gap-2 max-md:rounded-t-xl max-md:border-t max-md:bg-[rgba(14,11,9,0.96)] max-md:px-3 max-md:py-2.5 max-md:pb-[calc(10px+env(safe-area-inset-bottom,0px))] max-md:shadow-[0_-4px_18px_rgba(0,0,0,0.65)] max-md:backdrop-blur-[14px]">
+              <div className="min-w-0 flex-1 max-md:w-full">
+                <div className="bg-secondary h-[5px] overflow-hidden rounded-[3px]">
                   <i
+                    className="bg-primary block h-full w-0 transition-[width] duration-[600ms] ease-out"
                     style={{
                       width: `${Math.min(100, Math.round((view.waveCount / view.maxWaves) * 100))}%`,
                     }}
                   />
                 </div>
-                <p className="note">{phaseNote(view)}</p>
+                <p className="text-muted-foreground mt-1.5 font-mono text-[10.5px] tracking-[0.08em]">
+                  {phaseNote(view)}
+                </p>
               </div>
-              <div className="stats foot-stats">
+              <div className="flex flex-wrap gap-2 max-md:flex max-md:w-full max-md:justify-between">
                 <span className="chip">
-                  编年 <b>{view.timeline.length}</b> 段
+                  编年 <b className="text-foreground font-semibold">{view.timeline.length}</b> 段
                 </span>
                 <span className="chip">
-                  反应 <b>{view.reactionDone}</b>/<b>{view.reactionTotal}</b>
+                  反应 <b className="text-foreground font-semibold">{view.reactionDone}</b>/
+                  <b className="text-foreground font-semibold">{view.reactionTotal}</b>
                 </span>
               </div>
-              <div className="foot-actions flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 {view.canManualSettle && !view.isConcluded && onSettle && (
                   <button
                     type="button"
-                    className="btn settle-outline-btn"
+                    className="btn inline-flex cursor-pointer items-center gap-1.5 rounded-[4px] border border-[rgba(245,158,11,0.45)] bg-amber-500/10 px-3.5 py-[7px] text-[12.5px] font-semibold text-[#fbbf24] transition-all duration-200 hover:border-[#f59e0b] hover:bg-amber-500/20 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)]"
                     onClick={onSettle}
                     disabled={view.busy}
                     title="世界线已走向成熟，可随时提前收束并生成知乎体深度回答"
@@ -292,7 +315,11 @@ export function Observatory({
                 )}
                 <button
                   type="button"
-                  className={`btn advance-btn ${view.isConcluded ? "btn-concluded-gold" : ""}`}
+                  className={`btn max-md:h-11 max-md:w-full max-md:rounded-md max-md:text-sm max-md:font-semibold ${
+                    view.isConcluded
+                      ? "[animation:pulseGold_2.5s_infinite] border-[#fbbf24]! bg-[linear-gradient(135deg,#f59e0b,#d97706)]! font-bold! text-[#111827]! shadow-[0_0_16px_rgba(245,158,11,0.4)]!"
+                      : ""
+                  }`}
                   onClick={view.isConcluded ? onSettle : onAdvance}
                   disabled={advanceDisabled(view)}
                 >
@@ -302,7 +329,7 @@ export function Observatory({
             </footer>
           </TabsContent>
 
-          <TabsContent value="tree" className="obs-tab-panel">
+          <TabsContent value="tree" className="flex w-full flex-col gap-3.5 outline-none">
             <WorldlineEvolutionTree
               view={view}
               skin={skin}

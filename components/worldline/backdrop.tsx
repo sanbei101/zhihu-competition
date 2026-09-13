@@ -19,9 +19,13 @@ export function StageBackdrop({ skin }: { skin: ScenarioSkin }) {
 
   return (
     <>
-      <div className="layer sky-bg" />
+      <div className="from-background to-secondary pointer-events-none absolute inset-0 bg-linear-to-b" />
 
-      <svg className="layer" shapeRendering="crispEdges" aria-hidden="true">
+      <svg
+        className="pointer-events-none absolute inset-0"
+        shapeRendering="crispEdges"
+        aria-hidden="true"
+      >
         <defs>
           <pattern id="obs-sky" width="56" height="44" patternUnits="userSpaceOnUse">
             <rect x="7" y="8" width="2" height="2" fill={skin.ink} opacity="0.16" />
@@ -33,10 +37,10 @@ export function StageBackdrop({ skin }: { skin: ScenarioSkin }) {
         <rect width="100%" height="100%" fill="url(#obs-sky)" />
       </svg>
 
-      <div className="layer horizon" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(72%_100%_at_46%_100%,rgba(232,163,61,0.16),transparent_70%)]" />
 
       <svg
-        className="ridge"
+        className="absolute inset-x-0 bottom-(--ground) h-[150px] w-full"
         shapeRendering="crispEdges"
         aria-hidden="true"
         preserveAspectRatio="none"
@@ -55,7 +59,7 @@ export function StageBackdrop({ skin }: { skin: ScenarioSkin }) {
         ))}
       </svg>
 
-      <div className="layer">
+      <div className="pointer-events-none absolute inset-0">
         {Array.from({ length: MOTE_COUNT }, (_, index) => {
           const small = index % 3 === 0;
           const style = {
@@ -65,14 +69,24 @@ export function StageBackdrop({ skin }: { skin: ScenarioSkin }) {
             animationDelay: `${-index * 1.7}s`,
             ...(small ? { width: "2px", height: "2px" } : {}),
           } as CSSProperties;
-          return <span key={index} className="mote" style={style} />;
+          return (
+            <span
+              key={index}
+              className="absolute size-[3px] [animation:drift_linear_infinite] bg-(--obs-py)"
+              style={style}
+            />
+          );
         })}
       </div>
 
-      <div className="layer vignette" />
-      <div className="layer scan" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_100%_at_50%_6%,transparent_38%,rgba(0,0,0,0.62)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,rgba(0,0,0,0.2)_0_1px,transparent_1px_3px)] opacity-[0.32]" />
 
-      <svg className="ground" shapeRendering="crispEdges" aria-hidden="true">
+      <svg
+        className="absolute inset-x-0 bottom-0 h-(--ground) w-full"
+        shapeRendering="crispEdges"
+        aria-hidden="true"
+      >
         <defs>
           <pattern id="obs-earth" width="16" height="16" patternUnits="userSpaceOnUse">
             <rect width="16" height="16" fill={pixel.o} />

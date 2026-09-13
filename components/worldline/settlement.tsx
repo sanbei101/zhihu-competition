@@ -38,7 +38,10 @@ function SimpleMarkdownView({ content }: { content: string }) {
     const flushList = (key: string) => {
       if (listBuffer.length > 0) {
         nodes.push(
-          <ul key={`list-${key}`} className="zhihu-md-list">
+          <ul
+            key={`list-${key}`}
+            className="my-2 ml-[18px] list-disc [&_li]:mb-1 [&_li]:leading-[1.6]"
+          >
             {listBuffer.map((item, idx) => (
               <li key={idx}>{parseInlineFormatting(item.replace(/^[-*]\s+|\d+\.\s+/, ""))}</li>
             ))}
@@ -68,7 +71,7 @@ function SimpleMarkdownView({ content }: { content: string }) {
       // 标题
       if (trimmed.startsWith("# ")) {
         nodes.push(
-          <h1 key={index} className="zhihu-md-h1">
+          <h1 key={index} className="mt-5 mb-2.5 text-[20px] font-bold text-white">
             {trimmed.slice(2)}
           </h1>,
         );
@@ -76,7 +79,10 @@ function SimpleMarkdownView({ content }: { content: string }) {
       }
       if (trimmed.startsWith("## ")) {
         nodes.push(
-          <h2 key={index} className="zhihu-md-h2">
+          <h2
+            key={index}
+            className="mt-[18px] mb-2 border-b border-white/10 pb-1.25 text-[16.5px] font-bold text-[#60a5fa]"
+          >
             {trimmed.slice(3)}
           </h2>,
         );
@@ -84,7 +90,7 @@ function SimpleMarkdownView({ content }: { content: string }) {
       }
       if (trimmed.startsWith("### ")) {
         nodes.push(
-          <h3 key={index} className="zhihu-md-h3">
+          <h3 key={index} className="mt-[14px] mb-1.5 text-[15px] font-semibold text-[#f3f4f6]">
             {trimmed.slice(4)}
           </h3>,
         );
@@ -94,7 +100,10 @@ function SimpleMarkdownView({ content }: { content: string }) {
       // 引用块
       if (trimmed.startsWith("> ")) {
         nodes.push(
-          <blockquote key={index} className="zhihu-md-quote">
+          <blockquote
+            key={index}
+            className="my-3 rounded-r-[4px] border-l-[3px] border-l-[#0066ff] bg-[rgba(0,102,255,0.06)] px-[14px] py-1.5 text-[#9ca3af] italic"
+          >
             {parseInlineFormatting(trimmed.slice(2))}
           </blockquote>,
         );
@@ -103,7 +112,7 @@ function SimpleMarkdownView({ content }: { content: string }) {
 
       // 普通段落
       nodes.push(
-        <p key={index} className="zhihu-md-p">
+        <p key={index} className="my-2 leading-[1.75]">
           {parseInlineFormatting(trimmed)}
         </p>,
       );
@@ -113,7 +122,7 @@ function SimpleMarkdownView({ content }: { content: string }) {
     return nodes;
   }, [content]);
 
-  return <div className="zhihu-article-body">{elements}</div>;
+  return <div className="text-sm leading-[1.7] text-[#e5e7eb]">{elements}</div>;
 }
 
 /** 解析行内加粗 **bold** */
@@ -122,7 +131,7 @@ function parseInlineFormatting(text: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={i} className="zhihu-strong">
+        <strong key={i} className="font-semibold text-[#fbbf24]">
           {part.slice(2, -2)}
         </strong>
       );
@@ -244,23 +253,33 @@ export function WorldlineSettlementModal({
   if (!isOpen || !session) return null;
 
   return (
-    <div className="settle-modal-overlay" role="dialog" aria-modal="true">
-      <div className="settle-modal-backdrop" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 max-sm:p-1.5"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-[12px]" onClick={onClose} />
 
-      <div className="settle-modal-container">
+      <div className="relative flex max-h-[90vh] w-full max-w-[960px] [animation:modalPop_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards] flex-col overflow-hidden rounded-xl border border-t-2 border-white/15 border-t-[#0066ff] bg-[rgba(18,15,23,0.97)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)] max-sm:max-h-[96vh]">
         {/* 顶部标题栏 */}
-        <div className="settle-modal-header">
-          <div className="settle-header-left">
-            <div className="zhihu-tag-badge">
-              <span className="zhihu-logo-badge">知乎</span>
-              <span className="zhihu-topic-badge">硬核推演 · 终局结算</span>
+        <div className="flex items-start justify-between border-b border-white/10 bg-white/[0.02] px-[22px] py-[18px] max-sm:px-3.5 max-sm:py-3">
+          <div className="flex flex-col gap-1.5">
+            <div className="inline-flex items-center gap-1.5">
+              <span className="rounded-[3px] bg-[#0066ff] px-1.5 py-px text-[11px] font-extrabold tracking-[0.04em] text-white">
+                知乎
+              </span>
+              <span className="rounded-[3px] border border-[rgba(0,102,255,0.3)] bg-[rgba(0,102,255,0.12)] px-2 py-px font-mono text-[11px] text-[#60a5fa]">
+                硬核推演 · 终局结算
+              </span>
             </div>
-            <h2 className="settle-scenario-title">{session.scenarioTitle}</h2>
+            <h2 className="text-[18px] leading-[1.4] font-bold text-[#f3f4f6] max-sm:text-[15px]">
+              {session.scenarioTitle}
+            </h2>
           </div>
 
           <button
             type="button"
-            className="settle-close-btn"
+            className="text-muted-foreground flex items-center justify-center rounded-md border-0 bg-transparent p-1.5 transition-all duration-150 hover:bg-white/10 hover:text-white"
             onClick={onClose}
             aria-label="关闭结算"
           >
@@ -269,54 +288,80 @@ export function WorldlineSettlementModal({
         </div>
 
         {/* 弹窗内容主体 */}
-        <div className="settle-modal-body">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-5 max-sm:gap-3 max-sm:px-3 max-sm:py-3.5">
           {/* 数据全景卡片 */}
           {stats && (
-            <div className="settle-stats-overview">
-              <div className="settle-stat-card">
-                <span className="stat-label">演化历程</span>
-                <span className="stat-val">{stats.totalEras} 纪元</span>
-                <span className="stat-sub">{stats.scaleLabel} 尺度</span>
+            <div className="grid grid-cols-4 gap-3 max-sm:grid-cols-2 max-sm:gap-2">
+              <div className="flex flex-col gap-[3px] rounded-lg border border-white/[0.08] bg-white/[0.03] px-[14px] py-3">
+                <span className="text-muted-foreground font-mono text-[11px] uppercase">
+                  演化历程
+                </span>
+                <span className="text-[17px] leading-[1.25] font-bold text-[#f3f4f6]">
+                  {stats.totalEras} 纪元
+                </span>
+                <span className="text-muted-foreground text-[10.5px]">{stats.scaleLabel} 尺度</span>
               </div>
-              <div className="settle-stat-card">
-                <span className="stat-label">编年史篇</span>
-                <span className="stat-val">{stats.timelineLen} 段</span>
-                <span className="stat-sub">重大转折记录</span>
+              <div className="flex flex-col gap-[3px] rounded-lg border border-white/[0.08] bg-white/[0.03] px-[14px] py-3">
+                <span className="text-muted-foreground font-mono text-[11px] uppercase">
+                  编年史篇
+                </span>
+                <span className="text-[17px] leading-[1.25] font-bold text-[#f3f4f6]">
+                  {stats.timelineLen} 段
+                </span>
+                <span className="text-muted-foreground text-[10.5px]">重大转折记录</span>
               </div>
-              <div className="settle-stat-card">
-                <span className="stat-label">博弈阵营</span>
-                <span className="stat-val">{stats.beingsCount} 大主体</span>
-                <span className="stat-sub">多智能体演变</span>
+              <div className="flex flex-col gap-[3px] rounded-lg border border-white/[0.08] bg-white/[0.03] px-[14px] py-3">
+                <span className="text-muted-foreground font-mono text-[11px] uppercase">
+                  博弈阵营
+                </span>
+                <span className="text-[17px] leading-[1.25] font-bold text-[#f3f4f6]">
+                  {stats.beingsCount} 大主体
+                </span>
+                <span className="text-muted-foreground text-[10.5px]">多智能体演变</span>
               </div>
-              <div className="settle-stat-card">
-                <span className="stat-label">局势倾向</span>
-                <div className="stat-tones">
-                  <span className="tone-pill tone-good" title="利好事件">
+              <div className="flex flex-col gap-[3px] rounded-lg border border-white/[0.08] bg-white/[0.03] px-[14px] py-3">
+                <span className="text-muted-foreground font-mono text-[11px] uppercase">
+                  局势倾向
+                </span>
+                <div className="my-0.5 flex gap-1.25">
+                  <span
+                    className="rounded-[3px] border border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.18)] px-1.25 py-px font-mono text-[10px] text-[#34d399]"
+                    title="利好事件"
+                  >
                     利 {stats.goodCount}
                   </span>
-                  <span className="tone-pill tone-bad" title="险情事件">
+                  <span
+                    className="rounded-[3px] border border-[rgba(239,68,68,0.4)] bg-[rgba(239,68,68,0.18)] px-1.25 py-px font-mono text-[10px] text-[#f87171]"
+                    title="险情事件"
+                  >
                     险 {stats.badCount}
                   </span>
-                  <span className="tone-pill tone-odd" title="变数异象">
+                  <span
+                    className="rounded-[3px] border border-[rgba(217,70,239,0.4)] bg-[rgba(217,70,239,0.18)] px-1.25 py-px font-mono text-[10px] text-[#e879f9]"
+                    title="变数异象"
+                  >
                     异 {stats.oddCount}
                   </span>
                 </div>
-                <span className="stat-sub">好险异平衡律</span>
+                <span className="text-muted-foreground text-[10.5px]">好险异平衡律</span>
               </div>
             </div>
           )}
 
           {/* 势力定格状态条 */}
           {stats && (
-            <div className="settle-factions-panel">
-              <span className="factions-title">
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-[14px] py-3">
+              <span className="inline-flex items-center gap-1.5 font-mono text-[11.5px] font-semibold text-[#fbbf24]">
                 <Compass className="size-3.5 text-amber-400" />
                 终局势力定格态势:
               </span>
-              <div className="factions-chips">
+              <div className="flex flex-wrap gap-2">
                 {stats.beings.map((b) => (
-                  <div key={b.id} className="faction-chip">
-                    <b>{b.name}</b>: <span>{b.status}</span>
+                  <div
+                    key={b.id}
+                    className="rounded-[4px] border border-white/10 bg-black/35 px-2 py-[3px] text-[11.5px] text-[#d1d5db]"
+                  >
+                    <b className="mr-[3px] text-white">{b.name}</b>: <span>{b.status}</span>
                   </div>
                 ))}
               </div>
@@ -324,8 +369,8 @@ export function WorldlineSettlementModal({
           )}
 
           {/* 知乎答主卡片 */}
-          <div className="zhihu-author-card">
-            <div className="author-avatar-wrap">
+          <div className="flex items-center gap-[14px] rounded-lg border border-[rgba(0,102,255,0.2)] bg-[rgba(0,102,255,0.05)] px-4 py-3 max-sm:px-3 max-sm:py-2.5">
+            <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-[1.5px] border-[#0066ff] bg-black/40">
               <StandSvg
                 archetype={session.seed.witnessArchetype}
                 skin={skin}
@@ -333,30 +378,30 @@ export function WorldlineSettlementModal({
                 label={session.seed.witnessName}
               />
             </div>
-            <div className="author-meta">
-              <div className="author-name-row">
-                <span className="author-name">{session.seed.witnessName}</span>
-                <span className="author-badge">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-white">{session.seed.witnessName}</span>
+                <span className="inline-flex items-center gap-[3px] rounded-[3px] bg-[rgba(0,102,255,0.12)] px-1.5 py-px text-[11px] text-[#60a5fa]">
                   <Award className="size-3" /> 知乎认证 · 观测台首席推演官
                 </span>
               </div>
-              <p className="author-bio">
+              <p className="text-muted-foreground mt-0.5 text-[11.5px]">
                 历史与未来无常，沙盘演化见真章。历经 {stats?.totalEras} 个纪元推演撰写。
               </p>
             </div>
-            <div className="author-upvotes">
-              <div className="upvote-pill">
+            <div className="flex shrink-0 flex-col items-end gap-[3px] max-sm:hidden">
+              <div className="inline-flex items-center gap-1.25 rounded-[4px] border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.12)] px-2 py-[3px] text-[11.5px] font-semibold text-[#3b82f6]">
                 <ThumbsUp className="size-3.5 fill-blue-500 text-blue-500" />
                 <span>84.2k 赞同</span>
               </div>
-              <span className="fav-text">1.2w 收藏</span>
+              <span className="text-muted-foreground text-[10.5px]">1.2w 收藏</span>
             </div>
           </div>
 
           {/* 核心文章生成区域 */}
-          <div className="zhihu-article-container">
+          <div className="min-h-[220px] rounded-lg border border-white/10 bg-black/35 px-[26px] py-[22px] max-sm:px-3 max-sm:py-3.5">
             {errorMsg ? (
-              <div className="settle-error-box">
+              <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-4 text-center text-[#f87171]">
                 <p>{errorMsg}</p>
                 <Button
                   variant="outline"
@@ -371,10 +416,10 @@ export function WorldlineSettlementModal({
               <>
                 <SimpleMarkdownView content={markdown} />
                 {isGenerating && (
-                  <div className="typing-indicator">
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
+                  <div className="mt-3.5 flex items-center gap-1">
+                    <span className="size-[5px] animate-[typingBounce_1.2s_infinite_ease-in-out] rounded-full bg-[#0066ff]" />
+                    <span className="size-[5px] animate-[typingBounce_1.2s_infinite_ease-in-out] rounded-full bg-[#0066ff] [animation-delay:0.2s]" />
+                    <span className="size-[5px] animate-[typingBounce_1.2s_infinite_ease-in-out] rounded-full bg-[#0066ff] [animation-delay:0.4s]" />
                     <span className="text-muted-foreground ml-1.5 text-xs">
                       正在深度推演构思文章中…
                     </span>
@@ -382,8 +427,8 @@ export function WorldlineSettlementModal({
                 )}
               </>
             ) : (
-              <div className="settle-loading-state">
-                <div className="settle-spinner" />
+              <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                <div className="size-8 animate-spin rounded-full border-[3px] border-[rgba(0,102,255,0.15)] border-t-[#0066ff]" />
                 <p className="text-muted-foreground mt-3 text-sm font-medium">
                   AI 正在综合本条世界线全部大事与势力博弈，撰写知乎深度回答…
                 </p>
@@ -393,8 +438,8 @@ export function WorldlineSettlementModal({
         </div>
 
         {/* 底部操作工具栏 */}
-        <div className="settle-modal-footer">
-          <div className="footer-left">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-white/10 bg-[rgba(14,12,18,0.98)] px-[22px] py-3.5 max-sm:flex-col-reverse max-sm:items-stretch max-sm:px-3 max-sm:py-2.5">
+          <div className="flex items-center gap-2 max-sm:w-full max-sm:[&_button]:flex-1">
             <Button
               variant="outline"
               size="sm"
@@ -419,7 +464,7 @@ export function WorldlineSettlementModal({
             </Button>
           </div>
 
-          <div className="footer-right">
+          <div className="flex items-center gap-2 max-sm:w-full max-sm:[&_button]:flex-1">
             <Button variant="outline" size="sm" onClick={onClose} className="gap-1.5">
               <BookOpen className="size-3.5" />
               漫游演化树复盘
@@ -429,7 +474,7 @@ export function WorldlineSettlementModal({
               size="sm"
               onClick={handleCopy}
               disabled={!markdown || isGenerating}
-              className="settle-copy-btn gap-1.5"
+              className="gap-1.5 border-0! bg-[#0066ff]! font-semibold text-white! hover:bg-[#0052cc]! hover:shadow-[0_0_12px_rgba(0,102,255,0.4)]"
             >
               {hasCopied ? (
                 <>
